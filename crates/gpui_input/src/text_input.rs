@@ -1,5 +1,6 @@
 //! Generic text input field component for GPUI applications.
 
+use crate::InputHandler;
 use gpui::{
     div, prelude::FluentBuilder, px, App, ClickEvent, Context, ElementId, FocusHandle, Focusable,
     InteractiveElement, IntoElement, KeyDownEvent, ParentElement, Render, SharedString,
@@ -17,6 +18,7 @@ pub struct TextInput {
     selected_range: Range<usize>,
     width: Option<f32>,
     was_focused: bool,
+    disabled: bool,
 }
 
 impl TextInput {
@@ -29,6 +31,7 @@ impl TextInput {
             selected_range: 0..0,
             width: None,
             was_focused: false,
+            disabled: false,
         }
     }
 
@@ -39,6 +42,11 @@ impl TextInput {
 
     pub fn width(mut self, width: f32) -> Self {
         self.width = Some(width);
+        self
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
         self
     }
 
@@ -56,62 +64,71 @@ impl TextInput {
         self.focus_handle.is_focused(window)
     }
 
-    pub fn focus(&self, window: &mut Window) {
-        window.focus(&self.focus_handle);
+    // Mutation methods that handle Context
+
+    fn move_cursor_left(&mut self, cx: &mut Context<Self>) {
+        let new_pos = self.calculate_left_movement();
+        self.selected_range = new_pos..new_pos;
+        cx.notify();
     }
 
-    pub fn blur(&self, window: &mut Window) {
-        window.blur();
+    fn move_cursor_right(&mut self, cx: &mut Context<Self>) {
+        let new_pos = self.calculate_right_movement();
+        self.selected_range = new_pos..new_pos;
+        cx.notify();
+    }
+
+    fn select_all(&mut self, cx: &mut Context<Self>) {
+        self.selected_range = 0..self.value.len();
+        cx.notify();
     }
 
     fn insert_text(&mut self, text: &str, cx: &mut Context<Self>) {
-        self.value.replace_range(self.selected_range.clone(), text);
-        let new_cursor = self.selected_range.start + text.len();
-        self.selected_range = new_cursor..new_cursor;
-        cx.notify();
+        let filtered = self.filter_text(text);
+        if !filtered.is_empty() {
+            self.value
+                .replace_range(self.selected_range.clone(), &filtered);
+            let new_cursor = self.selected_range.start + filtered.len();
+            self.selected_range = new_cursor..new_cursor;
+            cx.notify();
+        }
     }
 
     fn backspace(&mut self, cx: &mut Context<Self>) {
-        if self.selected_range.is_empty() && self.selected_range.start > 0 {
-            let start = self.selected_range.start - 1;
-            self.value.remove(start);
-            self.selected_range = start..start;
-        } else if !self.selected_range.is_empty() {
-            self.value.replace_range(self.selected_range.clone(), "");
-            let cursor = self.selected_range.start;
-            self.selected_range = cursor..cursor;
-        }
-        cx.notify();
-    }
-
-    fn select_all(&mut self) {
-        self.selected_range = 0..self.value.len();
-    }
-
-    fn move_cursor_left(&mut self) {
-        if !self.selected_range.is_empty() {
-            self.selected_range = self.selected_range.start..self.selected_range.start;
-        } else if self.selected_range.start > 0 {
-            let new_pos = self.selected_range.start - 1;
-            self.selected_range = new_pos..new_pos;
+        if let Some(range) = self.calculate_backspace_range() {
+            self.value.replace_range(range.clone(), "");
+            self.selected_range = range.start..range.start;
+            cx.notify();
         }
     }
 
-    fn move_cursor_right(&mut self) {
-        if !self.selected_range.is_empty() {
-            self.selected_range = self.selected_range.end..self.selected_range.end;
-        } else if self.selected_range.end < self.value.len() {
-            let new_pos = self.selected_range.end + 1;
-            self.selected_range = new_pos..new_pos;
+    fn delete(&mut self, cx: &mut Context<Self>) {
+        if let Some(range) = self.calculate_delete_range() {
+            self.value.replace_range(range.clone(), "");
+            self.selected_range = range.start..range.start;
+            cx.notify();
         }
     }
 
     fn on_click(&mut self, _event: &ClickEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.focus_handle.is_focused(window) {
+        if !self.disabled && !self.focus_handle.is_focused(window) {
             window.focus(&self.focus_handle);
-            self.select_all();
+            self.select_all(cx);
         }
-        cx.notify();
+    }
+}
+
+impl InputHandler for TextInput {
+    fn content(&self) -> &str {
+        &self.value
+    }
+
+    fn selection_range(&self) -> Range<usize> {
+        self.selected_range.clone()
+    }
+
+    fn is_disabled(&self) -> bool {
+        self.disabled
     }
 }
 
@@ -123,7 +140,6 @@ impl Focusable for TextInput {
 
 impl Render for TextInput {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme();
         let is_focused = self.focus_handle.is_focused(window);
         let is_empty = self.value.is_empty();
 
@@ -132,10 +148,13 @@ impl Render for TextInput {
             // Lost focus
             self.selected_range = 0..0;
         } else if !self.was_focused && is_focused {
-            // Gained focus - select all
+            // Gained focus - select all (inline to avoid cx borrow issue)
             self.selected_range = 0..self.value.len();
+            cx.notify();
         }
         self.was_focused = is_focused;
+
+        let theme = cx.theme();
 
         div()
             .id(self.id.clone())
@@ -145,17 +164,28 @@ impl Render for TextInput {
                 this.on_click(event, window, cx);
             }))
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                if this.disabled {
+                    return;
+                }
+
                 match event.keystroke.key.as_str() {
-                    "enter" => {
-                        window.blur();
-                    }
-                    "escape" => {
+                    "enter" | "escape" => {
                         window.blur();
                     }
                     "backspace" => this.backspace(cx),
-                    "left" => this.move_cursor_left(),
-                    "right" => this.move_cursor_right(),
-                    "a" if event.keystroke.modifiers.platform => this.select_all(),
+                    "delete" => this.delete(cx),
+                    "left" => this.move_cursor_left(cx),
+                    "right" => this.move_cursor_right(cx),
+                    "home" => {
+                        this.selected_range = 0..0;
+                        cx.notify();
+                    }
+                    "end" => {
+                        let len = this.value.len();
+                        this.selected_range = len..len;
+                        cx.notify();
+                    }
+                    "a" if event.keystroke.modifiers.platform => this.select_all(cx),
                     _ => {
                         // Handle regular character input
                         if let Some(key_char) = &event.keystroke.key_char {
@@ -167,7 +197,6 @@ impl Render for TextInput {
                         }
                     }
                 }
-                cx.notify();
             }))
             .flex()
             .items_center()
@@ -178,13 +207,19 @@ impl Render for TextInput {
             .rounded(px(4.))
             .bg(theme.surface)
             .border_1()
-            .border_color(if is_focused {
+            .border_color(if is_focused && !self.disabled {
                 theme.outline
             } else {
                 theme.border
             })
-            .text_color(theme.fg)
+            .text_color(if self.disabled {
+                theme.fg.alpha(0.3)
+            } else {
+                theme.fg
+            })
             .text_size(px(13.))
+            .cursor_pointer()
+            .when(self.disabled, |d| d.cursor_not_allowed())
             .child(
                 div()
                     .flex_1()
@@ -204,16 +239,16 @@ impl Render for TextInput {
                     .when(!is_empty || is_focused, |d| {
                         d.child(
                             div()
-                                .when(is_focused && !self.selected_range.is_empty(), |d| {
+                                .when(is_focused && self.has_selection(), |d| {
                                     d.bg(theme.outline.alpha(0.3))
                                 })
                                 .child(self.value.clone()),
                         )
                     })
-                    .when(is_focused && self.selected_range.is_empty(), |d| {
+                    .when(is_focused && !self.has_selection(), |d| {
                         // Show cursor
-                        let cursor_offset = self.selected_range.start;
-                        let text_before = &self.value[..cursor_offset];
+                        let cursor_offset = self.cursor_offset();
+                        let text_before = &self.value[..cursor_offset.min(self.value.len())];
                         d.child(
                             div()
                                 .absolute()

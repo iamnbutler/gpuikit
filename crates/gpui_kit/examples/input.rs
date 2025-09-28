@@ -1,40 +1,39 @@
-//! Example demonstrating the TextInput and NumericInput components from gpui_input crate.
+//! Example demonstrating the TextInput component from gpui_input crate.
 
 use gpui::{
     div, px, size, AppContext, Application, Bounds, Context, Entity, IntoElement, ParentElement,
-    Render, Styled, WindowBounds, WindowOptions,
+    Render, Styled, VisualContext, WindowBounds, WindowOptions,
 };
-use gpui_input::{NumericInput, TextInput};
+use gpui_input::TextInput;
 use std::sync::Arc;
 use theme::{GlobalTheme, Theme};
 
-/// Main view containing the input examples
+/// Main view containing the input example
 struct InputExample {
     text_input: Entity<TextInput>,
-    numeric_input: Entity<NumericInput>,
+    text_input_disabled: Entity<TextInput>,
 }
 
 impl InputExample {
     fn new(cx: &mut Context<Self>) -> Self {
-        // Create the text input entity
+        // Create an enabled text input
         let text_input = cx.new(|cx| {
-            TextInput::new("text-input", "", cx)
+            TextInput::new("text-input", "Hello, GPUI!", cx)
                 .placeholder("Enter some text...")
-                .width(250.0)
+                .width(300.0)
         });
 
-        // Create the numeric input entity
-        let numeric_input = cx.new(|cx| {
-            NumericInput::new("numeric-input", Some(42.0), cx)
-                .placeholder("Enter a number...")
-                .min(0.0)
-                .max(100.0)
-                .width(150.0)
+        // Create a disabled text input
+        let text_input_disabled = cx.new(|cx| {
+            TextInput::new("text-input-disabled", "This is disabled", cx)
+                .placeholder("You can't edit this...")
+                .width(300.0)
+                .disabled(true)
         });
 
         Self {
             text_input,
-            numeric_input,
+            text_input_disabled,
         }
     }
 }
@@ -43,9 +42,8 @@ impl Render for InputExample {
     fn render(&mut self, _: &mut gpui::Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.global::<GlobalTheme>().0.clone();
 
-        // Read current values directly from inputs
+        // Read current value directly from input
         let text_value = self.text_input.read(cx).get_value().to_string();
-        let numeric_value = self.numeric_input.read(cx).get_value();
 
         div()
             .flex()
@@ -54,7 +52,7 @@ impl Render for InputExample {
             .p(px(40.))
             .bg(theme.bg)
             .size_full()
-            // Text Input Section
+            // Enabled Text Input Section
             .child(
                 div()
                     .flex()
@@ -75,7 +73,7 @@ impl Render for InputExample {
                             .child(format!("Current value: \"{}\"", text_value)),
                     ),
             )
-            // Numeric Input Section
+            // Disabled Text Input Section
             .child(
                 div()
                     .flex()
@@ -86,19 +84,14 @@ impl Render for InputExample {
                             .text_color(theme.fg)
                             .text_size(px(16.))
                             .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .child("Numeric Input (0-100)"),
+                            .child("Disabled Input"),
                     )
-                    .child(self.numeric_input.clone())
+                    .child(self.text_input_disabled.clone())
                     .child(
                         div()
                             .text_color(theme.fg.alpha(0.6))
                             .text_size(px(12.))
-                            .child(format!(
-                                "Current value: {}",
-                                numeric_value
-                                    .map(|v| v.to_string())
-                                    .unwrap_or_else(|| "None".to_string())
-                            )),
+                            .child("This input cannot be edited"),
                     ),
             )
     }
@@ -114,7 +107,7 @@ fn main() {
         cx.set_global(GlobalTheme(Arc::new(Theme::gruvbox_dark())));
 
         // Create and open the window
-        let bounds = Bounds::centered(None, size(px(600.0), px(500.0)), cx);
+        let bounds = Bounds::centered(None, size(px(500.0), px(600.0)), cx);
         cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),

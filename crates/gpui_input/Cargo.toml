@@ -7,3 +7,4 @@ edition = "2021"
 gpui = { workspace = true }
 theme = { path = "../theme" }
 smallvec = "1.11"
+unicode-segmentation = "1.10"

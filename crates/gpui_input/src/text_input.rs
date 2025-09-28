@@ -1,24 +1,28 @@
-//! Generic text input field component for GPUI applications.
+//! Text input field component for GPUI applications with proper text shaping.
 
-use crate::InputHandler;
 use gpui::{
-    div, prelude::FluentBuilder, px, App, ClickEvent, Context, ElementId, FocusHandle, Focusable,
-    InteractiveElement, IntoElement, KeyDownEvent, ParentElement, Render, SharedString,
-    StatefulInteractiveElement, Styled, Window,
+    div, point, px, size, App, Bounds, Context, Element, ElementId, ElementInputHandler,
+    EntityInputHandler, FocusHandle, Focusable, GlobalElementId, InteractiveElement, IntoElement,
+    KeyDownEvent, LayoutId, MouseButton, PaintQuad, ParentElement, Pixels, Point, Render,
+    ShapedLine, SharedString, Style, Styled, TextRun, UTF16Selection, UnderlineStyle, Window,
 };
 use std::ops::Range;
 use theme::ActiveTheme;
 
-/// A generic text input field component with focus management and editing capabilities.
+/// Text input field component that manages state and user interaction.
 pub struct TextInput {
     id: ElementId,
     value: String,
     placeholder: Option<SharedString>,
-    focus_handle: FocusHandle,
-    selected_range: Range<usize>,
+    pub(crate) focus_handle: FocusHandle,
+    pub(crate) selected_range: Range<usize>,
+    selection_reversed: bool,
+    marked_range: Option<Range<usize>>,
+    last_layout: Option<ShapedLine>,
+    last_bounds: Option<Bounds<Pixels>>,
     width: Option<f32>,
-    was_focused: bool,
     disabled: bool,
+    is_selecting: bool,
 }
 
 impl TextInput {
@@ -29,9 +33,13 @@ impl TextInput {
             placeholder: None,
             focus_handle: cx.focus_handle(),
             selected_range: 0..0,
+            selection_reversed: false,
+            marked_range: None,
+            last_layout: None,
+            last_bounds: None,
             width: None,
-            was_focused: false,
             disabled: false,
+            is_selecting: false,
         }
     }
 
@@ -64,71 +72,231 @@ impl TextInput {
         self.focus_handle.is_focused(window)
     }
 
-    // Mutation methods that handle Context
-
-    fn move_cursor_left(&mut self, cx: &mut Context<Self>) {
-        let new_pos = self.calculate_left_movement();
-        self.selected_range = new_pos..new_pos;
+    // Movement and selection methods
+    fn move_to(&mut self, offset: usize, cx: &mut Context<Self>) {
+        self.selected_range = offset..offset;
+        self.selection_reversed = false;
         cx.notify();
     }
 
-    fn move_cursor_right(&mut self, cx: &mut Context<Self>) {
-        let new_pos = self.calculate_right_movement();
-        self.selected_range = new_pos..new_pos;
+    fn cursor_offset(&self) -> usize {
+        if self.selection_reversed {
+            self.selected_range.start
+        } else {
+            self.selected_range.end
+        }
+    }
+
+    fn select_to(&mut self, offset: usize, cx: &mut Context<Self>) {
+        if self.selection_reversed {
+            self.selected_range.start = offset
+        } else {
+            self.selected_range.end = offset
+        };
+        if self.selected_range.end < self.selected_range.start {
+            self.selection_reversed = !self.selection_reversed;
+            self.selected_range = self.selected_range.end..self.selected_range.start;
+        }
         cx.notify();
     }
 
     fn select_all(&mut self, cx: &mut Context<Self>) {
-        self.selected_range = 0..self.value.len();
+        self.move_to(0, cx);
+        self.select_to(self.value.len(), cx);
+    }
+
+    fn index_for_mouse_position(&self, position: Point<Pixels>) -> usize {
+        if self.value.is_empty() {
+            return 0;
+        }
+
+        let (Some(bounds), Some(line)) = (self.last_bounds.as_ref(), self.last_layout.as_ref())
+        else {
+            return 0;
+        };
+
+        if position.y < bounds.top() {
+            return 0;
+        }
+        if position.y > bounds.bottom() {
+            return self.value.len();
+        }
+        line.closest_index_for_x(position.x - bounds.left())
+    }
+
+    // Text manipulation
+    fn insert_text(&mut self, text: &str, cx: &mut Context<Self>) {
+        self.value.replace_range(self.selected_range.clone(), text);
+        let new_cursor = self.selected_range.start + text.len();
+        self.selected_range = new_cursor..new_cursor;
+        self.selection_reversed = false;
         cx.notify();
     }
 
-    fn insert_text(&mut self, text: &str, cx: &mut Context<Self>) {
-        let filtered = self.filter_text(text);
-        if !filtered.is_empty() {
-            self.value
-                .replace_range(self.selected_range.clone(), &filtered);
-            let new_cursor = self.selected_range.start + filtered.len();
-            self.selected_range = new_cursor..new_cursor;
-            cx.notify();
-        }
-    }
-
     fn backspace(&mut self, cx: &mut Context<Self>) {
-        if let Some(range) = self.calculate_backspace_range() {
-            self.value.replace_range(range.clone(), "");
-            self.selected_range = range.start..range.start;
-            cx.notify();
+        if self.selected_range.is_empty() && self.selected_range.start > 0 {
+            let start = self.selected_range.start - 1;
+            self.value.remove(start);
+            self.selected_range = start..start;
+        } else if !self.selected_range.is_empty() {
+            self.value.replace_range(self.selected_range.clone(), "");
+            let cursor = self.selected_range.start;
+            self.selected_range = cursor..cursor;
         }
+        self.selection_reversed = false;
+        cx.notify();
     }
 
     fn delete(&mut self, cx: &mut Context<Self>) {
-        if let Some(range) = self.calculate_delete_range() {
-            self.value.replace_range(range.clone(), "");
-            self.selected_range = range.start..range.start;
-            cx.notify();
+        if self.selected_range.is_empty() && self.selected_range.end < self.value.len() {
+            self.value.remove(self.selected_range.end);
+        } else if !self.selected_range.is_empty() {
+            self.value.replace_range(self.selected_range.clone(), "");
+            let cursor = self.selected_range.start;
+            self.selected_range = cursor..cursor;
         }
+        self.selection_reversed = false;
+        cx.notify();
     }
 
-    fn on_click(&mut self, _event: &ClickEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.disabled && !self.focus_handle.is_focused(window) {
-            window.focus(&self.focus_handle);
-            self.select_all(cx);
+    fn on_mouse_up(&mut self, _window: &mut Window, _cx: &mut Context<Self>) {
+        self.is_selecting = false;
+    }
+
+    fn on_mouse_move(
+        &mut self,
+        event: &gpui::MouseMoveEvent,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.is_selecting && !self.disabled {
+            let index = self.index_for_mouse_position(event.position);
+            self.select_to(index, cx);
         }
     }
 }
 
-impl InputHandler for TextInput {
-    fn content(&self) -> &str {
-        &self.value
+// Implement EntityInputHandler for IME and text input
+impl EntityInputHandler for TextInput {
+    fn text_for_range(
+        &mut self,
+        range_utf16: Range<usize>,
+        actual_range: &mut Option<Range<usize>>,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<String> {
+        // For simplicity, we're not doing UTF16 conversion here
+        let range = range_utf16;
+        if range.end <= self.value.len() {
+            *actual_range = Some(range.clone());
+            Some(self.value[range].to_string())
+        } else {
+            None
+        }
     }
 
-    fn selection_range(&self) -> Range<usize> {
-        self.selected_range.clone()
+    fn selected_text_range(
+        &mut self,
+        _ignore_disabled_input: bool,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<UTF16Selection> {
+        // For simplicity, treating UTF8 indices as UTF16
+        Some(UTF16Selection {
+            range: self.selected_range.clone(),
+            reversed: self.selection_reversed,
+        })
     }
 
-    fn is_disabled(&self) -> bool {
-        self.disabled
+    fn marked_text_range(
+        &self,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<Range<usize>> {
+        self.marked_range.clone()
+    }
+
+    fn unmark_text(&mut self, _window: &mut Window, _cx: &mut Context<Self>) {
+        self.marked_range = None;
+    }
+
+    fn replace_text_in_range(
+        &mut self,
+        range_utf16: Option<Range<usize>>,
+        new_text: &str,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let range = range_utf16
+            .or(self.marked_range.clone())
+            .unwrap_or(self.selected_range.clone());
+
+        self.value =
+            (self.value[0..range.start].to_owned() + new_text + &self.value[range.end..]).into();
+        self.selected_range = range.start + new_text.len()..range.start + new_text.len();
+        self.marked_range.take();
+        cx.notify();
+    }
+
+    fn replace_and_mark_text_in_range(
+        &mut self,
+        range_utf16: Option<Range<usize>>,
+        new_text: &str,
+        new_selected_range_utf16: Option<Range<usize>>,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let range = range_utf16
+            .or(self.marked_range.clone())
+            .unwrap_or(self.selected_range.clone());
+
+        self.value =
+            (self.value[0..range.start].to_owned() + new_text + &self.value[range.end..]).into();
+
+        if !new_text.is_empty() {
+            self.marked_range = Some(range.start..range.start + new_text.len());
+        } else {
+            self.marked_range = None;
+        }
+
+        self.selected_range = new_selected_range_utf16
+            .map(|new_range| new_range.start + range.start..new_range.end + range.end)
+            .unwrap_or_else(|| range.start + new_text.len()..range.start + new_text.len());
+
+        cx.notify();
+    }
+
+    fn bounds_for_range(
+        &mut self,
+        range_utf16: Range<usize>,
+        bounds: Bounds<Pixels>,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<Bounds<Pixels>> {
+        let last_layout = self.last_layout.as_ref()?;
+        let range = range_utf16; // For simplicity, treating as UTF8
+        Some(Bounds::from_corners(
+            point(
+                bounds.left() + last_layout.x_for_index(range.start),
+                bounds.top(),
+            ),
+            point(
+                bounds.left() + last_layout.x_for_index(range.end),
+                bounds.bottom(),
+            ),
+        ))
+    }
+
+    fn character_index_for_point(
+        &mut self,
+        point: gpui::Point<Pixels>,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<usize> {
+        let last_bounds = self.last_bounds?;
+        let last_layout = self.last_layout.as_ref()?;
+        let local_x = point.x - last_bounds.left();
+        Some(last_layout.closest_index_for_x(local_x))
     }
 }
 
@@ -140,137 +308,262 @@ impl Focusable for TextInput {
 
 impl Render for TextInput {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let is_focused = self.focus_handle.is_focused(window);
-        let is_empty = self.value.is_empty();
-
-        // Check if focus state changed
-        if self.was_focused && !is_focused {
-            // Lost focus
-            self.selected_range = 0..0;
-        } else if !self.was_focused && is_focused {
-            // Gained focus - select all (inline to avoid cx borrow issue)
-            self.selected_range = 0..self.value.len();
-            cx.notify();
-        }
-        self.was_focused = is_focused;
-
         let theme = cx.theme();
+        let width = self.width.unwrap_or(200.0);
 
         div()
             .id(self.id.clone())
             .key_context("TextInput")
             .track_focus(&self.focus_handle)
-            .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
-                this.on_click(event, window, cx);
-            }))
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
                 if this.disabled {
                     return;
                 }
 
                 match event.keystroke.key.as_str() {
-                    "enter" | "escape" => {
-                        window.blur();
-                    }
+                    "enter" | "escape" => window.blur(),
                     "backspace" => this.backspace(cx),
                     "delete" => this.delete(cx),
-                    "left" => this.move_cursor_left(cx),
-                    "right" => this.move_cursor_right(cx),
-                    "home" => {
-                        this.selected_range = 0..0;
-                        cx.notify();
-                    }
-                    "end" => {
-                        let len = this.value.len();
-                        this.selected_range = len..len;
-                        cx.notify();
-                    }
-                    "a" if event.keystroke.modifiers.platform => this.select_all(cx),
-                    _ => {
-                        // Handle regular character input
-                        if let Some(key_char) = &event.keystroke.key_char {
-                            if !event.keystroke.modifiers.control
-                                && !event.keystroke.modifiers.platform
-                            {
-                                this.insert_text(key_char, cx);
-                            }
+                    "left" => {
+                        if this.selected_range.is_empty() {
+                            this.move_to(this.selected_range.start.saturating_sub(1), cx);
+                        } else {
+                            this.move_to(this.selected_range.start, cx);
                         }
                     }
+                    "right" => {
+                        if this.selected_range.is_empty() {
+                            this.move_to((this.selected_range.end + 1).min(this.value.len()), cx);
+                        } else {
+                            this.move_to(this.selected_range.end, cx);
+                        }
+                    }
+                    "home" => this.move_to(0, cx),
+                    "end" => this.move_to(this.value.len(), cx),
+                    "a" if event.keystroke.modifiers.platform => this.select_all(cx),
+                    _ => {}
                 }
             }))
-            .flex()
-            .items_center()
-            .pl(px(8.))
-            .pr(px(8.))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, event: &gpui::MouseDownEvent, _window, cx| {
+                    if !this.disabled {
+                        this.is_selecting = true;
+                        let index = this.index_for_mouse_position(event.position);
+                        if event.modifiers.shift {
+                            this.select_to(index, cx);
+                        } else {
+                            this.move_to(index, cx);
+                        }
+                    }
+                }),
+            )
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|this, _event: &gpui::MouseUpEvent, _window, _cx| {
+                    this.on_mouse_up(_window, _cx);
+                }),
+            )
+            .on_mouse_up_out(
+                MouseButton::Left,
+                cx.listener(|this, _event: &gpui::MouseUpEvent, _window, _cx| {
+                    this.on_mouse_up(_window, _cx);
+                }),
+            )
+            .on_mouse_move(cx.listener(Self::on_mouse_move))
+            .w(px(width))
             .h(px(28.))
-            .when_some(self.width, |d, w| d.w(px(w)))
+            .px(px(8.))
+            .py(px(4.))
             .rounded(px(4.))
             .bg(theme.surface)
             .border_1()
-            .border_color(if is_focused && !self.disabled {
+            .border_color(if self.is_focused(window) && !self.disabled {
                 theme.outline
             } else {
                 theme.border
             })
-            .text_color(if self.disabled {
-                theme.fg.alpha(0.3)
-            } else {
-                theme.fg
-            })
-            .text_size(px(13.))
             .cursor_pointer()
-            .when(self.disabled, |d| d.cursor_not_allowed())
-            .child(
-                div()
-                    .flex_1()
-                    .overflow_hidden()
-                    .relative()
-                    .when(is_empty && !is_focused, |d| {
-                        d.when_some(self.placeholder.clone(), |d, placeholder| {
-                            d.child(
-                                div()
-                                    .absolute()
-                                    .left_0()
-                                    .text_color(theme.fg.alpha(0.5))
-                                    .child(placeholder),
-                            )
-                        })
-                    })
-                    .when(!is_empty || is_focused, |d| {
-                        d.child(
-                            div()
-                                .when(is_focused && self.has_selection(), |d| {
-                                    d.bg(theme.outline.alpha(0.3))
-                                })
-                                .child(self.value.clone()),
-                        )
-                    })
-                    .when(is_focused && !self.has_selection() && !is_empty, |d| {
-                        // Show cursor after text
-                        let cursor_offset = self.cursor_offset();
-                        let text_before = &self.value[..cursor_offset.min(self.value.len())];
-                        d.child(
-                            div()
-                                .absolute()
-                                .top_0()
-                                .left(px(text_before.len() as f32 * 7.0)) // Approximate char width
-                                .w(px(2.))
-                                .h_full()
-                                .bg(theme.outline),
-                        )
-                    })
-                    .when(is_focused && !self.has_selection() && is_empty, |d| {
-                        // Show cursor at start when empty
-                        d.child(
-                            div()
-                                .absolute()
-                                .top_0()
-                                .left_0()
-                                .w(px(2.))
-                                .h_full()
-                                .bg(theme.outline),
-                        )
-                    }),
+            .child(TextElement {
+                input: cx.entity().clone(),
+            })
+    }
+}
+
+/// Custom element for rendering shaped text with selection and cursor.
+struct TextElement {
+    input: gpui::Entity<TextInput>,
+}
+
+struct PrepaintState {
+    line: Option<ShapedLine>,
+    cursor: Option<PaintQuad>,
+    selection: Option<PaintQuad>,
+}
+
+impl IntoElement for TextElement {
+    type Element = Self;
+
+    fn into_element(self) -> Self::Element {
+        self
+    }
+}
+
+impl Element for TextElement {
+    type RequestLayoutState = ();
+    type PrepaintState = PrepaintState;
+
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+
+    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&gpui::InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, Self::RequestLayoutState) {
+        let mut style = Style::default();
+        style.size.width = gpui::relative(1.).into();
+        style.size.height = window.line_height().into();
+        (window.request_layout(style, [], cx), ())
+    }
+
+    fn prepaint(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&gpui::InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        _request_layout: &mut Self::RequestLayoutState,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Self::PrepaintState {
+        let input = self.input.read(cx);
+        let theme = cx.global::<theme::GlobalTheme>().0.clone();
+        let content = input.value.clone();
+        let selected_range = input.selected_range.clone();
+        let cursor = input.cursor_offset();
+        let style = window.text_style();
+
+        let (display_text, text_color) = if content.is_empty() {
+            (
+                input
+                    .placeholder
+                    .clone()
+                    .unwrap_or_else(|| SharedString::from("")),
+                theme.fg.alpha(0.5),
             )
+        } else {
+            (SharedString::from(content), theme.fg)
+        };
+
+        let run = TextRun {
+            len: display_text.len(),
+            font: style.font(),
+            color: text_color,
+            background_color: None,
+            underline: if let Some(marked_range) = input.marked_range.as_ref() {
+                if marked_range.contains(&cursor) {
+                    Some(UnderlineStyle {
+                        color: Some(text_color),
+                        thickness: px(1.0),
+                        wavy: false,
+                    })
+                } else {
+                    None
+                }
+            } else {
+                None
+            },
+            strikethrough: None,
+        };
+
+        let font_size = style.font_size.to_pixels(window.rem_size());
+        let line = window
+            .text_system()
+            .shape_line(display_text.clone(), font_size, &[run], None);
+
+        let cursor_pos = line.x_for_index(cursor);
+        let (selection, cursor) = if selected_range.is_empty() {
+            (
+                None,
+                if input.focus_handle.is_focused(window) && !input.disabled {
+                    Some(gpui::fill(
+                        Bounds::new(
+                            point(bounds.left() + cursor_pos, bounds.top()),
+                            size(px(2.), bounds.bottom() - bounds.top()),
+                        ),
+                        theme.outline,
+                    ))
+                } else {
+                    None
+                },
+            )
+        } else {
+            (
+                Some(gpui::fill(
+                    Bounds::from_corners(
+                        point(
+                            bounds.left() + line.x_for_index(selected_range.start),
+                            bounds.top(),
+                        ),
+                        point(
+                            bounds.left() + line.x_for_index(selected_range.end),
+                            bounds.bottom(),
+                        ),
+                    ),
+                    theme.outline.alpha(0.3),
+                )),
+                None,
+            )
+        };
+
+        PrepaintState {
+            line: Some(line),
+            cursor,
+            selection,
+        }
+    }
+
+    fn paint(
+        &mut self,
+        _id: Option<&GlobalElementId>,
+        _inspector_id: Option<&gpui::InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        _request_layout: &mut Self::RequestLayoutState,
+        prepaint: &mut Self::PrepaintState,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let focus_handle = self.input.read(cx).focus_handle.clone();
+
+        window.handle_input(
+            &focus_handle,
+            ElementInputHandler::new(bounds, self.input.clone()),
+            cx,
+        );
+
+        if let Some(selection) = prepaint.selection.take() {
+            window.paint_quad(selection);
+        }
+
+        if let Some(line) = prepaint.line.take() {
+            line.paint(bounds.origin, window.line_height(), window, cx)
+                .unwrap();
+        }
+
+        if let Some(cursor) = prepaint.cursor.take() {
+            window.paint_quad(cursor);
+        }
+
+        self.input.update(cx, |input, _cx| {
+            input.last_layout = prepaint.line.clone();
+            input.last_bounds = Some(bounds);
+        });
     }
 }

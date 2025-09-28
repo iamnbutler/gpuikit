@@ -14,9 +14,8 @@ impl IconName {
     }
 }
 
-pub struct Icon {
-    color: Option<Hsla>,
-}
+// todo!("Icon::new likely returns an Icon in the long run, not an svg")
+pub struct Icon {}
 
 impl Icon {
     pub fn new(icon: IconName, color: impl Into<Option<Hsla>>) -> gpui::Svg {

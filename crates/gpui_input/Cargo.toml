@@ -1,0 +1,9 @@
+[package]
+name = "gpui_input"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gpui = { workspace = true }
+theme = { path = "../theme" }
+smallvec = "1.11"

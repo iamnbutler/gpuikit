@@ -1,10 +1,10 @@
 [package]
-name = "vitesse"
+name = "gpui-kit"
 version = "0.1.0"
 
 description = "A slick collection of building blocks to help you start building your next app with gpui."
-homepage = "https://github.com/iamnbutler/vitesse"
-repository = "https://github.com/iamnbutler/vitesse"
+homepage = "https://github.com/iamnbutler/gpui-kit"
+repository = "https://github.com/iamnbutler/gpui-kit"
 
 edition = "2021"
 license = "MIT"

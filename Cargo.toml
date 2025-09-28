@@ -1,13 +1,13 @@
-default-members = ["crates/vitesse"]
+default-members = ["crates/gpui-kit"]
 
 [workspace]
 resolver = "2"
 members = [
-    "crates/vitesse",
+    "crates/gpui-kit",
     "crates/assets"
 ]
 
 [workspace.dependencies]
-gpui = { git = "https://github.com/zed-industries/zed.git", rev = "1564bd82f25c3cef74da581489c31389810d39f7" }
+gpui = { git = "https://github.com/zed-industries/zed.git", rev = "78098f6809346ba8b45db7ffa768fba75578a263" }
 rust-embed = "8.2.0"
 anyhow = "1.0.79"

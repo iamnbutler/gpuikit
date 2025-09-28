@@ -1,0 +1,11 @@
+[package]
+name = "utils"
+version = "0.1.0"
+
+description = "Utilities for gpui-kit"
+
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+gpui.workspace = true

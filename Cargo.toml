@@ -3,8 +3,9 @@ default-members = ["crates/gpui-kit"]
 [workspace]
 resolver = "2"
 members = [
+    "crates/assets",
     "crates/gpui-kit",
-    "crates/assets"
+    "crates/utils"
 ]
 
 [workspace.dependencies]

@@ -245,17 +245,30 @@ impl Render for TextInput {
                                 .child(self.value.clone()),
                         )
                     })
-                    .when(is_focused && !self.has_selection(), |d| {
-                        // Show cursor
+                    .when(is_focused && !self.has_selection() && !is_empty, |d| {
+                        // Show cursor after text
                         let cursor_offset = self.cursor_offset();
                         let text_before = &self.value[..cursor_offset.min(self.value.len())];
                         d.child(
                             div()
                                 .absolute()
+                                .top_0()
                                 .left(px(text_before.len() as f32 * 7.0)) // Approximate char width
-                                .w(px(1.))
-                                .h(px(16.))
-                                .bg(theme.fg),
+                                .w(px(2.))
+                                .h_full()
+                                .bg(theme.outline),
+                        )
+                    })
+                    .when(is_focused && !self.has_selection() && is_empty, |d| {
+                        // Show cursor at start when empty
+                        d.child(
+                            div()
+                                .absolute()
+                                .top_0()
+                                .left_0()
+                                .w(px(2.))
+                                .h_full()
+                                .bg(theme.outline),
                         )
                     }),
             )

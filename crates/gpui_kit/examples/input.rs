@@ -116,5 +116,6 @@ fn main() {
             |_, cx| cx.new(InputExample::new),
         )
         .unwrap();
+        cx.activate(true);
     });
 }

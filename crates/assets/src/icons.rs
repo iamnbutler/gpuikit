@@ -1,4 +1,4 @@
-use gpui::{rgb, svg, Styled};
+use gpui::{hsla, svg, Hsla, Styled};
 
 pub enum IconName {
     Check,
@@ -14,10 +14,13 @@ impl IconName {
     }
 }
 
-pub struct Icon {}
+pub struct Icon {
+    color: Option<Hsla>,
+}
 
 impl Icon {
-    pub fn new(icon: IconName) -> gpui::Svg {
-        svg().size_4().text_color(rgb(0xff00ff)).path(icon.path())
+    pub fn new(icon: IconName, color: impl Into<Option<Hsla>>) -> gpui::Svg {
+        let color = color.into().unwrap_or(hsla(0.0, 0.0, 0.0, 1.0));
+        svg().size_4().text_color(color).path(icon.path())
     }
 }

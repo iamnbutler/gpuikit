@@ -1,5 +1,5 @@
 [package]
-name = "gpui-kit"
+name = "gpui_kit"
 version = "0.1.0"
 
 description = "A slick collection of building blocks to help you start building your next app with gpui."
@@ -11,4 +11,5 @@ license = "MIT"
 
 [dependencies]
 gpui.workspace = true
-assets = {path = "../assets"}
+assets.workspace = true
+theme.workspace = true

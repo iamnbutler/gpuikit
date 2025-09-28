@@ -1,14 +1,19 @@
-default-members = ["crates/gpui-kit"]
+default-members = ["crates/gpui_kit"]
 
 [workspace]
 resolver = "2"
 members = [
     "crates/assets",
-    "crates/gpui-kit",
+    "crates/gpui_kit",
+    "crates/theme",
     "crates/utils"
 ]
 
 [workspace.dependencies]
 gpui = { git = "https://github.com/zed-industries/zed.git", rev = "78098f6809346ba8b45db7ffa768fba75578a263" }
+utils = { path = "crates/utils" }
+theme = { path = "crates/theme" }
+assets = { path = "crates/assets" }
+gpui_kit = { path = "crates/gpui_kit" }
 rust-embed = "8.2.0"
 anyhow = "1.0.79"

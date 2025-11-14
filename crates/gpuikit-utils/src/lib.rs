@@ -3,46 +3,9 @@
 //! This crate provides a collection of utility functions and helpers
 //! commonly needed when building GPUI applications.
 
-use anyhow::Result;
-use gpui::{point, px, Bounds, Pixels, Point, Size};
+use gpui::{point, Bounds, Pixels, Point, Size};
 
-pub mod geometry;
-pub mod string;
-pub mod task;
-
-// Re-export commonly used utilities
-pub use geometry::{center_rect, expand_bounds, point_in_bounds};
-pub use string::{truncate_string, wrap_text};
-pub use task::{debounce, throttle};
-
-/// Common utility functions
-pub mod common {
-    use super::*;
-
-    /// Clamp a value between min and max
-    pub fn clamp<T: PartialOrd>(value: T, min: T, max: T) -> T {
-        if value < min {
-            min
-        } else if value > max {
-            max
-        } else {
-            value
-        }
-    }
-
-    /// Linear interpolation between two values
-    pub fn lerp(start: f32, end: f32, t: f32) -> f32 {
-        start + (end - start) * t.clamp(0.0, 1.0)
-    }
-
-    /// Map a value from one range to another
-    pub fn map_range(value: f32, in_min: f32, in_max: f32, out_min: f32, out_max: f32) -> f32 {
-        let normalized = (value - in_min) / (in_max - in_min);
-        out_min + normalized * (out_max - out_min)
-    }
-}
-
-/// Geometry utilities module
+/// Geometry utilities
 pub mod geometry {
     use super::*;
 
@@ -72,44 +35,10 @@ pub mod geometry {
             },
         }
     }
-
-    /// Contract bounds by a given amount
-    pub fn contract_bounds(bounds: Bounds<Pixels>, amount: Pixels) -> Bounds<Pixels> {
-        expand_bounds(bounds, -amount)
-    }
-
-    /// Calculate the distance between two points
-    pub fn distance(p1: Point<Pixels>, p2: Point<Pixels>) -> Pixels {
-        let dx = p2.x - p1.x;
-        let dy = p2.y - p1.y;
-        px((dx.0 * dx.0 + dy.0 * dy.0).sqrt())
-    }
-
-    /// Calculate the intersection of two rectangles
-    pub fn intersect_bounds(a: Bounds<Pixels>, b: Bounds<Pixels>) -> Option<Bounds<Pixels>> {
-        let x1 = a.origin.x.max(b.origin.x);
-        let y1 = a.origin.y.max(b.origin.y);
-        let x2 = (a.origin.x + a.size.width).min(b.origin.x + b.size.width);
-        let y2 = (a.origin.y + a.size.height).min(b.origin.y + b.size.height);
-
-        if x2 > x1 && y2 > y1 {
-            Some(Bounds {
-                origin: point(x1, y1),
-                size: Size {
-                    width: x2 - x1,
-                    height: y2 - y1,
-                },
-            })
-        } else {
-            None
-        }
-    }
 }
 
 /// String manipulation utilities
 pub mod string {
-    use super::*;
-
     /// Truncate a string to a maximum length with ellipsis
     pub fn truncate_string(s: &str, max_len: usize) -> String {
         if s.len() <= max_len {
@@ -148,62 +77,11 @@ pub mod string {
 
         lines
     }
-
-    /// Convert a string to title case
-    pub fn to_title_case(s: &str) -> String {
-        s.split_whitespace()
-            .map(|word| {
-                let mut chars = word.chars();
-                match chars.next() {
-                    None => String::new(),
-                    Some(first) => {
-                        first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase()
-                    }
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(" ")
-    }
-
-    /// Convert snake_case to camelCase
-    pub fn snake_to_camel(s: &str) -> String {
-        let mut result = String::new();
-        let mut capitalize_next = false;
-
-        for ch in s.chars() {
-            if ch == '_' {
-                capitalize_next = true;
-            } else if capitalize_next {
-                result.push_str(&ch.to_uppercase().to_string());
-                capitalize_next = false;
-            } else {
-                result.push(ch);
-            }
-        }
-
-        result
-    }
-
-    /// Convert camelCase to snake_case
-    pub fn camel_to_snake(s: &str) -> String {
-        let mut result = String::new();
-
-        for (i, ch) in s.chars().enumerate() {
-            if ch.is_uppercase() && i > 0 {
-                result.push('_');
-            }
-            result.push_str(&ch.to_lowercase().to_string());
-        }
-
-        result
-    }
 }
 
 /// Task and async utilities
 pub mod task {
-    use super::*;
-    use std::sync::Arc;
-    use std::sync::Mutex;
+    use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
 
     /// Debounce function calls
@@ -281,97 +159,14 @@ pub mod task {
     }
 }
 
-/// Time utilities (requires "time" feature)
-#[cfg(feature = "time")]
-pub mod time {
-    use chrono::{DateTime, Duration, Local, NaiveDateTime, Utc};
-
-    /// Format a timestamp for display
-    pub fn format_timestamp(timestamp: i64) -> String {
-        let datetime = DateTime::<Utc>::from_timestamp(timestamp, 0).unwrap_or_else(|| Utc::now());
-        datetime.format("%Y-%m-%d %H:%M:%S").to_string()
-    }
-
-    /// Get a human-readable relative time string
-    pub fn relative_time(datetime: DateTime<Utc>) -> String {
-        let now = Utc::now();
-        let duration = now.signed_duration_since(datetime);
-
-        if duration.num_seconds() < 60 {
-            "just now".to_string()
-        } else if duration.num_minutes() < 60 {
-            let mins = duration.num_minutes();
-            format!("{} minute{} ago", mins, if mins == 1 { "" } else { "s" })
-        } else if duration.num_hours() < 24 {
-            let hours = duration.num_hours();
-            format!("{} hour{} ago", hours, if hours == 1 { "" } else { "s" })
-        } else if duration.num_days() < 30 {
-            let days = duration.num_days();
-            format!("{} day{} ago", days, if days == 1 { "" } else { "s" })
-        } else if duration.num_days() < 365 {
-            let months = duration.num_days() / 30;
-            format!("{} month{} ago", months, if months == 1 { "" } else { "s" })
-        } else {
-            let years = duration.num_days() / 365;
-            format!("{} year{} ago", years, if years == 1 { "" } else { "s" })
-        }
-    }
-}
-
-/// UUID utilities (requires "uuid" feature)
-#[cfg(feature = "uuid")]
-pub mod uuid {
-    use uuid::Uuid;
-
-    /// Generate a new UUID v4
-    pub fn generate() -> String {
-        Uuid::new_v4().to_string()
-    }
-
-    /// Generate a short UUID (first 8 characters)
-    pub fn generate_short() -> String {
-        Uuid::new_v4().to_string()[..8].to_string()
-    }
-
-    /// Validate a UUID string
-    pub fn is_valid(uuid_str: &str) -> bool {
-        Uuid::parse_str(uuid_str).is_ok()
-    }
-}
-
-/// Serialization utilities (requires "serde" feature)
-#[cfg(feature = "serde")]
-pub mod serde_utils {
-    use super::*;
-    use serde::{Deserialize, Serialize};
-    use serde_json;
-
-    /// Serialize a value to pretty JSON
-    pub fn to_pretty_json<T: Serialize>(value: &T) -> Result<String> {
-        serde_json::to_string_pretty(value).map_err(Into::into)
-    }
-
-    /// Serialize a value to compact JSON
-    pub fn to_json<T: Serialize>(value: &T) -> Result<String> {
-        serde_json::to_string(value).map_err(Into::into)
-    }
-
-    /// Deserialize from JSON string
-    pub fn from_json<T: for<'de> Deserialize<'de>>(json: &str) -> Result<T> {
-        serde_json::from_str(json).map_err(Into::into)
-    }
-}
+// Re-export commonly used utilities
+pub use geometry::{center_rect, expand_bounds, point_in_bounds};
+pub use string::{truncate_string, wrap_text};
+pub use task::{debounce, throttle};
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_clamp() {
-        assert_eq!(common::clamp(5, 0, 10), 5);
-        assert_eq!(common::clamp(-5, 0, 10), 0);
-        assert_eq!(common::clamp(15, 0, 10), 10);
-    }
 
     #[test]
     fn test_truncate_string() {
@@ -385,11 +180,5 @@ mod tests {
         let wrapped = string::wrap_text(text, 10);
         assert!(wrapped.len() > 1);
         assert!(wrapped.iter().all(|line| line.len() <= 10));
-    }
-
-    #[test]
-    fn test_snake_camel_conversion() {
-        assert_eq!(string::snake_to_camel("hello_world"), "helloWorld");
-        assert_eq!(string::camel_to_snake("helloWorld"), "hello_world");
     }
 }

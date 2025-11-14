@@ -1,9 +1,5 @@
 //! gpuikit
 
-#![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
-
-// Re-export sub-crates
 pub use gpuikit_assets as assets;
 pub use gpuikit_theme as theme;
 pub use gpuikit_utils as utils;
@@ -26,14 +22,6 @@ pub use utils::{
 
 /// Prelude module for convenient imports
 pub mod prelude {
-    //! Convenient re-exports of commonly used types
-    //!
-    //! # Usage
-    //!
-    //! ```rust,no_run
-    //! use gpuikit::prelude::*;
-    //! ```
-
     pub use crate::assets::{AssetManager, EmbeddedAssets};
     pub use crate::theme::{Theme, ThemeAppearance, ThemeManager};
     pub use crate::utils::{center_rect, point_in_bounds};
@@ -53,18 +41,21 @@ pub mod components {
     use gpui::*;
 
     /// Button component (placeholder for future implementation)
+    #[allow(dead_code)]
     pub struct Button {
         label: SharedString,
         theme: Theme,
     }
 
     /// Input field component (placeholder for future implementation)
+    #[allow(dead_code)]
     pub struct Input {
         placeholder: Option<SharedString>,
         theme: Theme,
     }
 
     /// Panel component (placeholder for future implementation)
+    #[allow(dead_code)]
     pub struct Panel {
         theme: Theme,
     }
@@ -74,7 +65,7 @@ pub mod components {
 pub mod style {
     //! Styling utilities for consistent component appearance
 
-    use crate::theme::{Theme, ThemeColors};
+    use crate::theme::Theme;
     use gpui::*;
 
     /// Apply theme colors to an element

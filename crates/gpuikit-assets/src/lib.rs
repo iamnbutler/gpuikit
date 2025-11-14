@@ -1,13 +1,11 @@
-//! Asset management and embedding for GPUI applications
+//! Asset management for GPUI applications
 //!
-//! This crate provides utilities for embedding and managing static assets
-//! in GPUI applications using rust-embed.
+//! This crate provides utilities for embedding and managing assets in GPUI applications.
 
 use anyhow::{anyhow, Result};
-use gpui::AssetSource;
+use gpui::{AssetSource, SharedString};
 use rust_embed::RustEmbed;
 use std::borrow::Cow;
-use std::path::{Path, PathBuf};
 
 /// Trait for types that can serve as embedded asset sources
 pub trait EmbeddedAssets: RustEmbed {
@@ -39,14 +37,12 @@ impl<T: RustEmbed> EmbeddedAssets for T {}
 
 /// Asset manager for loading and caching embedded assets
 #[derive(Debug, Clone)]
-pub struct AssetManager {
-    name: String,
-}
+pub struct AssetManager {}
 
 impl AssetManager {
-    /// Create a new asset manager with a given name
-    pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into() }
+    /// Create a new asset manager
+    pub fn new() -> Self {
+        Self {}
     }
 
     /// Load an embedded asset
@@ -69,17 +65,17 @@ impl AssetManager {
 }
 
 /// GPUI AssetSource implementation for embedded assets
-pub struct EmbeddedAssetSource<T: EmbeddedAssets> {
+pub struct EmbeddedAssetSource<T: EmbeddedAssets + Send + Sync> {
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T: EmbeddedAssets> Default for EmbeddedAssetSource<T> {
+impl<T: EmbeddedAssets + Send + Sync> Default for EmbeddedAssetSource<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: EmbeddedAssets> EmbeddedAssetSource<T> {
+impl<T: EmbeddedAssets + Send + Sync> EmbeddedAssetSource<T> {
     /// Create a new embedded asset source
     pub fn new() -> Self {
         Self {
@@ -88,15 +84,15 @@ impl<T: EmbeddedAssets> EmbeddedAssetSource<T> {
     }
 }
 
-impl<T: EmbeddedAssets + 'static> AssetSource for EmbeddedAssetSource<T> {
-    fn load(&self, path: &str) -> Result<Cow<'static, [u8]>> {
-        T::get_asset(path).ok_or_else(|| anyhow!("Asset not found: {}", path))
+impl<T: EmbeddedAssets + Send + Sync + 'static> AssetSource for EmbeddedAssetSource<T> {
+    fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
+        Ok(T::get_asset(path))
     }
 
-    fn list(&self, prefix: &str) -> Result<Vec<PathBuf>> {
+    fn list(&self, prefix: &str) -> Result<Vec<SharedString>> {
         Ok(T::list_assets(Some(prefix))
             .into_iter()
-            .map(PathBuf::from)
+            .map(|s| s.into())
             .collect())
     }
 }
@@ -118,102 +114,13 @@ macro_rules! embed_assets {
     };
 }
 
-/// Common asset types
-pub mod types {
-    use super::*;
-
-    /// Icon asset metadata
-    #[cfg(feature = "manifest")]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-    pub struct IconAsset {
-        pub name: String,
-        pub path: String,
-        pub size: Option<(u32, u32)>,
-        pub category: Option<String>,
-    }
-
-    /// Font asset metadata
-    #[cfg(feature = "manifest")]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-    pub struct FontAsset {
-        pub name: String,
-        pub path: String,
-        pub family: String,
-        pub weight: Option<u32>,
-        pub style: Option<String>,
-    }
-
-    /// Asset manifest for cataloging embedded assets
-    #[cfg(feature = "manifest")]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-    pub struct AssetManifest {
-        pub icons: Vec<IconAsset>,
-        pub fonts: Vec<FontAsset>,
-        pub other: Vec<String>,
-    }
-}
-
-#[cfg(feature = "icons")]
-pub mod icons {
-    use super::*;
-
-    embed_assets!(DefaultIcons, "assets/icons");
-
-    /// Load a default icon by name
-    pub fn load_icon(name: &str) -> Result<Vec<u8>> {
-        let manager = AssetManager::new("default_icons");
-        let path = format!("{}.svg", name);
-        manager.load_embedded::<DefaultIcons>(&path)
-    }
-
-    /// List all available default icons
-    pub fn list_icons() -> Vec<String> {
-        DefaultIcons::list_assets(Some(".svg"))
-            .into_iter()
-            .map(|path| {
-                Path::new(&path)
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("")
-                    .to_string()
-            })
-            .collect()
-    }
-}
-
-#[cfg(feature = "fonts")]
-pub mod fonts {
-    use super::*;
-
-    embed_assets!(DefaultFonts, "assets/fonts");
-
-    /// Load a default font by name
-    pub fn load_font(name: &str) -> Result<Vec<u8>> {
-        let manager = AssetManager::new("default_fonts");
-        manager.load_embedded::<DefaultFonts>(name)
-    }
-
-    /// List all available default fonts
-    pub fn list_fonts() -> Vec<String> {
-        DefaultFonts::list_assets(None)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    embed_assets!(TestAssets, "tests/assets");
-
-    #[test]
-    fn test_embed_assets_macro() {
-        // This test will only work if tests/assets exists with some files
-        let _source = TestAssets::asset_source();
-    }
-
     #[test]
     fn test_asset_manager() {
-        let manager = AssetManager::new("test");
-        assert_eq!(manager.name, "test");
+        let _manager = AssetManager::new();
+        // Just verify that we can create an asset manager
     }
 }

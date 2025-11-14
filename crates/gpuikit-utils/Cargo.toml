@@ -19,51 +19,5 @@ path = "src/lib.rs"
 # GPUI framework
 gpui = { workspace = true }
 
-# Error handling
-anyhow = { workspace = true }
-
-# Logging
-log = { workspace = true }
-
-# Serialization
-serde = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
-
-# Time utilities
-chrono = { version = "0.4", optional = true }
-
-# UUID generation
-uuid = { version = "1.6", features = ["v4"], optional = true }
-
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
-tempfile = "3.8"
-pretty_assertions = "1.4"
-
-[features]
-default = []
-# Enable serialization utilities
-serde = ["dep:serde", "dep:serde_json"]
-# Enable time/date utilities
-time = ["chrono"]
-# Enable UUID utilities
-uuid = ["dep:uuid"]
-# Enable all utilities
-full = ["serde", "time", "uuid"]
-
-# Package metadata for crates.io
-[package.metadata.docs.rs]
-all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
-
-[[example]]
-name = "geometry"
-path = "examples/geometry.rs"
-
-[[example]]
-name = "async_helpers"
-path = "examples/async_helpers.rs"
-
-[[example]]
-name = "string_utils"
-path = "examples/string_utils.rs"

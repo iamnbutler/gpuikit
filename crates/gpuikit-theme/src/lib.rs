@@ -4,7 +4,7 @@
 //! custom theme support, and dynamic theme switching capabilities.
 
 use anyhow::{anyhow, Result};
-use gpui::{hsla, point, px, Hsla, Pixels, Point, Rgba, SharedString};
+use gpui::{hsla, px, Hsla, Pixels};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -14,7 +14,7 @@ pub mod styles;
 
 // Re-export commonly used types
 pub use colors::{ColorPalette, ColorScale, SystemColors};
-pub use styles::{BorderStyle, Spacing, Typography};
+pub use styles::{BorderStyle, Shadow, Spacing, Typography};
 
 /// A complete theme definition
 #[derive(Debug, Clone, Serialize, Deserialize)]

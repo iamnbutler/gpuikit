@@ -6,7 +6,6 @@ members = [
     "crates/gpuikit-theme",
     "crates/gpuikit-utils",
     "crates/gpuikit-keymap",
-    "crates/gpuikit-editor",
 ]
 
 default-members = ["crates/gpuikit"]
@@ -27,7 +26,6 @@ gpuikit-assets = { path = "crates/gpuikit-assets", version = "0.1.0" }
 gpuikit-theme = { path = "crates/gpuikit-theme", version = "0.1.0" }
 gpuikit-utils = { path = "crates/gpuikit-utils", version = "0.1.0" }
 gpuikit-keymap = { path = "crates/gpuikit-keymap", version = "0.1.0" }
-gpuikit-editor = { path = "crates/gpuikit-editor", version = "0.1.0" }
 
 # gpui
 gpui = "0.2.2"
@@ -41,9 +39,6 @@ log = "0.4"
 
 # todo: move to assets
 rust-embed = "8.2.0"
-
-# todo: move to editor
-syntect = "5.3.0"
 
 # lints
 [workspace.lints.rust]

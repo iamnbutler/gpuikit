@@ -347,7 +347,7 @@ pub mod utils {
             r: r as f32 / 255.0,
             g: g as f32 / 255.0,
             b: b as f32 / 255.0,
-            a,
+            a: a as f32 / 255.0,
         };
 
         Ok(rgba.into())

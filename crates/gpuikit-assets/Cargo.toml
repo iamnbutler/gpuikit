@@ -1,0 +1,59 @@
+[package]
+name = "gpuikit-assets"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Asset management and embedding for GPUI applications"
+readme = "README.md"
+keywords = ["gpui", "assets", "resources", "embed", "static"]
+categories = ["gui", "filesystem", "embedded"]
+
+[lib]
+name = "gpuikit_assets"
+path = "src/lib.rs"
+
+[dependencies]
+# Asset embedding
+rust-embed = { workspace = true }
+
+# GPUI framework
+gpui = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+
+# Logging
+log = { workspace = true }
+
+# Serialization (for asset manifests)
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = "3.8"
+
+[features]
+default = []
+# Enable asset manifest generation
+manifest = ["serde", "serde_json"]
+# Include default icon set
+icons = []
+# Include default font set
+fonts = []
+
+# Package metadata for crates.io
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[[example]]
+name = "embed_assets"
+path = "examples/embed_assets.rs"
+
+[[example]]
+name = "load_icons"
+path = "examples/load_icons.rs"
+required-features = ["icons"]

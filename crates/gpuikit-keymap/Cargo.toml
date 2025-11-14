@@ -1,0 +1,62 @@
+[package]
+name = "gpuikit-keymap"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Flexible keymap and keyboard shortcut management for GPUI applications"
+readme = "README.md"
+keywords = ["gpui", "keymap", "keyboard", "shortcuts", "keybindings"]
+categories = ["gui", "config"]
+
+[lib]
+name = "gpuikit_keymap"
+path = "src/lib.rs"
+
+[dependencies]
+# GPUI framework
+gpui = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+
+# Logging
+log = { workspace = true }
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
+tempfile = "3.8"
+pretty_assertions = "1.4"
+
+[features]
+default = []
+# Enable schema generation for keymap files
+schema = ["schemars"]
+
+# Optional dependencies
+[dependencies.schemars]
+version = "0.8"
+optional = true
+
+# Package metadata for crates.io
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[[example]]
+name = "basic_keymap"
+path = "examples/basic_keymap.rs"
+
+[[example]]
+name = "custom_actions"
+path = "examples/custom_actions.rs"
+
+[[example]]
+name = "load_from_json"
+path = "examples/load_from_json.rs"

@@ -1,0 +1,53 @@
+[package]
+name = "gpuikit"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "A comprehensive UI component library for GPUI applications"
+readme = "README.md"
+keywords = ["gpui", "ui", "components", "toolkit", "gui"]
+categories = ["gui", "graphics"]
+
+[lib]
+name = "gpuikit"
+path = "src/lib.rs"
+
+[dependencies]
+# Internal workspace dependencies
+gpuikit-assets = { workspace = true }
+gpuikit-theme = { workspace = true }
+gpuikit-utils = { workspace = true }
+
+# GPUI framework
+gpui = { workspace = true }
+
+# Core dependencies
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
+
+[features]
+default = ["full"]
+full = ["assets", "theme"]
+assets = []
+theme = []
+
+# Package metadata for crates.io
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[[example]]
+name = "basic_components"
+path = "examples/basic_components.rs"
+
+[[example]]
+name = "theme_showcase"
+path = "examples/theme_showcase.rs"

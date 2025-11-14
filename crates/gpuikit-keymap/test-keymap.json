@@ -1,0 +1,14 @@
+[
+  {
+    "context": "Editor",
+    "use_key_equivalents": true,
+    "bindings": {
+      "ctrl-t": "editor_demo::NextTheme",
+      "ctrl-l": "editor_demo::NextLanguage",
+      "alt-up": "editor_demo::MoveUp",
+      "alt-down": "editor_demo::MoveDown",
+      "cmd-d": "editor_demo::Delete",
+      "ctrl-a": "editor_demo::SelectAll"
+    }
+  }
+]

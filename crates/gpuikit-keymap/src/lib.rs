@@ -126,9 +126,9 @@ impl KeymapCollection {
     }
 
     /// Find all bindings for a given action
-    pub fn find_bindings_for_action(&self, action_name: &str) -> Vec<&BindingSpec> {
+    pub fn find_bindings_for_action(&self, action_name: &str) -> Vec<BindingSpec> {
         self.get_binding_specs()
-            .iter()
+            .into_iter()
             .filter(|spec| spec.action_name == action_name)
             .collect()
     }

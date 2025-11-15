@@ -6,10 +6,6 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "Simple theme system for GPUI applications"
-readme = "README.md"
-keywords = ["gpui", "theme", "theming", "colors"]
-categories = ["gui", "graphics"]
 
 [lib]
 name = "gpuikit_theme"
@@ -29,11 +25,3 @@ gpui = { workspace = true, features = ["test-support"] }
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
-
-[[example]]
-name = "basic_theme"
-path = "examples/basic_theme.rs"
-
-[[example]]
-name = "theme_switcher"
-path = "examples/theme_switcher.rs"

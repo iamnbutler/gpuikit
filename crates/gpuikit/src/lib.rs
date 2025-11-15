@@ -1,15 +1,13 @@
 //! gpuikit
 
-pub use gpuikit_assets as assets;
 pub use gpuikit_theme as theme;
-pub use gpuikit_utils as utils;
 
 pub mod error;
 pub mod layout;
 pub mod resource;
 
 pub mod style {
-    use crate::theme::Theme;
+    use gpuikit_theme::Theme;
 
     pub trait Themed {
         fn themed(self, theme: &Theme) -> Self;

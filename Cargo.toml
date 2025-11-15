@@ -2,9 +2,7 @@
 resolver = "2"
 members = [
     "crates/gpuikit",
-    "crates/gpuikit-assets",
     "crates/gpuikit-theme",
-    "crates/gpuikit-utils",
     "crates/gpuikit-keymap",
 ]
 
@@ -23,7 +21,6 @@ rust-version = "1.75"
 # workspace crates
 gpuikit = { path = "crates/gpuikit", version = "0.1.0" }
 gpuikit-theme = { path = "crates/gpuikit-theme", version = "0.1.0" }
-gpuikit-utils = { path = "crates/gpuikit-utils", version = "0.1.0" }
 gpuikit-keymap = { path = "crates/gpuikit-keymap", version = "0.1.0" }
 
 # gpui

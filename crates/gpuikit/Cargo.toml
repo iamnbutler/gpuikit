@@ -17,38 +17,24 @@ path = "src/lib.rs"
 
 [dependencies]
 # Internal workspace dependencies
-gpuikit-assets = { workspace = true }
 gpuikit-theme = { workspace = true }
-gpuikit-utils = { workspace = true }
+gpuikit-keymap = { workspace = true }
 
 # GPUI framework
 gpui = { workspace = true }
-
-# Core dependencies
+rust-embed = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }
-rust-embed = { workspace = true }
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
 
 [features]
-default = ["full"]
-full = ["assets", "theme"]
-assets = []
-theme = []
+default = []
 
 # Package metadata for crates.io
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
-
-[[example]]
-name = "basic_components"
-path = "examples/basic_components.rs"
-
-[[example]]
-name = "theme_showcase"
-path = "examples/theme_showcase.rs"

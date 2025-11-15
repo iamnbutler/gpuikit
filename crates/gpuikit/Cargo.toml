@@ -7,7 +7,7 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 description = "A comprehensive UI component library for GPUI applications"
-readme = "README.md"
+readme = "../../README.md"
 keywords = ["gpui", "ui", "components", "toolkit", "gui"]
 categories = ["gui", "graphics"]
 

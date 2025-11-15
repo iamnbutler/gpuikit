@@ -1,0 +1,35 @@
+[
+  {
+    "context": "Editor",
+    "bindings": {
+      "up": "editor::MoveUp",
+      "down": "editor::MoveDown",
+      "left": "editor::MoveLeft",
+      "right": "editor::MoveRight",
+      "shift-up": "editor::MoveUpWithShift",
+      "shift-down": "editor::MoveDownWithShift",
+      "shift-left": "editor::MoveLeftWithShift",
+      "shift-right": "editor::MoveRightWithShift",
+      "backspace": "editor::Backspace",
+      "delete": "editor::Delete",
+      "enter": "editor::InsertNewline",
+      "cmd-a": "editor::SelectAll",
+      "ctrl-a": "editor::SelectAll",
+      "escape": "editor::Escape",
+      "cmd-c": "editor::Copy",
+      "ctrl-c": "editor::Copy",
+      "cmd-x": "editor::Cut",
+      "ctrl-x": "editor::Cut",
+      "cmd-v": "editor::Paste",
+      "ctrl-v": "editor::Paste",
+      "cmd-]": "editor::NextTheme",
+      "ctrl-]": "editor::NextTheme",
+      "cmd-[": "editor::PreviousTheme",
+      "ctrl-[": "editor::PreviousTheme",
+      "cmd-shift-]": "editor::NextLanguage",
+      "ctrl-shift-]": "editor::NextLanguage",
+      "cmd-shift-[": "editor::PreviousLanguage",
+      "ctrl-shift-[": "editor::PreviousLanguage"
+    }
+  }
+]

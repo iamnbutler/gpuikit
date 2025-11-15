@@ -8,7 +8,7 @@ use gpuikit_keymap::KeymapCollection;
 use std::path::Path;
 
 actions!(
-    editor_demo,
+    editor,
     [
         MoveUp,
         MoveDown,
@@ -47,7 +47,6 @@ impl EditorView {
     fn new(cx: &mut Context<Self>) -> Self {
         let focus_handle = cx.focus_handle();
 
-        // Initialize with sample Rust code
         let initial_code = vec![
             "// Rust sample code".to_string(),
             "use std::collections::HashMap;".to_string(),
@@ -71,11 +70,9 @@ impl EditorView {
 
         let mut editor = Editor::new("editor", initial_code);
 
-        // Get available themes from syntax highlighter
         let highlighter = SyntaxHighlighter::new();
         let available_themes = highlighter.available_themes();
 
-        // Find and set a default theme
         let default_theme_index = available_themes
             .iter()
             .position(|t| t == "base16-ocean.dark")
@@ -354,8 +351,7 @@ fn load_keymaps(cx: &mut App) {
     // Load keymaps from JSON configuration
     let mut keymap_collection = KeymapCollection::new();
 
-    // Try to load from file first, fall back to defaults if not found
-    let keymap_path = Path::new("default-keymap.json");
+    let keymap_path = Path::new("examples/demo-keymap.json");
     let loaded_from_file = if keymap_path.exists() {
         match keymap_collection.load_file(keymap_path) {
             Ok(_) => {
@@ -371,40 +367,29 @@ fn load_keymaps(cx: &mut App) {
         false
     };
 
-    // If we didn't load from file, try built-in defaults
     if !loaded_from_file {
-        if let Err(e) = keymap_collection.load_defaults() {
-            eprintln!("Failed to load default keymaps: {}", e);
-            eprintln!("Falling back to hardcoded keybindings");
-
-            // Fallback to minimal hardcoded bindings
-            load_fallback_keymaps(cx);
-            return;
-        }
-        println!("Loaded built-in default keymaps");
+        let demo_keymap = include_str!("demo-keymap.json");
+        keymap_collection
+            .load_json(demo_keymap)
+            .expect("Failed to load embedded demo keymaps");
+        println!("Loaded embedded demo keymaps");
     }
 
-    // Get binding specifications from the loaded keymaps
     let specs = keymap_collection.get_binding_specs();
 
-    // Create GPUI key bindings from the specifications
-    // Since GPUI requires concrete action types, we need to map action names to actions
     let mut bindings = Vec::new();
 
     for spec in specs {
-        // Only process editor_demo actions for this example
-        if !spec.action_name.starts_with("editor_demo::") {
+        if !spec.action_name.starts_with("editor::") {
             continue;
         }
 
         let action_name = spec
             .action_name
-            .strip_prefix("editor_demo::")
+            .strip_prefix("editor::")
             .unwrap_or(&spec.action_name);
         let context = spec.context.as_deref();
 
-        // Map action names to concrete actions
-        // This is where the keymap system connects with GPUI's type system
         match action_name {
             "MoveUp" => bindings.push(KeyBinding::new(&spec.keystrokes, MoveUp, context)),
             "MoveDown" => bindings.push(KeyBinding::new(&spec.keystrokes, MoveDown, context)),
@@ -449,54 +434,20 @@ fn load_keymaps(cx: &mut App) {
                 bindings.push(KeyBinding::new(&spec.keystrokes, PreviousLanguage, context))
             }
             unknown => {
-                eprintln!("Unknown editor_demo action: {}", unknown);
+                eprintln!("Unknown editor action: {}", unknown);
             }
         }
     }
 
-    if bindings.is_empty() {
-        eprintln!("No valid keybindings found, using fallback");
-        load_fallback_keymaps(cx);
-    } else {
-        println!(
-            "Registered {} keybindings from configuration",
-            bindings.len()
-        );
-        cx.bind_keys(bindings);
-    }
-}
-
-fn load_fallback_keymaps(cx: &mut App) {
-    // Minimal fallback keybindings for when the keymap system fails
-    cx.bind_keys([
-        KeyBinding::new("up", MoveUp, None),
-        KeyBinding::new("down", MoveDown, None),
-        KeyBinding::new("left", MoveLeft, None),
-        KeyBinding::new("right", MoveRight, None),
-        KeyBinding::new("backspace", Backspace, None),
-        KeyBinding::new("delete", Delete, None),
-        KeyBinding::new("enter", InsertNewline, None),
-        KeyBinding::new("escape", Escape, None),
-        // Platform-specific modifier keys
-        #[cfg(target_os = "macos")]
-        KeyBinding::new("cmd-c", Copy, None),
-        #[cfg(not(target_os = "macos"))]
-        KeyBinding::new("ctrl-c", Copy, None),
-        #[cfg(target_os = "macos")]
-        KeyBinding::new("cmd-x", Cut, None),
-        #[cfg(not(target_os = "macos"))]
-        KeyBinding::new("ctrl-x", Cut, None),
-        #[cfg(target_os = "macos")]
-        KeyBinding::new("cmd-v", Paste, None),
-        #[cfg(not(target_os = "macos"))]
-        KeyBinding::new("ctrl-v", Paste, None),
-    ]);
+    println!(
+        "Registered {} keybindings from configuration",
+        bindings.len()
+    );
+    cx.bind_keys(bindings);
 }
 
 fn main() {
-    // Main application entry point
     Application::new().run(move |cx: &mut App| {
-        // Load keymaps using the new keymap system
         load_keymaps(cx);
 
         cx.open_window(
@@ -506,15 +457,17 @@ fn main() {
                     size(px(800.0), px(600.0)),
                     cx,
                 ))),
+                focus: true,
                 ..Default::default()
             },
             |_window, cx| cx.new(EditorView::new),
         )
         .unwrap();
+
+        cx.activate(true)
     });
 }
 
-// Sample code generators
 fn get_rust_sample() -> String {
     r#"// Rust sample code
 use std::collections::HashMap;

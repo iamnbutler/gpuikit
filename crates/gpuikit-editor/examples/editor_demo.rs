@@ -4,6 +4,7 @@
 
 use gpui::*;
 use gpui_editor::*;
+use gpuikit_keymap::KeymapCollection;
 use std::path::Path;
 
 actions!(
@@ -71,7 +72,7 @@ impl EditorView {
         let mut editor = Editor::new("editor", initial_code);
 
         // Get available themes from syntax highlighter
-        let mut highlighter = SyntaxHighlighter::new();
+        let highlighter = SyntaxHighlighter::new();
         let available_themes = highlighter.available_themes();
 
         // Find and set a default theme
@@ -276,8 +277,8 @@ impl EditorView {
 }
 
 impl Render for EditorView {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let current_theme = &self.available_themes[self.current_theme_index];
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let _current_theme = &self.available_themes[self.current_theme_index];
         let (current_language, _, _) = &self.available_languages[self.current_language_index];
 
         let language = match current_language.as_str() {
@@ -384,14 +385,7 @@ fn load_keymaps(cx: &mut App) {
     }
 
     // Get binding specifications from the loaded keymaps
-    let specs = match keymap_collection.get_binding_specs() {
-        Ok(specs) => specs,
-        Err(e) => {
-            eprintln!("Failed to get binding specifications: {}", e);
-            load_fallback_keymaps(cx);
-            return;
-        }
-    };
+    let specs = keymap_collection.get_binding_specs();
 
     // Create GPUI key bindings from the specifications
     // Since GPUI requires concrete action types, we need to map action names to actions

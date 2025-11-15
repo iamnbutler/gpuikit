@@ -108,7 +108,7 @@ impl SyntaxHighlighter {
         language: &str,
         line_number: usize,
         font_family: SharedString,
-        font_size: f32,
+        _font_size: f32,
     ) -> Vec<TextRun> {
         let mut inner = self.inner.borrow_mut();
 
@@ -382,7 +382,7 @@ impl SyntaxHighlighter {
             .map_err(|e| format!("Failed to load syntax: {}", e))?;
 
         // Merge with existing syntaxes
-        for syntax in inner.syntax_set.syntaxes() {
+        for _syntax in inner.syntax_set.syntaxes() {
             builder.add_plain_text_syntax();
         }
 

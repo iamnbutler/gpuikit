@@ -1,4 +1,4 @@
-# gpui-editor
+# gpuikit-editor
 
 🚧 This crate is a work in progress – it is currently in a prototype state 🚧
 

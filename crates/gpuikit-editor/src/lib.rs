@@ -13,8 +13,7 @@
 pub mod buffer;
 pub mod editor;
 pub mod element;
-pub mod keymap;
-pub mod keymap_ext;
+
 pub mod syntax_highlighter;
 
 // Internal modules
@@ -24,11 +23,9 @@ mod meta_line;
 pub use buffer::{GapBuffer, TextBuffer};
 pub use editor::{CursorPosition, Editor, EditorConfig};
 pub use element::EditorElement;
-pub use keymap::{
-    ActionRegistry, ActionValue, BindingSpec, KeyBindingEntry, Keymap, KeymapCollection,
-    SimpleActionRegistry,
-};
-pub use keymap_ext::{bind, create_bindings, BindingBuilder};
+// Re-export keymap types from gpuikit-keymap
+pub use gpuikit_keymap::extensions::{bind, create_bindings, BindingBuilder};
+pub use gpuikit_keymap::{BindingSpec, Keymap, KeymapCollection};
 pub use meta_line::{Language, MetaLine, Selection};
 pub use syntax_highlighter::SyntaxHighlighter;
 

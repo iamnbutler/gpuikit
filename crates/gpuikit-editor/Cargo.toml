@@ -1,5 +1,5 @@
 [package]
-name = "gpui-editor"
+name = "gpuikit-editor"
 version = "0.1.0"
 authors = ["Nate Butler <iamnbutler@gmail.com>"]
 description = "A standalone editor component for GPUI"

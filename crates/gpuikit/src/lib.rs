@@ -6,6 +6,7 @@ pub use gpuikit_utils as utils;
 
 pub mod error;
 pub mod layout;
+pub mod resource;
 
 pub mod style {
     use crate::theme::Theme;

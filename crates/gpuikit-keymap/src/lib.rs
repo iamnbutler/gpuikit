@@ -4,7 +4,6 @@
 //! keybindings to be loaded from external files rather than hardcoded.
 
 use anyhow::{anyhow, Context as _, Result};
-use gpui::Action;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -19,77 +18,24 @@ pub struct Keymap {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<String>,
 
-    /// Whether to use platform-specific key equivalents
-    #[serde(default)]
-    pub use_key_equivalents: bool,
-
     /// The key bindings in this keymap
-    pub bindings: KeyBindings,
+    pub bindings: HashMap<String, String>,
 }
 
-/// Represents the bindings section of a keymap
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum KeyBindings {
-    /// Simple map of keystroke -> action
-    Simple(HashMap<String, ActionValue>),
-    /// List of individual key binding entries (for more complex configurations)
-    Complex(Vec<KeyBindingEntry>),
-}
-
-/// Represents a single key binding entry
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KeyBindingEntry {
-    /// The keystroke sequence (e.g., "cmd-s", "ctrl-shift-p")
-    pub key: String,
-
-    /// The action to trigger
-    pub action: ActionValue,
-
-    /// Optional context where this binding applies
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub context: Option<String>,
-}
-
-/// Represents an action value in the keymap
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum ActionValue {
-    /// Simple action name
-    Simple(String),
-    /// Action with parameters
-    WithParams(Vec<serde_json::Value>),
-}
-
-impl ActionValue {
-    /// Get the action name from this value
-    pub fn action_name(&self) -> Result<String> {
-        match self {
-            ActionValue::Simple(name) => Ok(name.clone()),
-            ActionValue::WithParams(values) => {
-                if let Some(first) = values.first() {
-                    if let Some(name) = first.as_str() {
-                        return Ok(name.to_string());
-                    }
-                }
-                Err(anyhow!(
-                    "Invalid action format: expected action name as first element"
-                ))
-            }
+impl Keymap {
+    /// Create a new keymap with the given bindings
+    pub fn new(bindings: HashMap<String, String>) -> Self {
+        Self {
+            context: None,
+            bindings,
         }
     }
 
-    /// Get the action parameters if any
-    pub fn params(&self) -> Option<serde_json::Value> {
-        match self {
-            ActionValue::Simple(_) => None,
-            ActionValue::WithParams(values) => {
-                if values.len() > 1 {
-                    Some(values[1].clone())
-                } else {
-                    None
-                }
-            }
+    /// Create a new keymap with context
+    pub fn with_context(context: impl Into<String>, bindings: HashMap<String, String>) -> Self {
+        Self {
+            context: Some(context.into()),
+            bindings,
         }
     }
 }
@@ -135,9 +81,9 @@ impl KeymapCollection {
         Err(anyhow!("Invalid keymap JSON format"))
     }
 
-    /// Load default keymaps for the current platform
+    /// Load default keymaps
     pub fn load_defaults(&mut self) -> Result<()> {
-        let default_keymap = default_keymap_json();
+        let default_keymap = include_str!("../default-keymap.json");
         self.load_json(default_keymap)?;
         Ok(())
     }
@@ -146,61 +92,22 @@ impl KeymapCollection {
     ///
     /// Returns a list of binding specifications that can be used to create
     /// actual GPUI key bindings with concrete action types.
-    pub fn get_binding_specs(&self) -> Result<Vec<BindingSpec>> {
+    pub fn get_binding_specs(&self) -> Vec<BindingSpec> {
         let mut specs = Vec::new();
 
         for keymap in &self.keymaps {
             let context = keymap.context.as_deref();
 
-            match &keymap.bindings {
-                KeyBindings::Simple(map) => {
-                    for (key, action_value) in map {
-                        let action_name = action_value.action_name()?;
-                        specs.push(BindingSpec {
-                            keystrokes: key.clone(),
-                            action_name,
-                            action_params: action_value.params(),
-                            context: context.map(String::from),
-                        });
-                    }
-                }
-                KeyBindings::Complex(entries) => {
-                    for entry in entries {
-                        let action_name = entry.action.action_name()?;
-                        let binding_context = entry.context.as_deref().or(context);
-                        specs.push(BindingSpec {
-                            keystrokes: entry.key.clone(),
-                            action_name,
-                            action_params: entry.action.params(),
-                            context: binding_context.map(String::from),
-                        });
-                    }
-                }
+            for (keystrokes, action_name) in &keymap.bindings {
+                specs.push(BindingSpec {
+                    keystrokes: keystrokes.clone(),
+                    action_name: action_name.clone(),
+                    context: context.map(String::from),
+                });
             }
         }
 
-        Ok(specs)
-    }
-
-    /// Convert this collection into boxed actions using a registry
-    ///
-    /// This is primarily for testing and validation purposes.
-    pub fn to_actions(
-        &self,
-        action_registry: &impl ActionRegistry,
-    ) -> Result<Vec<(String, Box<dyn Action>, Option<String>)>> {
-        let mut actions = Vec::new();
-
-        for spec in self.get_binding_specs()? {
-            if let Some(action) = action_registry.get_action(&spec.action_name, spec.action_params)
-            {
-                actions.push((spec.keystrokes, action, spec.context));
-            } else {
-                log::warn!("Unknown action in keymap: {}", spec.action_name);
-            }
-        }
-
-        Ok(actions)
+        specs
     }
 
     /// Get all keymaps in this collection
@@ -208,111 +115,64 @@ impl KeymapCollection {
         &self.keymaps
     }
 
+    /// Add a keymap to this collection
+    pub fn add(&mut self, keymap: Keymap) {
+        self.keymaps.push(keymap);
+    }
+
     /// Clear all keymaps from this collection
     pub fn clear(&mut self) {
         self.keymaps.clear();
     }
+
+    /// Find all bindings for a given action
+    pub fn find_bindings_for_action(&self, action_name: &str) -> Vec<&BindingSpec> {
+        self.get_binding_specs()
+            .iter()
+            .filter(|spec| spec.action_name == action_name)
+            .collect()
+    }
+
+    /// Find the action for a given keystroke in a context
+    pub fn find_action(&self, keystrokes: &str, context: Option<&str>) -> Option<&str> {
+        // First try to find a binding with matching context
+        if let Some(context) = context {
+            for keymap in &self.keymaps {
+                if keymap.context.as_deref() == Some(context) {
+                    if let Some(action) = keymap.bindings.get(keystrokes) {
+                        return Some(action);
+                    }
+                }
+            }
+        }
+
+        // Then try bindings without context (global)
+        for keymap in &self.keymaps {
+            if keymap.context.is_none() {
+                if let Some(action) = keymap.bindings.get(keystrokes) {
+                    return Some(action);
+                }
+            }
+        }
+
+        None
+    }
 }
 
-/// Specification for a key binding that can be used to create actual bindings
+/// Specification for a key binding
 #[derive(Debug, Clone)]
 pub struct BindingSpec {
     /// The keystroke sequence (e.g., "cmd-s", "ctrl-shift-p")
     pub keystrokes: String,
     /// The action name to trigger
     pub action_name: String,
-    /// Optional parameters for the action
-    pub action_params: Option<serde_json::Value>,
     /// Optional context where this binding applies
     pub context: Option<String>,
 }
 
-/// Trait for registries that can provide Action instances from names
-pub trait ActionRegistry {
-    /// Get an action by name, optionally with parameters
-    fn get_action(&self, name: &str, params: Option<serde_json::Value>) -> Option<Box<dyn Action>>;
-}
-
-/// A simple action registry implementation using a HashMap
-pub struct SimpleActionRegistry {
-    actions: HashMap<String, Box<dyn Fn(Option<serde_json::Value>) -> Box<dyn Action>>>,
-}
-
-impl SimpleActionRegistry {
-    /// Create a new empty registry
-    pub fn new() -> Self {
-        Self {
-            actions: HashMap::new(),
-        }
-    }
-
-    /// Register an action factory
-    pub fn register<F>(&mut self, name: impl Into<String>, factory: F)
-    where
-        F: Fn(Option<serde_json::Value>) -> Box<dyn Action> + 'static,
-    {
-        self.actions.insert(name.into(), Box::new(factory));
-    }
-
-    /// Register a simple action (no parameters)
-    pub fn register_simple<A: Action>(&mut self, name: impl Into<String>, action: A)
-    where
-        A: Clone + 'static,
-    {
-        let name = name.into();
-        self.register(name, move |_params| Box::new(action.clone()));
-    }
-}
-
-impl ActionRegistry for SimpleActionRegistry {
-    fn get_action(&self, name: &str, params: Option<serde_json::Value>) -> Option<Box<dyn Action>> {
-        self.actions.get(name).map(|factory| factory(params))
-    }
-}
-
-/// Returns the default keymap JSON for the current platform
-pub fn default_keymap_json() -> &'static str {
-    #[cfg(target_os = "macos")]
-    {
-        include_str!("../default-keymap.json")
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        include_str!("../default-keymap-windows.json")
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        include_str!("../default-keymap-linux.json")
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-    {
-        include_str!("../default-keymap.json")
-    }
-}
-
-/// Helper function to create a KeyBinding from a simple action
-pub fn binding(key: impl Into<String>, action: impl Into<String>) -> KeyBindingEntry {
-    KeyBindingEntry {
-        key: key.into(),
-        action: ActionValue::Simple(action.into()),
-        context: None,
-    }
-}
-
-/// Helper function to create a KeyBinding with context
-pub fn binding_with_context(
-    key: impl Into<String>,
-    action: impl Into<String>,
-    context: impl Into<String>,
-) -> KeyBindingEntry {
-    KeyBindingEntry {
-        key: key.into(),
-        action: ActionValue::Simple(action.into()),
-        context: Some(context.into()),
-    }
+/// Helper function to create a simple binding
+pub fn binding(key: impl Into<String>, action: impl Into<String>) -> (String, String) {
+    (key.into(), action.into())
 }
 
 #[cfg(test)]
@@ -331,59 +191,33 @@ mod tests {
 
         let keymap: Keymap = serde_json::from_str(json).unwrap();
         assert_eq!(keymap.context, Some("Editor".to_string()));
-
-        if let KeyBindings::Simple(map) = keymap.bindings {
-            assert_eq!(map.len(), 2);
-            assert!(matches!(map.get("cmd-s"), Some(ActionValue::Simple(s)) if s == "Save"));
-            assert!(matches!(map.get("cmd-z"), Some(ActionValue::Simple(s)) if s == "Undo"));
-        } else {
-            panic!("Expected simple bindings");
-        }
+        assert_eq!(keymap.bindings.len(), 2);
+        assert_eq!(keymap.bindings.get("cmd-s"), Some(&"Save".to_string()));
+        assert_eq!(keymap.bindings.get("cmd-z"), Some(&"Undo".to_string()));
     }
 
     #[test]
-    fn test_parse_complex_keymap() {
+    fn test_parse_multiple_keymaps() {
         let json = r#"[
             {
-                "bindings": [
-                    { "key": "cmd-s", "action": "Save" },
-                    { "key": "cmd-z", "action": ["Undo", { "count": 1 }] }
-                ]
+                "bindings": {
+                    "cmd-s": "Save",
+                    "cmd-z": "Undo"
+                }
+            },
+            {
+                "context": "Menu",
+                "bindings": {
+                    "enter": "Select",
+                    "escape": "Cancel"
+                }
             }
         ]"#;
 
         let keymaps: Vec<Keymap> = serde_json::from_str(json).unwrap();
-        assert_eq!(keymaps.len(), 1);
-
-        let keymap = &keymaps[0];
-        if let KeyBindings::Complex(entries) = &keymap.bindings {
-            assert_eq!(entries.len(), 2);
-
-            assert_eq!(entries[0].key, "cmd-s");
-            assert!(matches!(&entries[0].action, ActionValue::Simple(s) if s == "Save"));
-
-            assert_eq!(entries[1].key, "cmd-z");
-            assert!(matches!(&entries[1].action, ActionValue::WithParams(_)));
-        } else {
-            panic!("Expected complex bindings");
-        }
-    }
-
-    #[test]
-    fn test_action_value_methods() {
-        let simple = ActionValue::Simple("Save".to_string());
-        assert_eq!(simple.action_name().unwrap(), "Save");
-        assert_eq!(simple.params(), None);
-
-        let with_params = ActionValue::WithParams(vec![
-            serde_json::json!("Undo"),
-            serde_json::json!({ "count": 1 }),
-        ]);
-        assert_eq!(with_params.action_name().unwrap(), "Undo");
-        assert_eq!(
-            with_params.params(),
-            Some(serde_json::json!({ "count": 1 }))
-        );
+        assert_eq!(keymaps.len(), 2);
+        assert_eq!(keymaps[0].context, None);
+        assert_eq!(keymaps[1].context, Some("Menu".to_string()));
     }
 
     #[test]
@@ -399,24 +233,58 @@ mod tests {
         assert_eq!(collection.keymaps().len(), 2);
         assert_eq!(collection.keymaps()[0].context, None);
         assert_eq!(collection.keymaps()[1].context, Some("Menu".to_string()));
+
+        let specs = collection.get_binding_specs();
+        assert_eq!(specs.len(), 2);
+        assert_eq!(specs[0].keystrokes, "cmd-s");
+        assert_eq!(specs[0].action_name, "Save");
+        assert_eq!(specs[0].context, None);
+    }
+
+    #[test]
+    fn test_find_action() {
+        let mut collection = KeymapCollection::new();
+
+        collection.add(Keymap::new(
+            [("cmd-s", "Save"), ("cmd-z", "Undo")]
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        ));
+
+        collection.add(Keymap::with_context(
+            "Editor",
+            [("cmd-x", "Cut")]
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        ));
+
+        // Global binding
+        assert_eq!(collection.find_action("cmd-s", None), Some("Save"));
+        assert_eq!(
+            collection.find_action("cmd-s", Some("Editor")),
+            Some("Save")
+        );
+
+        // Context-specific binding
+        assert_eq!(collection.find_action("cmd-x", Some("Editor")), Some("Cut"));
+        assert_eq!(collection.find_action("cmd-x", None), None);
+        assert_eq!(collection.find_action("cmd-x", Some("Menu")), None);
     }
 
     #[test]
     fn test_serialize_keymap() {
         let mut bindings = HashMap::new();
-        bindings.insert("cmd-s".to_string(), ActionValue::Simple("Save".to_string()));
-        bindings.insert("cmd-z".to_string(), ActionValue::Simple("Undo".to_string()));
+        bindings.insert("cmd-s".to_string(), "Save".to_string());
+        bindings.insert("cmd-z".to_string(), "Undo".to_string());
 
-        let keymap = Keymap {
-            context: Some("Editor".to_string()),
-            use_key_equivalents: false,
-            bindings: KeyBindings::Simple(bindings),
-        };
+        let keymap = Keymap::with_context("Editor", bindings);
 
         let json = serde_json::to_string_pretty(&keymap).unwrap();
         let parsed: Keymap = serde_json::from_str(&json).unwrap();
 
         assert_eq!(parsed.context, keymap.context);
-        assert_eq!(parsed.use_key_equivalents, keymap.use_key_equivalents);
+        assert_eq!(parsed.bindings, keymap.bindings);
     }
 }

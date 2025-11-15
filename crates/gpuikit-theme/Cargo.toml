@@ -1,5 +1,6 @@
 [package]
 name = "gpuikit-theme"
+description = "A theme module for gpuikit"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

@@ -1,6 +1,6 @@
 [
   {
-    "context": "Editor",
+    "context": "editor",
     "bindings": {
       "up": "editor::MoveUp",
       "down": "editor::MoveDown",

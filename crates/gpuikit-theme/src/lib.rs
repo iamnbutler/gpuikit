@@ -1,408 +1,214 @@
-//! Flexible theming system for GPUI applications
-//!
-//! This crate provides a comprehensive theming system with built-in themes,
-//! custom theme support, and dynamic theme switching capabilities.
+//! A simple theme system for gpui-kit
 
-use anyhow::{anyhow, Result};
-use gpui::{hsla, px, Hsla, Pixels};
-use serde::{Deserialize, Serialize};
+use gpui::{App, Global, Hsla, SharedString};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-pub mod colors;
-pub mod styles;
-
-// Re-export commonly used types
-pub use colors::{ColorPalette, ColorScale, SystemColors};
-pub use styles::{BorderStyle, Shadow, Spacing, Typography};
-
-/// A complete theme definition
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Theme {
-    /// Unique identifier for the theme
-    pub id: String,
-    /// Display name of the theme
-    pub name: String,
-    /// Theme appearance (light or dark)
-    pub appearance: ThemeAppearance,
-    /// Color definitions
-    pub colors: ThemeColors,
-    /// Typography settings
-    pub typography: Typography,
-    /// Spacing and sizing
-    pub spacing: Spacing,
-    /// Component-specific styles
-    pub components: ComponentStyles,
-    /// Custom metadata
-    #[serde(default)]
-    pub metadata: ThemeMetadata,
-}
-
-/// Theme appearance mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ThemeAppearance {
-    Light,
+/// Available theme variants
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThemeVariant {
     Dark,
-    Auto,
+    Light,
 }
 
-/// Core theme colors
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ThemeColors {
-    /// Background colors
-    pub background: ColorScale,
-    /// Foreground/text colors
-    pub foreground: ColorScale,
-    /// Primary accent color
-    pub primary: ColorScale,
-    /// Secondary accent color
-    pub secondary: ColorScale,
-    /// Success/positive color
-    pub success: ColorScale,
-    /// Warning color
-    pub warning: ColorScale,
-    /// Error/danger color
-    pub error: ColorScale,
-    /// Info color
-    pub info: ColorScale,
-    /// Border colors
-    pub border: ColorScale,
-    /// System colors (window, controls, etc.)
-    pub system: SystemColors,
-}
-
-/// Component-specific styling
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ComponentStyles {
-    /// Button styles
-    #[serde(default)]
-    pub button: ButtonStyle,
-    /// Input field styles
-    #[serde(default)]
-    pub input: InputStyle,
-    /// Panel/container styles
-    #[serde(default)]
-    pub panel: PanelStyle,
-    /// Custom component styles
-    #[serde(default)]
-    pub custom: HashMap<String, serde_json::Value>,
-}
-
-/// Button styling
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ButtonStyle {
-    pub padding: Spacing,
-    pub border_radius: Pixels,
-    pub border_width: Pixels,
-    #[serde(default)]
-    pub variants: HashMap<String, ButtonVariant>,
-}
-
-impl Default for ButtonStyle {
+impl Default for ThemeVariant {
     fn default() -> Self {
-        Self {
-            padding: Spacing::default(),
-            border_radius: px(4.0),
-            border_width: px(1.0),
-            variants: HashMap::new(),
-        }
+        ThemeVariant::Dark
     }
 }
 
-/// Button variant styling
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ButtonVariant {
-    pub background: Hsla,
-    pub foreground: Hsla,
+/// Core theme structure with essential color tokens
+#[derive(Debug, Clone)]
+pub struct Theme {
+    pub name: SharedString,
+    pub variant: ThemeVariant,
+
+    /// Foreground color for text
+    pub fg: Hsla,
+
+    /// Background color for the main application
+    pub bg: Hsla,
+
+    /// Surface color for cards, panels, and elevated surfaces
+    pub surface: Hsla,
+
+    /// Border color for dividers and component boundaries
     pub border: Hsla,
-    #[serde(default)]
-    pub hover_background: Option<Hsla>,
-    #[serde(default)]
-    pub hover_foreground: Option<Hsla>,
-    #[serde(default)]
-    pub active_background: Option<Hsla>,
+
+    /// Outline color for focus states
+    pub outline: Hsla,
 }
 
-/// Input field styling
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InputStyle {
-    pub padding: Spacing,
-    pub border_radius: Pixels,
-    pub border_width: Pixels,
-    pub background: Hsla,
-    pub foreground: Hsla,
-    pub border: Hsla,
-    pub placeholder: Hsla,
-}
-
-impl Default for InputStyle {
-    fn default() -> Self {
-        Self {
-            padding: Spacing::default(),
-            border_radius: px(4.0),
-            border_width: px(1.0),
-            background: hsla(0.0, 0.0, 1.0, 1.0),
-            foreground: hsla(0.0, 0.0, 0.0, 1.0),
-            border: hsla(0.0, 0.0, 0.8, 1.0),
-            placeholder: hsla(0.0, 0.0, 0.5, 1.0),
+impl Theme {
+    /// Create a Gruvbox Dark theme
+    pub fn gruvbox_dark() -> Self {
+        Theme {
+            name: SharedString::from("Gruvbox Dark"),
+            variant: ThemeVariant::Dark,
+            fg: parse_hex("#ebdbb2"),
+            bg: parse_hex("#282828"),
+            surface: parse_hex("#3c3836"),
+            border: parse_hex("#504945"),
+            outline: parse_hex("#458588"),
         }
+    }
+
+    /// Create a Gruvbox Light theme
+    pub fn gruvbox_light() -> Self {
+        Theme {
+            name: SharedString::from("Gruvbox Light"),
+            variant: ThemeVariant::Light,
+            fg: parse_hex("#3c3836"),
+            bg: parse_hex("#fbf1c7"),
+            surface: parse_hex("#ebdbb2"),
+            border: parse_hex("#d5c4a1"),
+            outline: parse_hex("#076678"),
+        }
+    }
+
+    /// Get the global theme instance
+    pub fn get_global(cx: &App) -> &Arc<Theme> {
+        &cx.global::<GlobalTheme>().0
     }
 }
 
-/// Panel/container styling
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PanelStyle {
-    pub padding: Spacing,
-    pub background: Hsla,
-    pub border: Option<BorderStyle>,
-}
-
-impl Default for PanelStyle {
+impl Default for Theme {
     fn default() -> Self {
-        Self {
-            padding: Spacing::default(),
-            background: hsla(0.0, 0.0, 1.0, 1.0),
-            border: None,
-        }
+        Theme::gruvbox_dark()
     }
 }
 
-/// Theme metadata
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ThemeMetadata {
-    /// Theme author
-    #[serde(default)]
-    pub author: Option<String>,
-    /// Theme version
-    #[serde(default)]
-    pub version: Option<String>,
-    /// Theme description
-    #[serde(default)]
-    pub description: Option<String>,
-    /// Parent theme (for variants)
-    #[serde(default)]
-    pub parent: Option<String>,
-    /// Custom metadata fields
-    #[serde(flatten)]
-    pub custom: HashMap<String, serde_json::Value>,
+/// Global container for the application-wide theme
+#[derive(Clone, Debug)]
+pub struct GlobalTheme(pub Arc<Theme>);
+
+impl Global for GlobalTheme {}
+
+impl Default for GlobalTheme {
+    fn default() -> Self {
+        GlobalTheme(Arc::new(Theme::default()))
+    }
 }
 
-/// Theme manager for loading and switching themes
-pub struct ThemeManager {
-    themes: HashMap<String, Arc<Theme>>,
-    active_theme: Arc<Theme>,
+/// Trait for accessing the current theme from an App context
+pub trait ActiveTheme {
+    /// Returns a reference to the currently active theme
+    fn theme(&self) -> &Arc<Theme>;
 }
 
-impl ThemeManager {
-    /// Create a new theme manager with default theme
+impl ActiveTheme for App {
+    fn theme(&self) -> &Arc<Theme> {
+        &self.global::<GlobalTheme>().0
+    }
+}
+
+/// Simple theme collection manager
+#[derive(Debug, Default)]
+pub struct Themes {
+    themes: HashMap<SharedString, Arc<Theme>>,
+    active: Option<SharedString>,
+}
+
+impl Themes {
+    /// Create a new theme collection with built-in themes
     pub fn new() -> Self {
-        let default_theme = Self::default_theme();
         let mut themes = HashMap::new();
-        themes.insert(default_theme.id.clone(), Arc::new(default_theme.clone()));
+
+        // Add built-in themes
+        let gruvbox_dark = Theme::gruvbox_dark();
+        let gruvbox_light = Theme::gruvbox_light();
+
+        themes.insert(gruvbox_dark.name.clone(), Arc::new(gruvbox_dark));
+        themes.insert(gruvbox_light.name.clone(), Arc::new(gruvbox_light));
 
         Self {
             themes,
-            active_theme: Arc::new(default_theme),
+            active: Some(SharedString::from("Gruvbox Dark")),
         }
     }
 
-    /// Register a new theme
-    pub fn register(&mut self, theme: Theme) {
-        self.themes.insert(theme.id.clone(), Arc::new(theme));
+    /// Add a custom theme
+    pub fn add(&mut self, theme: Theme) {
+        self.themes.insert(theme.name.clone(), Arc::new(theme));
     }
 
-    /// Load theme from JSON
-    pub fn load_from_json(&mut self, json: &str) -> Result<()> {
-        let theme: Theme = serde_json::from_str(json)?;
-        self.register(theme);
-        Ok(())
+    /// Get a theme by name
+    pub fn get(&self, name: &str) -> Option<Arc<Theme>> {
+        self.themes.get(name).cloned()
     }
 
-    /// Set active theme by ID
-    pub fn set_active(&mut self, theme_id: &str) -> Result<()> {
-        let theme = self
-            .themes
-            .get(theme_id)
-            .ok_or_else(|| anyhow!("Theme not found: {}", theme_id))?;
-        self.active_theme = Arc::clone(theme);
-        Ok(())
+    /// Set the active theme by name
+    pub fn set_active(&mut self, name: impl Into<SharedString>) -> Option<Arc<Theme>> {
+        let name = name.into();
+        if let Some(theme) = self.themes.get(&name) {
+            self.active = Some(name);
+            Some(theme.clone())
+        } else {
+            None
+        }
     }
 
     /// Get the active theme
-    pub fn active(&self) -> Arc<Theme> {
-        Arc::clone(&self.active_theme)
+    pub fn active(&self) -> Option<Arc<Theme>> {
+        self.active
+            .as_ref()
+            .and_then(|name| self.themes.get(name).cloned())
     }
 
-    /// Get a theme by ID
-    pub fn get(&self, theme_id: &str) -> Option<Arc<Theme>> {
-        self.themes.get(theme_id).cloned()
+    /// List all available theme names
+    pub fn list(&self) -> Vec<SharedString> {
+        self.themes.keys().cloned().collect()
     }
 
-    /// List all available themes
-    pub fn list(&self) -> Vec<&str> {
-        self.themes.keys().map(|s| s.as_str()).collect()
-    }
-
-    /// Get default light theme
-    fn default_theme() -> Theme {
-        Theme {
-            id: "default-light".to_string(),
-            name: "Default Light".to_string(),
-            appearance: ThemeAppearance::Light,
-            colors: ThemeColors::default_light(),
-            typography: Typography::default(),
-            spacing: Spacing::default(),
-            components: ComponentStyles::default(),
-            metadata: ThemeMetadata::default(),
+    /// Apply the active theme globally
+    pub fn apply_global(&self, cx: &mut App) -> Option<Arc<Theme>> {
+        if let Some(theme) = self.active() {
+            cx.set_global(GlobalTheme(theme.clone()));
+            Some(theme)
+        } else {
+            None
         }
     }
 }
 
-impl Default for ThemeManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+/// Helper function to parse hex color strings
+fn parse_hex(hex: &str) -> Hsla {
+    let hex = hex.trim_start_matches('#');
 
-impl ThemeColors {
-    /// Create default light theme colors
-    pub fn default_light() -> Self {
-        Self {
-            background: ColorScale::grayscale_light(),
-            foreground: ColorScale::grayscale_dark(),
-            primary: ColorScale::blue(),
-            secondary: ColorScale::purple(),
-            success: ColorScale::green(),
-            warning: ColorScale::yellow(),
-            error: ColorScale::red(),
-            info: ColorScale::cyan(),
-            border: ColorScale::grayscale_light(),
-            system: SystemColors::default_light(),
-        }
-    }
+    let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
+    let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
+    let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
 
-    /// Create default dark theme colors
-    pub fn default_dark() -> Self {
-        Self {
-            background: ColorScale::grayscale_dark(),
-            foreground: ColorScale::grayscale_light(),
-            primary: ColorScale::blue(),
-            secondary: ColorScale::purple(),
-            success: ColorScale::green(),
-            warning: ColorScale::yellow(),
-            error: ColorScale::red(),
-            info: ColorScale::cyan(),
-            border: ColorScale::grayscale_dark(),
-            system: SystemColors::default_dark(),
-        }
-    }
-}
+    // Convert RGB to HSLA
+    let r = r as f32 / 255.0;
+    let g = g as f32 / 255.0;
+    let b = b as f32 / 255.0;
 
-/// Built-in themes module
-#[cfg(feature = "builtin-themes")]
-pub mod builtin {
-    use super::*;
+    let max = r.max(g).max(b);
+    let min = r.min(g).min(b);
+    let delta = max - min;
 
-    /// Get all built-in themes
-    pub fn all() -> Vec<Theme> {
-        vec![light(), dark(), solarized_light(), solarized_dark(), nord()]
-    }
+    let lightness = (max + min) / 2.0;
 
-    /// Default light theme
-    pub fn light() -> Theme {
-        Theme {
-            id: "builtin-light".to_string(),
-            name: "Light".to_string(),
-            appearance: ThemeAppearance::Light,
-            colors: ThemeColors::default_light(),
-            typography: Typography::default(),
-            spacing: Spacing::default(),
-            components: ComponentStyles::default(),
-            metadata: ThemeMetadata {
-                author: Some("GPUIKit".to_string()),
-                version: Some("1.0.0".to_string()),
-                description: Some("Default light theme".to_string()),
-                ..Default::default()
-            },
-        }
-    }
+    let saturation = if delta == 0.0 {
+        0.0
+    } else {
+        delta / (1.0 - (2.0 * lightness - 1.0).abs())
+    };
 
-    /// Default dark theme
-    pub fn dark() -> Theme {
-        Theme {
-            id: "builtin-dark".to_string(),
-            name: "Dark".to_string(),
-            appearance: ThemeAppearance::Dark,
-            colors: ThemeColors::default_dark(),
-            typography: Typography::default(),
-            spacing: Spacing::default(),
-            components: ComponentStyles::default(),
-            metadata: ThemeMetadata {
-                author: Some("GPUIKit".to_string()),
-                version: Some("1.0.0".to_string()),
-                description: Some("Default dark theme".to_string()),
-                ..Default::default()
-            },
-        }
-    }
+    let hue = if delta == 0.0 {
+        0.0
+    } else if max == r {
+        60.0 * (((g - b) / delta) % 6.0)
+    } else if max == g {
+        60.0 * ((b - r) / delta + 2.0)
+    } else {
+        60.0 * ((r - g) / delta + 4.0)
+    };
 
-    /// Solarized light theme
-    pub fn solarized_light() -> Theme {
-        // Implementation would include Solarized color scheme
-        light() // Placeholder
-    }
+    let hue = if hue < 0.0 { hue + 360.0 } else { hue };
 
-    /// Solarized dark theme
-    pub fn solarized_dark() -> Theme {
-        // Implementation would include Solarized color scheme
-        dark() // Placeholder
-    }
-
-    /// Nord theme
-    pub fn nord() -> Theme {
-        // Implementation would include Nord color scheme
-        dark() // Placeholder
-    }
-}
-
-/// Hot-reload support for theme development
-#[cfg(feature = "hot-reload")]
-pub mod hot_reload {
-    use super::*;
-    use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-    use std::path::PathBuf;
-    use std::sync::mpsc;
-
-    /// Theme watcher for hot-reloading
-    pub struct ThemeWatcher {
-        watcher: RecommendedWatcher,
-        rx: mpsc::Receiver<notify::Result<Event>>,
-    }
-
-    impl ThemeWatcher {
-        /// Create a new theme watcher
-        pub fn new(theme_path: PathBuf) -> Result<Self> {
-            let (tx, rx) = mpsc::channel();
-            let mut watcher = notify::recommended_watcher(tx)?;
-            watcher.watch(&theme_path, RecursiveMode::NonRecursive)?;
-
-            Ok(Self { watcher, rx })
-        }
-
-        /// Check for theme changes
-        pub fn check_changes(&self) -> Option<PathBuf> {
-            if let Ok(Ok(event)) = self.rx.try_recv() {
-                if let EventKind::Modify(_) = event.kind {
-                    event.paths.first().cloned()
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        }
-    }
+    gpui::hsla(hue / 360.0, saturation, lightness, 1.0)
 }
 
 #[cfg(test)]
@@ -410,39 +216,49 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_theme_creation() {
-        let theme = Theme {
-            id: "test".to_string(),
-            name: "Test Theme".to_string(),
-            appearance: ThemeAppearance::Light,
-            colors: ThemeColors::default_light(),
-            typography: Typography::default(),
-            spacing: Spacing::default(),
-            components: ComponentStyles::default(),
-            metadata: ThemeMetadata::default(),
-        };
-
-        assert_eq!(theme.id, "test");
-        assert_eq!(theme.appearance, ThemeAppearance::Light);
+    fn test_default_theme() {
+        let theme = Theme::default();
+        assert_eq!(theme.name, SharedString::from("Gruvbox Dark"));
+        assert_eq!(theme.variant, ThemeVariant::Dark);
     }
 
     #[test]
-    fn test_theme_manager() {
-        let mut manager = ThemeManager::new();
-        assert!(!manager.list().is_empty());
+    fn test_themes_manager() {
+        let mut themes = Themes::new();
 
-        let theme = Theme {
-            id: "custom".to_string(),
-            name: "Custom Theme".to_string(),
-            appearance: ThemeAppearance::Dark,
-            colors: ThemeColors::default_dark(),
-            typography: Typography::default(),
-            spacing: Spacing::default(),
-            components: ComponentStyles::default(),
-            metadata: ThemeMetadata::default(),
+        // Should have built-in themes
+        assert!(themes.get("Gruvbox Dark").is_some());
+        assert!(themes.get("Gruvbox Light").is_some());
+
+        // Active theme should be set
+        assert!(themes.active().is_some());
+
+        // Should be able to switch themes
+        let light_theme = themes.set_active("Gruvbox Light");
+        assert!(light_theme.is_some());
+        assert_eq!(themes.active().unwrap().variant, ThemeVariant::Light);
+
+        // Can add custom themes
+        let custom = Theme {
+            name: SharedString::from("Custom"),
+            variant: ThemeVariant::Dark,
+            fg: parse_hex("#ffffff"),
+            bg: parse_hex("#000000"),
+            surface: parse_hex("#111111"),
+            border: parse_hex("#222222"),
+            outline: parse_hex("#0066cc"),
         };
 
-        manager.register(theme);
-        assert!(manager.get("custom").is_some());
+        themes.add(custom);
+        assert!(themes.get("Custom").is_some());
+    }
+
+    #[test]
+    fn test_hex_parsing() {
+        let color = parse_hex("#ffffff");
+        assert_eq!(color.l, 1.0); // White should have lightness of 1.0
+
+        let color = parse_hex("#000000");
+        assert_eq!(color.l, 0.0); // Black should have lightness of 0.0
     }
 }

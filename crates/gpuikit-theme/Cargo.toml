@@ -6,9 +6,9 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "Flexible theming system for GPUI applications with built-in themes"
+description = "Simple theme system for GPUI applications"
 readme = "README.md"
-keywords = ["gpui", "theme", "theming", "colors", "styles"]
+keywords = ["gpui", "theme", "theming", "colors"]
 categories = ["gui", "graphics"]
 
 [lib]
@@ -19,38 +19,11 @@ path = "src/lib.rs"
 # GPUI framework
 gpui = { workspace = true }
 
-# Serialization for theme files
-serde = { workspace = true }
-serde_json = { workspace = true }
-
-# Error handling
-anyhow = { workspace = true }
-
-# Logging
+# Logging (optional)
 log = { workspace = true }
-
-# Color manipulation
-palette = "0.7"
-csscolorparser = "0.6"
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
-tempfile = "3.8"
-pretty_assertions = "1.4"
-
-[features]
-default = ["builtin-themes"]
-# Include built-in themes
-builtin-themes = []
-# Enable custom theme loading from JSON/YAML
-custom-themes = []
-# Enable theme hot-reloading for development
-hot-reload = ["notify"]
-
-# Optional dependencies
-[dependencies.notify]
-version = "6.1"
-optional = true
 
 # Package metadata for crates.io
 [package.metadata.docs.rs]
@@ -64,11 +37,3 @@ path = "examples/basic_theme.rs"
 [[example]]
 name = "theme_switcher"
 path = "examples/theme_switcher.rs"
-
-[[example]]
-name = "custom_theme"
-path = "examples/custom_theme.rs"
-
-[[example]]
-name = "color_palette"
-path = "examples/color_palette.rs"

@@ -30,7 +30,9 @@ pub trait TextBuffer {
 
     /// Get the length of a specific line in characters
     fn line_len(&self, line_idx: usize) -> usize {
-        self.get_line(line_idx).map(|s| s.len()).unwrap_or(0)
+        self.get_line(line_idx)
+            .map(|s| s.chars().count())
+            .unwrap_or(0)
     }
 
     /// Get all lines (for now, while we're simple)
@@ -289,25 +291,27 @@ impl GapBuffer {
         let text = self.to_string();
         let mut current_row = 0;
         let mut current_col = 0;
+        let mut char_index = 0;
 
-        for (i, ch) in text.char_indices() {
+        for ch in text.chars() {
             if current_row == row && current_col == col {
-                return i;
+                return char_index;
             }
 
             if ch == '\n' {
                 if current_row == row {
-                    return i; // Return position at end of line if col is beyond line end
+                    return char_index; // Return position at end of line if col is beyond line end
                 }
                 current_row += 1;
                 current_col = 0;
             } else {
                 current_col += 1;
             }
+            char_index += 1;
         }
 
-        // Return end of text if position is beyond
-        text.len()
+        // Return character count if position is beyond
+        char_index
     }
 
     /// Convert buffer position to cursor position (row, col).
@@ -319,13 +323,15 @@ impl GapBuffer {
     /// A tuple of (row, column) representing the cursor position
     pub fn position_to_cursor(&self, position: usize) -> (usize, usize) {
         let text = self.to_string();
-        let position = min(position, text.len());
+        let char_count = text.chars().count();
+        let position = min(position, char_count);
 
         let mut row = 0;
         let mut col = 0;
+        let mut char_index = 0;
 
-        for (i, ch) in text.char_indices() {
-            if i >= position {
+        for ch in text.chars() {
+            if char_index >= position {
                 break;
             }
             if ch == '\n' {
@@ -334,6 +340,7 @@ impl GapBuffer {
             } else {
                 col += 1;
             }
+            char_index += 1;
         }
 
         (row, col)
@@ -367,7 +374,7 @@ impl TextBuffer for GapBuffer {
 
     fn line_len(&self, line_idx: usize) -> usize {
         let lines = self.to_lines();
-        lines.get(line_idx).map(|s| s.len()).unwrap_or(0)
+        lines.get(line_idx).map(|s| s.chars().count()).unwrap_or(0)
     }
 
     fn insert_at(&mut self, row: usize, col: usize, text: &str) {

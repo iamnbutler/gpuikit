@@ -12,6 +12,13 @@ pub struct EditorElement {
 impl EditorElement {
     /// Create a new EditorElement from an Editor
     pub fn new(editor: Editor) -> Self {
+        let mut style = Style::default();
+        let refinement = StyleRefinement::default().bg(solid_background(gpui::red()));
+
+        style.refine(&refinement);
+
+        dbg!(style);
+
         Self { editor }
     }
 

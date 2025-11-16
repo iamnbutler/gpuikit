@@ -103,9 +103,21 @@ impl Editor {
     }
 
     pub fn set_cursor_position(&mut self, position: CursorPosition) {
-        self.cursor_position = position;
+        self.cursor_position = self.clamp_cursor_position(position);
         // Reset goal column when cursor position is explicitly set
         self.goal_column = None;
+    }
+
+    fn clamp_cursor_position(&self, position: CursorPosition) -> CursorPosition {
+        let line_count = self.buffer.line_count();
+        // Clamp row to valid range [0, line_count - 1]
+        let row = position.row.min(line_count.saturating_sub(1));
+
+        // Clamp column to valid range [0, line_len]
+        let line_len = self.buffer.line_len(row);
+        let col = position.col.min(line_len);
+
+        CursorPosition::new(row, col)
     }
 
     pub fn get_cursor_position(&self) -> CursorPosition {
@@ -400,6 +412,13 @@ impl Editor {
             return;
         }
 
+        // Store the previous line length before the merge (if at line start)
+        let prev_line_len = if self.cursor_position.col == 0 && self.cursor_position.row > 0 {
+            self.buffer.line_len(self.cursor_position.row - 1)
+        } else {
+            0
+        };
+
         // Use the buffer's backspace_at method directly
         self.buffer
             .backspace_at(self.cursor_position.row, self.cursor_position.col);
@@ -410,10 +429,9 @@ impl Editor {
             self.syntax_highlighter
                 .clear_state_from_line(self.cursor_position.row, &self.language);
         } else if self.cursor_position.row > 0 {
-            // Move to end of previous line
+            // Move to the merge point (end of previous line before merge)
             self.cursor_position.row -= 1;
-            let line_len = self.buffer.line_len(self.cursor_position.row);
-            self.cursor_position.col = line_len;
+            self.cursor_position.col = prev_line_len;
             // Clear highlighting state from the previous line onward
             self.syntax_highlighter
                 .clear_state_from_line(self.cursor_position.row, &self.language);

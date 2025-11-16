@@ -3,6 +3,7 @@
 pub use gpuikit_theme as theme;
 
 pub mod error;
+pub mod fs;
 pub mod layout;
 pub mod resource;
 

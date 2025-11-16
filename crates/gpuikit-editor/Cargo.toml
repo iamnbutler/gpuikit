@@ -21,6 +21,7 @@ path = "examples/editor_demo.rs"
 [dependencies]
 gpui = { version = "0.2.2", features = ["test-support"] }
 gpui_util = { version = "0.2.2" }
+gpuikit = { workspace = true }
 gpuikit-keymap = { workspace = true }
 syntect = "5.3.0"
 serde = { version = "1.0", features = ["derive"] }

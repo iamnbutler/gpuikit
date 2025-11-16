@@ -8,6 +8,7 @@ pub enum Language {
     #[default]
     PlainText,
     Rust,
+    Markdown,
 }
 
 impl Language {
@@ -15,6 +16,7 @@ impl Language {
         let string: &'static str = match self {
             Language::PlainText => "Plain Text",
             Language::Rust => "Rust",
+            Language::Markdown => "Markdown",
         };
 
         string.into()

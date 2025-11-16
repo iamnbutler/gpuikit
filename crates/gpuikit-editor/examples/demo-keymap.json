@@ -29,7 +29,15 @@
       "cmd-shift-]": "editor::NextLanguage",
       "ctrl-shift-]": "editor::NextLanguage",
       "cmd-shift-[": "editor::PreviousLanguage",
-      "ctrl-shift-[": "editor::PreviousLanguage"
+      "ctrl-shift-[": "editor::PreviousLanguage",
+      "cmd-n": "editor::NewFile",
+      "ctrl-n": "editor::NewFile",
+      "cmd-o": "editor::OpenFile",
+      "ctrl-o": "editor::OpenFile",
+      "cmd-s": "editor::SaveFile",
+      "ctrl-s": "editor::SaveFile",
+      "cmd-shift-s": "editor::SaveFileAs",
+      "ctrl-shift-s": "editor::SaveFileAs"
     }
   }
 ]

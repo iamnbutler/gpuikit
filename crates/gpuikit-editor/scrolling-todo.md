@@ -1,10 +1,10 @@
-- [ ] Add mouse wheel event handler to increment/decrement scroll_row
+- [x] Add mouse wheel event handler to increment/decrement scroll_row
 - [ ] Implement PageUp/PageDown keyboard shortcuts
-- [ ] Implement Home/End keyboard shortcuts  
+- [ ] Implement Home/End keyboard shortcuts
 - [ ] Implement Ctrl+Home/Ctrl+End for document start/end
-- [ ] Add auto-scroll when cursor moves above visible range
-- [ ] Add auto-scroll when cursor moves below visible range
-- [ ] Add scroll margin (keep N lines visible above/below cursor)
+- [x] Add auto-scroll when cursor moves above visible range
+- [x] Add auto-scroll when cursor moves below visible range
+- [x] Add scroll margin (keep N lines visible above/below cursor)
 - [ ] Implement smooth scrolling animation with velocity tracking
 - [ ] Add momentum/inertia for mouse wheel scrolling
 - [ ] Handle scroll bounds clamping when buffer shrinks

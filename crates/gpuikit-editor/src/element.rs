@@ -7,12 +7,16 @@ use gpui::*;
 /// A GPUI Element that renders an Editor
 pub struct EditorElement {
     editor: Editor,
+    interactivity: Interactivity,
 }
 
 impl EditorElement {
     /// Create a new EditorElement from an Editor
     pub fn new(editor: Editor) -> Self {
-        Self { editor }
+        Self {
+            editor,
+            interactivity: Interactivity::default(),
+        }
     }
 
     /// Get a reference to the underlying Editor
@@ -351,14 +355,45 @@ impl EditorElement {
 impl IntoElement for EditorElement {
     type Element = Self;
 
-    fn into_element(self) -> Self::Element {
+    fn into_element(mut self) -> Self::Element {
+        let editor = self.editor.clone();
+
+        self.interactivity
+            .on_scroll_wheel(move |event, _window, _cx| {
+                let mut editor = editor.clone();
+
+                // Calculate scroll delta in lines
+                let lines_to_scroll = match event.delta {
+                    ScrollDelta::Lines(lines) => {
+                        // Scroll by the number of lines specified
+                        -lines.y as isize
+                    }
+                    ScrollDelta::Pixels(pixels) => {
+                        // Convert pixels to lines
+                        let line_height: f32 = editor.config().line_height.into();
+                        let pixels_y: f32 = pixels.y.into();
+                        -(pixels_y / line_height).round() as isize
+                    }
+                };
+
+                if lines_to_scroll != 0 {
+                    editor.scroll_by(lines_to_scroll);
+                }
+            });
+
         self
+    }
+}
+
+impl InteractiveElement for EditorElement {
+    fn interactivity(&mut self) -> &mut Interactivity {
+        &mut self.interactivity
     }
 }
 
 impl Element for EditorElement {
     type RequestLayoutState = ();
-    type PrepaintState = ();
+    type PrepaintState = Option<Hitbox>;
 
     fn id(&self) -> Option<ElementId> {
         Some(self.editor.id().clone())
@@ -385,26 +420,47 @@ impl Element for EditorElement {
 
     fn prepaint(
         &mut self,
-        _: Option<&GlobalElementId>,
-        _: Option<&gpui::InspectorElementId>,
-        _: Bounds<Pixels>,
+        global_id: Option<&GlobalElementId>,
+        inspector_id: Option<&gpui::InspectorElementId>,
+        bounds: Bounds<Pixels>,
         _: &mut Self::RequestLayoutState,
-        _window: &mut Window,
-        _cx: &mut App,
+        window: &mut Window,
+        cx: &mut App,
     ) -> Self::PrepaintState {
-        ()
+        self.interactivity.prepaint(
+            global_id,
+            inspector_id,
+            bounds,
+            bounds.size,
+            window,
+            cx,
+            |_, _, _, _, _| {},
+        );
+
+        // Insert a hitbox for scroll handling
+        Some(window.insert_hitbox(bounds, HitboxBehavior::Normal))
     }
 
     fn paint(
         &mut self,
-        _: Option<&GlobalElementId>,
-        _: Option<&gpui::InspectorElementId>,
+        global_id: Option<&GlobalElementId>,
+        inspector_id: Option<&gpui::InspectorElementId>,
         bounds: Bounds<Pixels>,
         _: &mut Self::RequestLayoutState,
-        _: &mut Self::PrepaintState,
+        hitbox: &mut Self::PrepaintState,
         window: &mut Window,
         cx: &mut App,
     ) {
+        self.interactivity.paint(
+            global_id,
+            inspector_id,
+            bounds,
+            hitbox.as_ref(),
+            window,
+            cx,
+            |_, _, _| {},
+        );
+
         self.paint_gutter_background(window, bounds);
         self.paint_editor_background(window, bounds);
         self.paint_active_line_background(window, bounds);

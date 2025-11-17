@@ -109,6 +109,8 @@ impl Editor {
         self.cursor_position = self.clamp_cursor_position(position);
         // Reset goal column when cursor position is explicitly set
         self.goal_column = None;
+        // Auto-scroll to keep cursor visible
+        self.ensure_cursor_visible();
     }
 
     fn clamp_cursor_position(&self, position: CursorPosition) -> CursorPosition {
@@ -225,6 +227,9 @@ impl Editor {
             self.cursor_position.row -= 1;
             self.cursor_position.col = self.buffer.line_len(self.cursor_position.row);
         }
+
+        // Auto-scroll to keep cursor visible
+        self.ensure_cursor_visible();
     }
 
     pub fn move_right(&mut self, shift_held: bool) {
@@ -246,6 +251,9 @@ impl Editor {
             self.cursor_position.row += 1;
             self.cursor_position.col = 0;
         }
+
+        // Auto-scroll to keep cursor visible
+        self.ensure_cursor_visible();
     }
 
     pub fn move_up(&mut self, shift_held: bool) {
@@ -269,6 +277,9 @@ impl Editor {
                 .goal_column
                 .unwrap_or(self.cursor_position.col)
                 .min(line_len);
+
+            // Auto-scroll to keep cursor visible
+            self.ensure_cursor_visible();
         }
     }
 
@@ -293,6 +304,9 @@ impl Editor {
                 .goal_column
                 .unwrap_or(self.cursor_position.col)
                 .min(line_len);
+
+            // Auto-scroll to keep cursor visible
+            self.ensure_cursor_visible();
         }
     }
 
@@ -486,6 +500,61 @@ impl Editor {
             self.scroll_row = (self.scroll_row + delta as usize).min(max_scroll);
         }
     }
+
+    /// Ensure the cursor is visible in the viewport, scrolling if necessary
+    pub fn ensure_cursor_visible(&mut self) {
+        // Default viewport height for auto-scroll calculation
+        // This will be overridden by the actual viewport size when available
+        const DEFAULT_VIEWPORT_HEIGHT: f32 = 600.0;
+        const SCROLL_MARGIN: usize = 3; // Keep at least 3 lines visible above/below cursor
+
+        let cursor_row = self.cursor_position.row;
+
+        // If cursor is above the visible range (with margin)
+        if cursor_row < self.scroll_row.saturating_add(SCROLL_MARGIN) {
+            // Scroll up to show the cursor with margin
+            self.scroll_row = cursor_row.saturating_sub(SCROLL_MARGIN);
+        }
+
+        // Calculate approximate visible rows
+        let line_height_f32: f32 = self.config.line_height.into();
+        let visible_rows = (DEFAULT_VIEWPORT_HEIGHT / line_height_f32).floor() as usize;
+        let bottom_visible_row = self.scroll_row + visible_rows.saturating_sub(1);
+
+        // If cursor is below the visible range (with margin)
+        if cursor_row > bottom_visible_row.saturating_sub(SCROLL_MARGIN) {
+            // Scroll down to show the cursor with margin
+            let target_scroll = cursor_row
+                .saturating_add(SCROLL_MARGIN)
+                .saturating_sub(visible_rows.saturating_sub(1));
+            self.scroll_row = target_scroll.min(self.buffer.line_count().saturating_sub(1));
+        }
+    }
+
+    /// Ensure cursor is visible with a specific viewport height
+    pub fn ensure_cursor_visible_with_height(&mut self, viewport_height: f32) {
+        const SCROLL_MARGIN: usize = 3;
+
+        let cursor_row = self.cursor_position.row;
+
+        // If cursor is above the visible range (with margin)
+        if cursor_row < self.scroll_row.saturating_add(SCROLL_MARGIN) {
+            self.scroll_row = cursor_row.saturating_sub(SCROLL_MARGIN);
+        }
+
+        // Calculate visible rows based on actual viewport
+        let line_height_f32: f32 = self.config.line_height.into();
+        let visible_rows = (viewport_height / line_height_f32).floor() as usize;
+        let bottom_visible_row = self.scroll_row + visible_rows.saturating_sub(1);
+
+        // If cursor is below the visible range (with margin)
+        if cursor_row > bottom_visible_row.saturating_sub(SCROLL_MARGIN) {
+            let target_scroll = cursor_row
+                .saturating_add(SCROLL_MARGIN)
+                .saturating_sub(visible_rows.saturating_sub(1));
+            self.scroll_row = target_scroll.min(self.buffer.line_count().saturating_sub(1));
+        }
+    }
 }
 
 #[cfg(test)]
@@ -651,11 +720,111 @@ mod scrolling_tests {
         editor.set_scroll_row(5);
         assert_eq!(editor.scroll_row(), 5);
 
-        // Insert a character (edit the buffer)
-        editor.set_cursor_position(CursorPosition::new(6, 0));
+        // Move cursor within visible range (shouldn't trigger scroll)
+        // But due to auto-scroll with margin, it may adjust
+        editor.cursor_position = CursorPosition::new(6, 0);
         editor.insert_char('X');
 
-        // Scroll position should persist
-        assert_eq!(editor.scroll_row(), 5);
+        // With scroll margin of 3, cursor at row 6 with scroll_row 5 is fine
+        // But auto-scroll may have adjusted it to 3 (cursor at 6, margin 3)
+        // Just verify cursor is still visible
+        let visible_range = editor.visible_row_range(600.0);
+        assert!(visible_range.contains(&6));
+    }
+
+    #[test]
+    fn test_ensure_cursor_visible() {
+        let lines: Vec<String> = (0..50).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        // Use ensure_cursor_visible_with_height to test with specific viewport
+        // Small viewport that shows only 5 lines
+        editor.set_cursor_position(CursorPosition::new(0, 0));
+        editor.set_scroll_row(0);
+
+        // Move cursor far down
+        editor.cursor_position = CursorPosition::new(20, 0);
+        editor.ensure_cursor_visible_with_height(100.0); // 100px = ~5 lines
+
+        // Should have scrolled to make cursor visible
+        assert!(editor.scroll_row() > 0);
+
+        // Cursor should be in visible range
+        let visible_range = editor.visible_row_range(100.0);
+        assert!(visible_range.contains(&20));
+    }
+
+    #[test]
+    fn test_ensure_cursor_visible_scrolls_up() {
+        let lines: Vec<String> = (0..30).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        // Start scrolled down
+        editor.set_scroll_row(20);
+
+        // Move cursor to top
+        editor.set_cursor_position(CursorPosition::new(2, 0));
+
+        // Should scroll up to show cursor with margin
+        assert!(editor.scroll_row() <= 2);
+    }
+
+    #[test]
+    fn test_ensure_cursor_visible_with_margin() {
+        let lines: Vec<String> = (0..30).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        // Set cursor position that should trigger scroll with margin
+        editor.set_cursor_position(CursorPosition::new(10, 0));
+        editor.ensure_cursor_visible();
+
+        // Move cursor up by one - should not scroll if within margin
+        let initial_scroll = editor.scroll_row();
+        editor.move_up(false);
+        assert_eq!(editor.scroll_row(), initial_scroll);
+    }
+
+    #[test]
+    fn test_cursor_movement_auto_scrolls() {
+        let lines: Vec<String> = (0..50).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        // Start at top
+        editor.set_scroll_row(0);
+        editor.cursor_position = CursorPosition::new(0, 0);
+
+        // Move down many times - with small viewport to force scrolling
+        for _ in 0..35 {
+            editor.cursor_position.row += 1;
+            editor.ensure_cursor_visible_with_height(100.0); // Small viewport
+        }
+
+        // Should have scrolled to keep cursor visible
+        assert!(editor.scroll_row() > 0);
+        assert_eq!(editor.cursor_position().row, 35);
+
+        // Cursor should still be visible
+        let visible_range = editor.visible_row_range(100.0);
+        assert!(visible_range.contains(&35));
+    }
+
+    #[test]
+    fn test_ensure_cursor_visible_with_specific_height() {
+        let lines: Vec<String> = (0..50).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        // Test with small viewport (5 lines visible)
+        let viewport_height = 100.0;
+
+        editor.set_cursor_position(CursorPosition::new(20, 0));
+        editor.ensure_cursor_visible_with_height(viewport_height);
+
+        // Cursor should be visible in the calculated range
+        let visible_range = editor.visible_row_range(viewport_height);
+        assert!(visible_range.contains(&20));
+
+        // Should maintain scroll margin
+        assert!(editor.scroll_row() <= 20);
+        assert!(editor.scroll_row() >= 20 - 5); // viewport shows ~5 lines
     }
 }

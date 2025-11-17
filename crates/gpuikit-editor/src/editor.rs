@@ -201,6 +201,11 @@ impl Editor {
         font_family: SharedString,
         font_size: f32,
     ) -> Vec<TextRun> {
+        // Ensure parse states are built up to this line
+        let lines: Vec<String> = self.buffer.to_lines();
+        self.syntax_highlighter
+            .ensure_parse_states(&self.language, line_index, &lines);
+
         self.syntax_highlighter.highlight_line(
             line,
             &self.language,
@@ -482,6 +487,13 @@ impl Editor {
     pub fn set_scroll_row(&mut self, row: usize) {
         let max_scroll = self.buffer.line_count().saturating_sub(1);
         self.scroll_row = row.min(max_scroll);
+
+        // Pre-build parse states for the visible range when scrolling
+        let range = self.visible_row_range(10.0);
+        let lines: Vec<String> = self.buffer.to_lines();
+        let end_line = range.end.min(lines.len());
+        self.syntax_highlighter
+            .ensure_parse_states(&self.language, end_line, &lines);
     }
 
     pub fn visible_row_range(&self, viewport_height: f32) -> std::ops::Range<usize> {
@@ -499,6 +511,13 @@ impl Editor {
             let max_scroll = self.buffer.line_count().saturating_sub(1);
             self.scroll_row = (self.scroll_row + delta as usize).min(max_scroll);
         }
+
+        // Pre-build parse states for the visible range when scrolling
+        let range = self.visible_row_range(10.0);
+        let lines: Vec<String> = self.buffer.to_lines();
+        let end_line = range.end.min(lines.len());
+        self.syntax_highlighter
+            .ensure_parse_states(&self.language, end_line, &lines);
     }
 
     /// Ensure the cursor is visible in the viewport, scrolling if necessary
@@ -554,6 +573,13 @@ impl Editor {
                 .saturating_sub(visible_rows.saturating_sub(1));
             self.scroll_row = target_scroll.min(self.buffer.line_count().saturating_sub(1));
         }
+
+        // Pre-build parse states for the visible range after auto-scrolling
+        let range = self.visible_row_range(viewport_height);
+        let lines: Vec<String> = self.buffer.to_lines();
+        let end_line = range.end.min(lines.len());
+        self.syntax_highlighter
+            .ensure_parse_states(&self.language, end_line, &lines);
     }
 }
 
@@ -826,5 +852,90 @@ mod scrolling_tests {
         // Should maintain scroll margin
         assert!(editor.scroll_row() <= 20);
         assert!(editor.scroll_row() >= 20 - 5); // viewport shows ~5 lines
+    }
+
+    #[test]
+    fn test_syntax_highlighting_consistency_when_scrolling() {
+        // Set up a Rust code example
+        let code = r#"fn main() {
+    let x = 42;
+    let y = "hello";
+    println!("{} {}", x, y);
+
+    for i in 0..10 {
+        println!("{}", i);
+    }
+
+    let result = match x {
+        42 => "answer",
+        _ => "unknown",
+    };
+}
+"#;
+
+        let lines: Vec<String> = code.lines().map(|s| s.to_string()).collect();
+        let mut editor = Editor::new("test_syntax_highlight", lines);
+        editor.set_language("Rust".to_string());
+
+        // Get highlighting for line 3 (println! line) at scroll position 0
+        let line_3 = editor.get_buffer().get_line(3).unwrap_or_default();
+        let initial_highlight = editor.highlight_line(&line_3, 3, "Courier".into(), 14.0);
+
+        // Scroll down
+        editor.set_scroll_row(2);
+
+        // Get highlighting for the same line again
+        let line_3_after_scroll = editor.get_buffer().get_line(3).unwrap_or_default();
+        let highlight_after_scroll =
+            editor.highlight_line(&line_3_after_scroll, 3, "Courier".into(), 14.0);
+
+        // Verify the highlighting is the same
+        assert_eq!(
+            initial_highlight.len(),
+            highlight_after_scroll.len(),
+            "Number of text runs should be the same"
+        );
+
+        for (initial, after) in initial_highlight.iter().zip(highlight_after_scroll.iter()) {
+            assert_eq!(initial.len, after.len, "Text run length should be the same");
+            assert_eq!(
+                initial.color, after.color,
+                "Text run color should be the same"
+            );
+            assert_eq!(
+                initial.font.weight, after.font.weight,
+                "Font weight should be the same"
+            );
+            assert_eq!(
+                initial.font.style, after.font.style,
+                "Font style should be the same"
+            );
+        }
+
+        // Test scrolling back up
+        editor.set_scroll_row(0);
+
+        let highlight_after_scroll_back = editor.highlight_line(&line_3, 3, "Courier".into(), 14.0);
+
+        // Verify it's still the same
+        assert_eq!(
+            initial_highlight.len(),
+            highlight_after_scroll_back.len(),
+            "Number of text runs should be the same after scrolling back"
+        );
+
+        for (initial, after) in initial_highlight
+            .iter()
+            .zip(highlight_after_scroll_back.iter())
+        {
+            assert_eq!(
+                initial.len, after.len,
+                "Text run length should be the same after scrolling back"
+            );
+            assert_eq!(
+                initial.color, after.color,
+                "Text run color should be the same after scrolling back"
+            );
+        }
     }
 }

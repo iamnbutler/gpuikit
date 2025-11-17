@@ -9,8 +9,10 @@ struct SyntaxHighlighterInner {
     syntax_set: SyntaxSet,
     theme_set: ThemeSet,
     current_theme: String,
-    parse_states: HashMap<String, ParseState>,
-    highlight_states: HashMap<String, HighlightState>,
+    // Map of (language, line_number) -> ParseState
+    // We store the parse state AFTER parsing that line
+    parse_states: HashMap<(String, usize), ParseState>,
+    highlight_states: HashMap<(String, usize), HighlightState>,
 }
 
 #[derive(Clone)]
@@ -80,17 +82,27 @@ impl SyntaxHighlighter {
         let mut inner = self.inner.borrow_mut();
 
         // Clear parse states for this language from this line onward
-        // Since we don't track line numbers in parse_states directly,
-        // we need to clear it entirely for now
-        // TODO: Improve this to track line-specific states
-        if line_number == 0 {
-            inner.parse_states.remove(language);
+        let states_to_remove: Vec<_> = inner
+            .parse_states
+            .keys()
+            .filter(|(lang, line)| lang == language && *line >= line_number)
+            .cloned()
+            .collect();
+
+        for key in states_to_remove {
+            inner.parse_states.remove(&key);
         }
 
         // Clear highlight states that might be affected
-        let cache_key = format!("{}-{}", language, inner.current_theme);
-        if line_number == 0 {
-            inner.highlight_states.remove(&cache_key);
+        let highlight_states_to_remove: Vec<_> = inner
+            .highlight_states
+            .keys()
+            .filter(|(lang, line)| lang == language && *line >= line_number)
+            .cloned()
+            .collect();
+
+        for key in highlight_states_to_remove {
+            inner.highlight_states.remove(&key);
         }
     }
 
@@ -109,6 +121,19 @@ impl SyntaxHighlighter {
         line_number: usize,
         font_family: SharedString,
         _font_size: f32,
+    ) -> Vec<TextRun> {
+        // For multi-line parsing, we need to handle line content carefully
+        // Some lines might just be empty or need to be parsed with previous context
+        self.highlight_line_with_context(line, language, line_number, font_family, None)
+    }
+
+    fn highlight_line_with_context(
+        &mut self,
+        line: &str,
+        language: &str,
+        line_number: usize,
+        font_family: SharedString,
+        lines_context: Option<&[String]>,
     ) -> Vec<TextRun> {
         let mut inner = self.inner.borrow_mut();
 
@@ -132,27 +157,59 @@ impl SyntaxHighlighter {
             }];
         }
 
-        let cache_key = format!("{}-{}", language, inner.current_theme);
-        let parse_state_key = language.to_string();
-
-        // Clear states if starting fresh
-        if line_number == 0 {
-            inner.parse_states.remove(&parse_state_key);
-            inner.highlight_states.remove(&cache_key);
-        }
-
         // Get or create parse state - we already checked syntax exists above
         let syntax = inner
             .syntax_set
             .find_syntax_by_name(language)
             .expect("syntax should exist after check above");
 
+        // Get the parse state for the previous line, or build it up if needed
         let mut parse_state = if line_number == 0 {
             ParseState::new(syntax)
-        } else if let Some(state) = inner.parse_states.get(&parse_state_key) {
-            state.clone()
         } else {
-            ParseState::new(syntax)
+            // Check if we have the state for the previous line
+            let prev_line_key = (language.to_string(), line_number - 1);
+
+            if let Some(state) = inner.parse_states.get(&prev_line_key) {
+                state.clone()
+            } else {
+                // We need to build up the state from the beginning or from the last cached state
+                let mut last_cached_line = None;
+                for i in (0..line_number).rev() {
+                    if inner.parse_states.contains_key(&(language.to_string(), i)) {
+                        last_cached_line = Some(i);
+                        break;
+                    }
+                }
+
+                let mut state = if let Some(cached_line) = last_cached_line {
+                    inner
+                        .parse_states
+                        .get(&(language.to_string(), cached_line))
+                        .cloned()
+                        .unwrap_or_else(|| ParseState::new(syntax))
+                } else {
+                    ParseState::new(syntax)
+                };
+
+                // Parse lines from last_cached_line+1 to line_number-1 if we have context
+                if let Some(lines) = lines_context {
+                    let start_line = last_cached_line.map_or(0, |l| l + 1);
+                    for i in start_line..line_number {
+                        if i < lines.len() {
+                            let ops = state.parse_line(&lines[i], &inner.syntax_set);
+                            if ops.is_ok() {
+                                // Store intermediate states
+                                inner
+                                    .parse_states
+                                    .insert((language.to_string(), i), state.clone());
+                            }
+                        }
+                    }
+                }
+
+                state
+            }
         };
 
         // Get the theme, with fallback to default colors if theme not found
@@ -189,7 +246,10 @@ impl SyntaxHighlighter {
 
         let mut highlight_state = if line_number == 0 {
             HighlightState::new(&highlighter, ScopeStack::new())
-        } else if let Some(state) = inner.highlight_states.get(&cache_key) {
+        } else if let Some(state) = inner
+            .highlight_states
+            .get(&(language.to_string(), line_number - 1))
+        {
             state.clone()
         } else {
             HighlightState::new(&highlighter, ScopeStack::new())
@@ -261,17 +321,65 @@ impl SyntaxHighlighter {
             });
         }
 
-        // Store parse state for next line
-        let new_parse_state = parse_state
-            .parse_line(line, &inner.syntax_set)
-            .map(|_| parse_state.clone())
-            .unwrap_or_else(|_| ParseState::new(syntax));
-        inner.parse_states.insert(parse_state_key, new_parse_state);
+        // Parse the current line to update state
+        let parse_result = parse_state.parse_line(line, &inner.syntax_set);
+        if parse_result.is_ok() {
+            // Store this line's parse state for use by the next line
+            inner
+                .parse_states
+                .insert((language.to_string(), line_number), parse_state);
+        }
 
-        // Store highlight state for next line - it was already mutated by the iterator
-        inner.highlight_states.insert(cache_key, highlight_state);
+        // Store highlight state for this line
+        inner
+            .highlight_states
+            .insert((language.to_string(), line_number), highlight_state);
 
         text_runs
+    }
+
+    /// Ensure parse states exist up to a given line by parsing from the beginning if needed
+    pub fn ensure_parse_states(&mut self, language: &str, up_to_line: usize, lines: &[String]) {
+        let mut inner = self.inner.borrow_mut();
+
+        let syntax = match inner.syntax_set.find_syntax_by_name(language) {
+            Some(s) => s,
+            None => return,
+        };
+
+        // Find the last cached state before up_to_line
+        let mut last_cached_line = None;
+        for i in (0..=up_to_line).rev() {
+            if inner.parse_states.contains_key(&(language.to_string(), i)) {
+                last_cached_line = Some(i);
+                break;
+            }
+        }
+
+        // Build up states from the last cached line (or from the beginning)
+        let start_line = last_cached_line.map_or(0, |l| l + 1);
+        let mut parse_state = if let Some(cached_line) = last_cached_line {
+            inner
+                .parse_states
+                .get(&(language.to_string(), cached_line))
+                .cloned()
+                .unwrap_or_else(|| ParseState::new(syntax))
+        } else {
+            ParseState::new(syntax)
+        };
+
+        for i in start_line..=up_to_line {
+            if i >= lines.len() {
+                break;
+            }
+
+            let ops = parse_state.parse_line(&lines[i], &inner.syntax_set);
+            if ops.is_ok() {
+                inner
+                    .parse_states
+                    .insert((language.to_string(), i), parse_state.clone());
+            }
+        }
     }
 
     pub fn get_theme_background(&self) -> Hsla {

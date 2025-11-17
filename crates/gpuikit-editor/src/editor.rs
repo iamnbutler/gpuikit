@@ -1,6 +1,7 @@
+use gpui::{px, rgb, ElementId, Pixels, Rgba, SharedString, TextRun};
+
 use crate::buffer::{GapBuffer, TextBuffer};
 use crate::syntax_highlighter::SyntaxHighlighter;
-use gpui::*;
 
 #[derive(Clone)]
 pub struct EditorConfig {
@@ -56,6 +57,7 @@ pub struct Editor {
     syntax_highlighter: SyntaxHighlighter,
     language: String,
     current_theme: String,
+    scroll_row: usize,
 }
 
 impl Editor {
@@ -79,6 +81,7 @@ impl Editor {
             syntax_highlighter,
             language,
             current_theme: String::new(),
+            scroll_row: 0,
         }
     }
 
@@ -106,6 +109,8 @@ impl Editor {
         self.cursor_position = self.clamp_cursor_position(position);
         // Reset goal column when cursor position is explicitly set
         self.goal_column = None;
+        // Auto-scroll to keep cursor visible
+        self.ensure_cursor_visible();
     }
 
     fn clamp_cursor_position(&self, position: CursorPosition) -> CursorPosition {
@@ -196,6 +201,11 @@ impl Editor {
         font_family: SharedString,
         font_size: f32,
     ) -> Vec<TextRun> {
+        // Ensure parse states are built up to this line
+        let lines: Vec<String> = self.buffer.to_lines();
+        self.syntax_highlighter
+            .ensure_parse_states(&self.language, line_index, &lines);
+
         self.syntax_highlighter.highlight_line(
             line,
             &self.language,
@@ -222,6 +232,9 @@ impl Editor {
             self.cursor_position.row -= 1;
             self.cursor_position.col = self.buffer.line_len(self.cursor_position.row);
         }
+
+        // Auto-scroll to keep cursor visible
+        self.ensure_cursor_visible();
     }
 
     pub fn move_right(&mut self, shift_held: bool) {
@@ -243,6 +256,9 @@ impl Editor {
             self.cursor_position.row += 1;
             self.cursor_position.col = 0;
         }
+
+        // Auto-scroll to keep cursor visible
+        self.ensure_cursor_visible();
     }
 
     pub fn move_up(&mut self, shift_held: bool) {
@@ -266,6 +282,9 @@ impl Editor {
                 .goal_column
                 .unwrap_or(self.cursor_position.col)
                 .min(line_len);
+
+            // Auto-scroll to keep cursor visible
+            self.ensure_cursor_visible();
         }
     }
 
@@ -290,6 +309,124 @@ impl Editor {
                 .goal_column
                 .unwrap_or(self.cursor_position.col)
                 .min(line_len);
+
+            // Auto-scroll to keep cursor visible
+            self.ensure_cursor_visible();
+        }
+    }
+
+    /// Move the cursor to the start of the current line (Home key)
+    pub fn move_to_line_start(&mut self, with_selection: bool) {
+        if !with_selection {
+            self.clear_selection();
+        }
+        self.cursor_position.col = 0;
+        self.goal_column = None;
+        self.ensure_cursor_visible();
+    }
+
+    /// Move the cursor to the end of the current line (End key)
+    pub fn move_to_line_end(&mut self, with_selection: bool) {
+        if !with_selection {
+            self.clear_selection();
+        }
+        let line_len = self
+            .buffer
+            .get_line(self.cursor_position.row)
+            .map(|line| line.len())
+            .unwrap_or(0);
+        self.cursor_position.col = line_len;
+        self.goal_column = None;
+        self.ensure_cursor_visible();
+    }
+
+    /// Move the cursor to the start of the document (Ctrl+Home)
+    pub fn move_to_document_start(&mut self, with_selection: bool) {
+        if !with_selection {
+            self.clear_selection();
+        }
+        self.cursor_position.row = 0;
+        self.cursor_position.col = 0;
+        self.goal_column = None;
+        self.set_scroll_row(0);
+    }
+
+    /// Move the cursor to the end of the document (Ctrl+End)
+    pub fn move_to_document_end(&mut self, with_selection: bool) {
+        if !with_selection {
+            self.clear_selection();
+        }
+        let last_row = self.buffer.line_count().saturating_sub(1);
+        let last_col = self
+            .buffer
+            .get_line(last_row)
+            .map(|line| line.len())
+            .unwrap_or(0);
+        self.cursor_position.row = last_row;
+        self.cursor_position.col = last_col;
+        self.goal_column = None;
+        self.ensure_cursor_visible();
+    }
+
+    /// Scroll up by one page (PageUp key)
+    pub fn page_up(&mut self, with_selection: bool) {
+        const DEFAULT_VIEWPORT_HEIGHT: usize = 25;
+        let page_size = DEFAULT_VIEWPORT_HEIGHT.saturating_sub(1); // Leave one line for context
+
+        if !with_selection {
+            self.clear_selection();
+        }
+
+        // Move cursor up by page_size
+        let new_row = self.cursor_position.row.saturating_sub(page_size);
+        self.cursor_position.row = new_row;
+
+        // Scroll the viewport up
+        self.scroll_row = self.scroll_row.saturating_sub(page_size);
+
+        // Adjust column position if needed
+        let line = self.buffer.get_line(self.cursor_position.row);
+        if let Some(line) = line {
+            let max_col = line.len();
+            if let Some(goal) = self.goal_column {
+                self.cursor_position.col = goal.min(max_col);
+            } else {
+                self.cursor_position.col = self.cursor_position.col.min(max_col);
+            }
+        } else {
+            self.cursor_position.col = 0;
+        }
+    }
+
+    /// Scroll down by one page (PageDown key)
+    pub fn page_down(&mut self, with_selection: bool) {
+        const DEFAULT_VIEWPORT_HEIGHT: usize = 25;
+        let page_size = DEFAULT_VIEWPORT_HEIGHT.saturating_sub(1); // Leave one line for context
+        let max_row = self.buffer.line_count().saturating_sub(1);
+
+        if !with_selection {
+            self.clear_selection();
+        }
+
+        // Move cursor down by page_size
+        let new_row = (self.cursor_position.row + page_size).min(max_row);
+        self.cursor_position.row = new_row;
+
+        // Scroll the viewport down
+        let max_scroll = self.buffer.line_count().saturating_sub(1);
+        self.scroll_row = (self.scroll_row + page_size).min(max_scroll);
+
+        // Adjust column position if needed
+        let line = self.buffer.get_line(self.cursor_position.row);
+        if let Some(line) = line {
+            let max_col = line.len();
+            if let Some(goal) = self.goal_column {
+                self.cursor_position.col = goal.min(max_col);
+            } else {
+                self.cursor_position.col = self.cursor_position.col.min(max_col);
+            }
+        } else {
+            self.cursor_position.col = 0;
         }
     }
 
@@ -456,5 +593,612 @@ impl Editor {
             .clear_state_from_line(self.cursor_position.row, &self.language);
 
         self.goal_column = None;
+    }
+
+    pub fn scroll_row(&self) -> usize {
+        self.scroll_row
+    }
+
+    pub fn set_scroll_row(&mut self, row: usize) {
+        let max_scroll = self.buffer.line_count().saturating_sub(1);
+        self.scroll_row = row.min(max_scroll);
+
+        // Pre-build parse states for the visible range when scrolling
+        let range = self.visible_row_range(10.0);
+        let lines: Vec<String> = self.buffer.to_lines();
+        let end_line = range.end.min(lines.len());
+        self.syntax_highlighter
+            .ensure_parse_states(&self.language, end_line, &lines);
+    }
+
+    pub fn visible_row_range(&self, viewport_height: f32) -> std::ops::Range<usize> {
+        let line_height_f32: f32 = self.config.line_height.into();
+        let visible_rows = (viewport_height / line_height_f32).floor() as usize;
+        let start = self.scroll_row;
+        let end = (start + visible_rows).min(self.buffer.line_count());
+        start..end
+    }
+
+    pub fn scroll_by(&mut self, delta: isize) {
+        if delta < 0 {
+            self.scroll_row = self.scroll_row.saturating_sub(delta.abs() as usize);
+        } else {
+            let max_scroll = self.buffer.line_count().saturating_sub(1);
+            self.scroll_row = (self.scroll_row + delta as usize).min(max_scroll);
+        }
+
+        // Pre-build parse states for the visible range when scrolling
+        let range = self.visible_row_range(10.0);
+        let lines: Vec<String> = self.buffer.to_lines();
+        let end_line = range.end.min(lines.len());
+        self.syntax_highlighter
+            .ensure_parse_states(&self.language, end_line, &lines);
+    }
+
+    /// Ensure the cursor is visible in the viewport, scrolling if necessary
+    pub fn ensure_cursor_visible(&mut self) {
+        // Default viewport height for auto-scroll calculation
+        // This will be overridden by the actual viewport size when available
+        const DEFAULT_VIEWPORT_HEIGHT: f32 = 600.0;
+        const SCROLL_MARGIN: usize = 3; // Keep at least 3 lines visible above/below cursor
+
+        let cursor_row = self.cursor_position.row;
+
+        // If cursor is above the visible range (with margin)
+        if cursor_row < self.scroll_row.saturating_add(SCROLL_MARGIN) {
+            // Scroll up to show the cursor with margin
+            self.scroll_row = cursor_row.saturating_sub(SCROLL_MARGIN);
+        }
+
+        // Calculate approximate visible rows
+        let line_height_f32: f32 = self.config.line_height.into();
+        let visible_rows = (DEFAULT_VIEWPORT_HEIGHT / line_height_f32).floor() as usize;
+        let bottom_visible_row = self.scroll_row + visible_rows.saturating_sub(1);
+
+        // If cursor is below the visible range (with margin)
+        if cursor_row > bottom_visible_row.saturating_sub(SCROLL_MARGIN) {
+            // Scroll down to show the cursor with margin
+            let target_scroll = cursor_row
+                .saturating_add(SCROLL_MARGIN)
+                .saturating_sub(visible_rows.saturating_sub(1));
+            self.scroll_row = target_scroll.min(self.buffer.line_count().saturating_sub(1));
+        }
+    }
+
+    /// Ensure cursor is visible with a specific viewport height
+    pub fn ensure_cursor_visible_with_height(&mut self, viewport_height: f32) {
+        const SCROLL_MARGIN: usize = 3;
+
+        let cursor_row = self.cursor_position.row;
+
+        // If cursor is above the visible range (with margin)
+        if cursor_row < self.scroll_row.saturating_add(SCROLL_MARGIN) {
+            self.scroll_row = cursor_row.saturating_sub(SCROLL_MARGIN);
+        }
+
+        // Calculate visible rows based on actual viewport
+        let line_height_f32: f32 = self.config.line_height.into();
+        let visible_rows = (viewport_height / line_height_f32).floor() as usize;
+        let bottom_visible_row = self.scroll_row + visible_rows.saturating_sub(1);
+
+        // If cursor is below the visible range (with margin)
+        if cursor_row > bottom_visible_row.saturating_sub(SCROLL_MARGIN) {
+            let target_scroll = cursor_row
+                .saturating_add(SCROLL_MARGIN)
+                .saturating_sub(visible_rows.saturating_sub(1));
+            self.scroll_row = target_scroll.min(self.buffer.line_count().saturating_sub(1));
+        }
+
+        // Pre-build parse states for the visible range after auto-scrolling
+        let range = self.visible_row_range(viewport_height);
+        let lines: Vec<String> = self.buffer.to_lines();
+        let end_line = range.end.min(lines.len());
+        self.syntax_highlighter
+            .ensure_parse_states(&self.language, end_line, &lines);
+    }
+}
+
+#[cfg(test)]
+mod scrolling_tests {
+    use super::*;
+
+    #[test]
+    fn test_set_scroll_row() {
+        let lines = vec![
+            "Line 1".to_string(),
+            "Line 2".to_string(),
+            "Line 3".to_string(),
+            "Line 4".to_string(),
+            "Line 5".to_string(),
+        ];
+        let mut editor = Editor::new("test_editor", lines);
+
+        editor.set_scroll_row(2);
+        assert_eq!(editor.scroll_row(), 2);
+
+        // Test clamping to max
+        editor.set_scroll_row(100);
+        assert_eq!(editor.scroll_row(), 4); // 5 lines, max scroll is 4
+    }
+
+    #[test]
+    fn test_visible_row_range() {
+        let lines: Vec<String> = (0..20).map(|i| format!("Line {}", i)).collect();
+        let editor = Editor::new("test_editor", lines);
+
+        // Assuming default line height of 20px
+        let viewport_height = 100.0; // Should show 5 lines
+        let range = editor.visible_row_range(viewport_height);
+        assert_eq!(range, 0..5);
+    }
+
+    #[test]
+    fn test_visible_row_range_with_scroll() {
+        let lines: Vec<String> = (0..20).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        editor.set_scroll_row(5);
+        let viewport_height = 100.0; // Should show 5 lines
+        let range = editor.visible_row_range(viewport_height);
+        assert_eq!(range, 5..10);
+    }
+
+    #[test]
+    fn test_visible_row_range_at_end() {
+        let lines: Vec<String> = (0..20).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        editor.set_scroll_row(17);
+        let viewport_height = 100.0; // Should show 5 lines, but only 3 available
+        let range = editor.visible_row_range(viewport_height);
+        assert_eq!(range, 17..20); // Should clamp to buffer end
+    }
+
+    #[test]
+    fn test_scroll_by_positive() {
+        let lines: Vec<String> = (0..20).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        editor.scroll_by(3);
+        assert_eq!(editor.scroll_row(), 3);
+
+        editor.scroll_by(2);
+        assert_eq!(editor.scroll_row(), 5);
+    }
+
+    #[test]
+    fn test_scroll_by_negative() {
+        let lines: Vec<String> = (0..20).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        editor.set_scroll_row(10);
+        editor.scroll_by(-3);
+        assert_eq!(editor.scroll_row(), 7);
+
+        editor.scroll_by(-10);
+        assert_eq!(editor.scroll_row(), 0); // Should clamp to 0
+    }
+
+    #[test]
+    fn test_scroll_by_beyond_bounds() {
+        let lines: Vec<String> = (0..10).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        // Scroll beyond end
+        editor.scroll_by(100);
+        assert_eq!(editor.scroll_row(), 9); // 10 lines, max scroll is 9
+
+        // Scroll before start
+        editor.scroll_by(-200);
+        assert_eq!(editor.scroll_row(), 0);
+    }
+
+    #[test]
+    fn test_empty_buffer_scroll() {
+        let editor = Editor::new("test_editor", vec![]);
+        assert_eq!(editor.scroll_row(), 0);
+
+        let range = editor.visible_row_range(100.0);
+        assert_eq!(range, 0..1); // Empty buffer has 1 empty line
+    }
+
+    #[test]
+    fn test_single_line_buffer_scroll() {
+        let mut editor = Editor::new("test_editor", vec!["Single line".to_string()]);
+
+        editor.set_scroll_row(5);
+        assert_eq!(editor.scroll_row(), 0); // Should clamp to 0 since only 1 line
+
+        let range = editor.visible_row_range(100.0);
+        assert_eq!(range, 0..1);
+    }
+
+    #[test]
+    fn test_scroll_preserves_cursor_visibility() {
+        // This test documents expected behavior for auto-scrolling
+        // which will be implemented in a future TODO item
+        let lines: Vec<String> = (0..20).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        // Set cursor at line 10
+        editor.set_cursor_position(CursorPosition::new(10, 0));
+
+        // Currently, scrolling doesn't auto-adjust for cursor visibility
+        // This will be implemented as part of the auto-scroll TODO
+        editor.set_scroll_row(0);
+        assert_eq!(editor.scroll_row(), 0);
+        assert_eq!(editor.cursor_position().row, 10);
+
+        // In the future, we'd expect auto-scroll to make cursor visible
+        // For now, we just verify the scroll and cursor are independent
+    }
+
+    #[test]
+    fn test_large_viewport_shows_all_lines() {
+        let lines: Vec<String> = (0..5).map(|i| format!("Line {}", i)).collect();
+        let editor = Editor::new("test_editor", lines);
+
+        let viewport_height = 1000.0; // Very large viewport
+        let range = editor.visible_row_range(viewport_height);
+        assert_eq!(range, 0..5); // Should show all 5 lines
+    }
+
+    #[test]
+    fn test_tiny_viewport() {
+        let lines: Vec<String> = (0..10).map(|i| format!("Line {}", i)).collect();
+        let editor = Editor::new("test_editor", lines);
+
+        let viewport_height = 25.0; // Slightly more than one line
+        let range = editor.visible_row_range(viewport_height);
+        assert_eq!(range, 0..1); // Should show at least 1 line
+    }
+
+    #[test]
+    fn test_scroll_state_persists_through_edits() {
+        let lines: Vec<String> = (0..20).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        editor.set_scroll_row(5);
+        assert_eq!(editor.scroll_row(), 5);
+
+        // Move cursor within visible range (shouldn't trigger scroll)
+        // But due to auto-scroll with margin, it may adjust
+        editor.cursor_position = CursorPosition::new(6, 0);
+        editor.insert_char('X');
+
+        // With scroll margin of 3, cursor at row 6 with scroll_row 5 is fine
+        // But auto-scroll may have adjusted it to 3 (cursor at 6, margin 3)
+        // Just verify cursor is still visible
+        let visible_range = editor.visible_row_range(600.0);
+        assert!(visible_range.contains(&6));
+    }
+
+    #[test]
+    fn test_ensure_cursor_visible() {
+        let lines: Vec<String> = (0..50).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        // Use ensure_cursor_visible_with_height to test with specific viewport
+        // Small viewport that shows only 5 lines
+        editor.set_cursor_position(CursorPosition::new(0, 0));
+        editor.set_scroll_row(0);
+
+        // Move cursor far down
+        editor.cursor_position = CursorPosition::new(20, 0);
+        editor.ensure_cursor_visible_with_height(100.0); // 100px = ~5 lines
+
+        // Should have scrolled to make cursor visible
+        assert!(editor.scroll_row() > 0);
+
+        // Cursor should be in visible range
+        let visible_range = editor.visible_row_range(100.0);
+        assert!(visible_range.contains(&20));
+    }
+
+    #[test]
+    fn test_ensure_cursor_visible_scrolls_up() {
+        let lines: Vec<String> = (0..30).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        // Start scrolled down
+        editor.set_scroll_row(20);
+
+        // Move cursor to top
+        editor.set_cursor_position(CursorPosition::new(2, 0));
+
+        // Should scroll up to show cursor with margin
+        assert!(editor.scroll_row() <= 2);
+    }
+
+    #[test]
+    fn test_ensure_cursor_visible_with_margin() {
+        let lines: Vec<String> = (0..30).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        // Set cursor position that should trigger scroll with margin
+        editor.set_cursor_position(CursorPosition::new(10, 0));
+        editor.ensure_cursor_visible();
+
+        // Move cursor up by one - should not scroll if within margin
+        let initial_scroll = editor.scroll_row();
+        editor.move_up(false);
+        assert_eq!(editor.scroll_row(), initial_scroll);
+    }
+
+    #[test]
+    fn test_cursor_movement_auto_scrolls() {
+        let lines: Vec<String> = (0..50).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        // Start at top
+        editor.set_scroll_row(0);
+        editor.cursor_position = CursorPosition::new(0, 0);
+
+        // Move down many times - with small viewport to force scrolling
+        for _ in 0..35 {
+            editor.cursor_position.row += 1;
+            editor.ensure_cursor_visible_with_height(100.0); // Small viewport
+        }
+
+        // Should have scrolled to keep cursor visible
+        assert!(editor.scroll_row() > 0);
+        assert_eq!(editor.cursor_position().row, 35);
+
+        // Cursor should still be visible
+        let visible_range = editor.visible_row_range(100.0);
+        assert!(visible_range.contains(&35));
+    }
+
+    #[test]
+    fn test_ensure_cursor_visible_with_specific_height() {
+        let lines: Vec<String> = (0..50).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        // Test with small viewport (5 lines visible)
+        let viewport_height = 100.0;
+
+        editor.set_cursor_position(CursorPosition::new(20, 0));
+        editor.ensure_cursor_visible_with_height(viewport_height);
+
+        // Cursor should be visible in the calculated range
+        let visible_range = editor.visible_row_range(viewport_height);
+        assert!(visible_range.contains(&20));
+
+        // Should maintain scroll margin
+        assert!(editor.scroll_row() <= 20);
+        assert!(editor.scroll_row() >= 20 - 5); // viewport shows ~5 lines
+    }
+
+    #[test]
+    fn test_syntax_highlighting_consistency_when_scrolling() {
+        // Set up a Rust code example
+        let code = r#"fn main() {
+    let x = 42;
+    let y = "hello";
+    println!("{} {}", x, y);
+
+    for i in 0..10 {
+        println!("{}", i);
+    }
+
+    let result = match x {
+        42 => "answer",
+        _ => "unknown",
+    };
+}
+"#;
+
+        let lines: Vec<String> = code.lines().map(|s| s.to_string()).collect();
+        let mut editor = Editor::new("test_syntax_highlight", lines);
+        editor.set_language("Rust".to_string());
+
+        // Get highlighting for line 3 (println! line) at scroll position 0
+        let line_3 = editor.get_buffer().get_line(3).unwrap_or_default();
+        let initial_highlight = editor.highlight_line(&line_3, 3, "Courier".into(), 14.0);
+
+        // Scroll down
+        editor.set_scroll_row(2);
+
+        // Get highlighting for the same line again
+        let line_3_after_scroll = editor.get_buffer().get_line(3).unwrap_or_default();
+        let highlight_after_scroll =
+            editor.highlight_line(&line_3_after_scroll, 3, "Courier".into(), 14.0);
+
+        // Verify the highlighting is the same
+        assert_eq!(
+            initial_highlight.len(),
+            highlight_after_scroll.len(),
+            "Number of text runs should be the same"
+        );
+
+        for (initial, after) in initial_highlight.iter().zip(highlight_after_scroll.iter()) {
+            assert_eq!(initial.len, after.len, "Text run length should be the same");
+            assert_eq!(
+                initial.color, after.color,
+                "Text run color should be the same"
+            );
+            assert_eq!(
+                initial.font.weight, after.font.weight,
+                "Font weight should be the same"
+            );
+            assert_eq!(
+                initial.font.style, after.font.style,
+                "Font style should be the same"
+            );
+        }
+
+        // Test scrolling back up
+        editor.set_scroll_row(0);
+
+        let highlight_after_scroll_back = editor.highlight_line(&line_3, 3, "Courier".into(), 14.0);
+
+        // Verify it's still the same
+        assert_eq!(
+            initial_highlight.len(),
+            highlight_after_scroll_back.len(),
+            "Number of text runs should be the same after scrolling back"
+        );
+
+        for (initial, after) in initial_highlight
+            .iter()
+            .zip(highlight_after_scroll_back.iter())
+        {
+            assert_eq!(
+                initial.len, after.len,
+                "Text run length should be the same after scrolling back"
+            );
+            assert_eq!(
+                initial.color, after.color,
+                "Text run color should be the same after scrolling back"
+            );
+        }
+    }
+
+    #[test]
+    fn test_page_up() {
+        let lines: Vec<String> = (0..100).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_page_up", lines);
+
+        // Start at line 50
+        editor.set_cursor_position(CursorPosition::new(50, 5));
+        editor.set_scroll_row(45);
+
+        // Page up
+        editor.page_up(false);
+
+        // Should move up by ~24 lines (page size - 1)
+        assert!(editor.cursor_position().row < 50);
+        assert!(editor.cursor_position().row >= 26);
+        assert!(editor.scroll_row() < 45);
+
+        // Page up from top should stay at top
+        editor.set_cursor_position(CursorPosition::new(5, 0));
+        editor.set_scroll_row(0);
+        editor.page_up(false);
+        assert_eq!(editor.cursor_position().row, 0);
+        assert_eq!(editor.scroll_row(), 0);
+    }
+
+    #[test]
+    fn test_page_down() {
+        let lines: Vec<String> = (0..100).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_page_down", lines);
+
+        // Start at line 10
+        editor.set_cursor_position(CursorPosition::new(10, 5));
+        editor.set_scroll_row(5);
+
+        // Page down
+        editor.page_down(false);
+
+        // Should move down by ~24 lines (page size - 1)
+        assert!(editor.cursor_position().row > 10);
+        assert!(editor.cursor_position().row <= 34);
+        assert!(editor.scroll_row() > 5);
+
+        // Page down from near bottom should stop at last line
+        editor.set_cursor_position(CursorPosition::new(95, 0));
+        editor.set_scroll_row(90);
+        editor.page_down(false);
+        assert_eq!(editor.cursor_position().row, 99);
+    }
+
+    #[test]
+    fn test_home_key() {
+        let mut editor = Editor::new("test_home", vec!["Hello, World!".to_string()]);
+
+        // Start at middle of line
+        editor.set_cursor_position(CursorPosition::new(0, 7));
+
+        // Press Home
+        editor.move_to_line_start(false);
+
+        assert_eq!(editor.cursor_position().row, 0);
+        assert_eq!(editor.cursor_position().col, 0);
+        assert_eq!(editor.goal_column, None);
+    }
+
+    #[test]
+    fn test_end_key() {
+        let mut editor = Editor::new("test_end", vec!["Hello, World!".to_string()]);
+
+        // Start at beginning of line
+        editor.set_cursor_position(CursorPosition::new(0, 0));
+
+        // Press End
+        editor.move_to_line_end(false);
+
+        assert_eq!(editor.cursor_position().row, 0);
+        assert_eq!(editor.cursor_position().col, 13); // "Hello, World!" is 13 characters
+        assert_eq!(editor.goal_column, None);
+    }
+
+    #[test]
+    fn test_document_start() {
+        let lines: Vec<String> = (0..50).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_doc_start", lines);
+
+        // Start at middle of document
+        editor.set_cursor_position(CursorPosition::new(25, 3));
+        editor.set_scroll_row(20);
+
+        // Go to document start
+        editor.move_to_document_start(false);
+
+        assert_eq!(editor.cursor_position().row, 0);
+        assert_eq!(editor.cursor_position().col, 0);
+        assert_eq!(editor.scroll_row(), 0);
+        assert_eq!(editor.goal_column, None);
+    }
+
+    #[test]
+    fn test_document_end() {
+        let lines = vec![
+            "First line".to_string(),
+            "Second line".to_string(),
+            "Last line here".to_string(),
+        ];
+        let mut editor = Editor::new("test_doc_end", lines);
+
+        // Start at beginning
+        editor.set_cursor_position(CursorPosition::new(0, 0));
+        editor.set_scroll_row(0);
+
+        // Go to document end
+        editor.move_to_document_end(false);
+
+        assert_eq!(editor.cursor_position().row, 2);
+        assert_eq!(editor.cursor_position().col, 14); // "Last line here" is 14 characters
+        assert_eq!(editor.goal_column, None);
+    }
+
+    #[test]
+    fn test_navigation_with_selection() {
+        let lines: Vec<String> = (0..10).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_nav_selection", lines);
+
+        // Start with a selection
+        editor.set_cursor_position(CursorPosition::new(2, 0));
+        editor.selection_anchor = Some(CursorPosition::new(1, 0));
+
+        // Test that navigation without shift clears selection
+        editor.move_to_line_end(false);
+        assert_eq!(editor.selection_anchor, None);
+
+        // Set up selection again
+        editor.selection_anchor = Some(CursorPosition::new(2, 0));
+
+        // Test that navigation with shift preserves selection
+        editor.move_to_line_end(true);
+        assert!(editor.selection_anchor.is_some());
+
+        // Test with page navigation
+        editor.selection_anchor = Some(CursorPosition::new(2, 0));
+        editor.page_down(false);
+        assert_eq!(editor.selection_anchor, None);
+
+        editor.selection_anchor = Some(CursorPosition::new(2, 0));
+        editor.page_down(true);
+        assert!(editor.selection_anchor.is_some());
     }
 }

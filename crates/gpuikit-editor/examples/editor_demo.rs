@@ -19,6 +19,18 @@ actions!(
         MoveDownWithShift,
         MoveLeftWithShift,
         MoveRightWithShift,
+        PageUp,
+        PageDown,
+        PageUpWithShift,
+        PageDownWithShift,
+        Home,
+        End,
+        HomeWithShift,
+        EndWithShift,
+        DocumentStart,
+        DocumentEnd,
+        DocumentStartWithShift,
+        DocumentEndWithShift,
         Backspace,
         Delete,
         InsertNewline,
@@ -188,6 +200,86 @@ impl EditorView {
         cx: &mut Context<Self>,
     ) {
         self.editor.move_right(true);
+        cx.notify();
+    }
+
+    fn page_up(&mut self, _: &PageUp, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.page_up(false);
+        cx.notify();
+    }
+
+    fn page_down(&mut self, _: &PageDown, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.page_down(false);
+        cx.notify();
+    }
+
+    fn page_up_with_shift(
+        &mut self,
+        _: &PageUpWithShift,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.editor.page_up(true);
+        cx.notify();
+    }
+
+    fn page_down_with_shift(
+        &mut self,
+        _: &PageDownWithShift,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.editor.page_down(true);
+        cx.notify();
+    }
+
+    fn home(&mut self, _: &Home, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.move_to_line_start(false);
+        cx.notify();
+    }
+
+    fn end(&mut self, _: &End, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.move_to_line_end(false);
+        cx.notify();
+    }
+
+    fn home_with_shift(&mut self, _: &HomeWithShift, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.move_to_line_start(true);
+        cx.notify();
+    }
+
+    fn end_with_shift(&mut self, _: &EndWithShift, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.move_to_line_end(true);
+        cx.notify();
+    }
+
+    fn document_start(&mut self, _: &DocumentStart, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.move_to_document_start(false);
+        cx.notify();
+    }
+
+    fn document_end(&mut self, _: &DocumentEnd, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.move_to_document_end(false);
+        cx.notify();
+    }
+
+    fn document_start_with_shift(
+        &mut self,
+        _: &DocumentStartWithShift,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.editor.move_to_document_start(true);
+        cx.notify();
+    }
+
+    fn document_end_with_shift(
+        &mut self,
+        _: &DocumentEndWithShift,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.editor.move_to_document_end(true);
         cx.notify();
     }
 
@@ -503,6 +595,18 @@ impl Render for EditorView {
                     .on_action(cx.listener(Self::move_down_with_shift))
                     .on_action(cx.listener(Self::move_left_with_shift))
                     .on_action(cx.listener(Self::move_right_with_shift))
+                    .on_action(cx.listener(Self::page_up))
+                    .on_action(cx.listener(Self::page_down))
+                    .on_action(cx.listener(Self::page_up_with_shift))
+                    .on_action(cx.listener(Self::page_down_with_shift))
+                    .on_action(cx.listener(Self::home))
+                    .on_action(cx.listener(Self::end))
+                    .on_action(cx.listener(Self::home_with_shift))
+                    .on_action(cx.listener(Self::end_with_shift))
+                    .on_action(cx.listener(Self::document_start))
+                    .on_action(cx.listener(Self::document_end))
+                    .on_action(cx.listener(Self::document_start_with_shift))
+                    .on_action(cx.listener(Self::document_end_with_shift))
                     .on_action(cx.listener(Self::backspace))
                     .on_action(cx.listener(Self::delete))
                     .on_action(cx.listener(Self::insert_newline))
@@ -535,6 +639,71 @@ impl Render for EditorView {
                             }
                         },
                     ))
+                    .on_scroll_wheel(cx.listener(|this, event: &ScrollWheelEvent, _window, cx| {
+                        // Calculate scroll delta in lines
+                        let lines_to_scroll = match event.delta {
+                            ScrollDelta::Lines(lines) => {
+                                // Scroll by the number of lines specified
+                                -lines.y as isize
+                            }
+                            ScrollDelta::Pixels(pixels) => {
+                                // Convert pixels to lines
+                                let line_height: f32 = this.editor.config().line_height.into();
+                                let pixels_y: f32 = pixels.y.into();
+                                -(pixels_y / line_height).round() as isize
+                            }
+                        };
+
+                        if lines_to_scroll != 0 {
+                            this.editor.scroll_by(lines_to_scroll);
+                            cx.notify();
+                        }
+                    }))
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, event: &MouseDownEvent, window, cx| {
+                            // Get editor configuration
+                            let config = this.editor.config();
+                            let line_height = config.line_height;
+                            let gutter_width = config.gutter_width + config.gutter_padding;
+                            let scroll_row = this.editor.scroll_row();
+
+                            // Calculate relative position within the editor area
+                            let editor_x = (event.position.x - gutter_width).max(px(0.));
+                            let editor_y = event.position.y;
+
+                            // Calculate row from y position
+                            let row_float = editor_y / line_height;
+                            let clicked_row = row_float.floor() as usize + scroll_row;
+                            let max_row = this.editor.get_buffer().line_count().saturating_sub(1);
+                            let row = clicked_row.min(max_row);
+
+                            // Calculate column from x position (rough approximation)
+                            let char_width = config.font_size * 0.6; // Rough approximation
+                            let col_float = editor_x / char_width;
+                            let clicked_col = col_float.floor() as usize;
+
+                            // Get the actual line to clamp column properly
+                            let max_col = this
+                                .editor
+                                .get_buffer()
+                                .get_line(row)
+                                .map(|line| line.len())
+                                .unwrap_or(0);
+                            let col = clicked_col.min(max_col);
+
+                            let position = CursorPosition::new(row, col);
+
+                            // Clear selection and set cursor position
+                            this.editor.clear_selection();
+                            this.editor.set_cursor_position(position);
+                            this.editor.ensure_cursor_visible();
+
+                            // Focus the editor when clicked
+                            this.focus_handle.focus(window);
+                            cx.notify();
+                        }),
+                    )
                     .child(EditorElement::new(self.editor.clone())),
             )
             .child(
@@ -611,6 +780,38 @@ fn load_keymaps(cx: &mut App) {
             "MoveRightWithShift" => bindings.push(KeyBinding::new(
                 &spec.keystrokes,
                 MoveRightWithShift,
+                context,
+            )),
+            "PageUp" => bindings.push(KeyBinding::new(&spec.keystrokes, PageUp, context)),
+            "PageDown" => bindings.push(KeyBinding::new(&spec.keystrokes, PageDown, context)),
+            "PageUpWithShift" => {
+                bindings.push(KeyBinding::new(&spec.keystrokes, PageUpWithShift, context))
+            }
+            "PageDownWithShift" => bindings.push(KeyBinding::new(
+                &spec.keystrokes,
+                PageDownWithShift,
+                context,
+            )),
+            "Home" => bindings.push(KeyBinding::new(&spec.keystrokes, Home, context)),
+            "End" => bindings.push(KeyBinding::new(&spec.keystrokes, End, context)),
+            "HomeWithShift" => {
+                bindings.push(KeyBinding::new(&spec.keystrokes, HomeWithShift, context))
+            }
+            "EndWithShift" => {
+                bindings.push(KeyBinding::new(&spec.keystrokes, EndWithShift, context))
+            }
+            "DocumentStart" => {
+                bindings.push(KeyBinding::new(&spec.keystrokes, DocumentStart, context))
+            }
+            "DocumentEnd" => bindings.push(KeyBinding::new(&spec.keystrokes, DocumentEnd, context)),
+            "DocumentStartWithShift" => bindings.push(KeyBinding::new(
+                &spec.keystrokes,
+                DocumentStartWithShift,
+                context,
+            )),
+            "DocumentEndWithShift" => bindings.push(KeyBinding::new(
+                &spec.keystrokes,
+                DocumentEndWithShift,
                 context,
             )),
             "Backspace" => bindings.push(KeyBinding::new(&spec.keystrokes, Backspace, context)),

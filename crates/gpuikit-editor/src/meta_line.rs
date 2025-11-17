@@ -14,7 +14,7 @@ pub enum Language {
 impl Language {
     pub fn label(self) -> SharedString {
         let string: &'static str = match self {
-            Language::PlainText => "Plain Text",
+            Language::PlainText => "Text",
             Language::Rust => "Rust",
             Language::Markdown => "Markdown",
         };
@@ -47,6 +47,21 @@ impl MetaLine {
             selection,
         }
     }
+
+    pub fn selection_label(&self) -> Option<SharedString> {
+        if let Some(selection) = &self.selection {
+            if selection.lines > 0 {
+                Some(SharedString::from(format!(
+                    "({} LN, {} CHAR)",
+                    selection.lines, selection.chars
+                )))
+            } else {
+                Some(SharedString::from(format!("({} chars)", selection.chars)))
+            }
+        } else {
+            None
+        }
+    }
 }
 
 impl RenderOnce for MetaLine {
@@ -62,17 +77,15 @@ impl RenderOnce for MetaLine {
                 div()
                     .flex()
                     .gap_2()
-                    .text_sm()
+                    .text_xs()
                     .text_color(rgb(0xaaaaaa))
-                    .child(self.language.label())
                     .child(SharedString::from(format!(
                         "{}:{}",
                         self.cursor_position.y + 1,
                         self.cursor_position.x + 1
                     )))
-                    .when_some(self.selection, |this, selection| {
-                        this.child(SharedString::from(format!("{} chars", selection.chars)))
-                    }),
+                    .when_some(self.selection_label(), |this, label| this.child(label))
+                    .child(self.language.label().to_uppercase()),
             )
     }
 }

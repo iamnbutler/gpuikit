@@ -1,37 +1,37 @@
 //! GPUI Element implementation for rendering an Editor
 
 use crate::buffer::TextBuffer;
-use crate::editor::Editor;
-use gpui::*;
+use crate::editor::{CursorPosition, Editor};
+use gpui::{canvas, Stateful, *};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// A GPUI Element that renders an Editor
 pub struct EditorElement {
-    editor: Editor,
-    interactivity: Interactivity,
+    editor: Rc<RefCell<Editor>>,
 }
 
 impl EditorElement {
     /// Create a new EditorElement from an Editor
     pub fn new(editor: Editor) -> Self {
         Self {
-            editor,
-            interactivity: Interactivity::default(),
+            editor: Rc::new(RefCell::new(editor)),
         }
     }
 
     /// Get a reference to the underlying Editor
-    pub fn editor(&self) -> &Editor {
-        &self.editor
+    pub fn editor(&self) -> std::cell::Ref<'_, Editor> {
+        self.editor.borrow()
     }
 
     /// Get a mutable reference to the underlying Editor
-    pub fn editor_mut(&mut self) -> &mut Editor {
-        &mut self.editor
+    pub fn editor_mut(&self) -> std::cell::RefMut<'_, Editor> {
+        self.editor.borrow_mut()
     }
 
     fn line_bounds(&self, row: usize, bounds: Bounds<Pixels>) -> Bounds<Pixels> {
-        let config = self.editor.config();
-        let scroll_row = self.editor.scroll_row();
+        let config = self.editor.borrow().config().clone();
+        let scroll_row = self.editor.borrow().scroll_row();
         let visual_row = row.saturating_sub(scroll_row);
         Bounds {
             origin: point(
@@ -43,12 +43,12 @@ impl EditorElement {
     }
 
     fn cursor_position_px(&self, bounds: Bounds<Pixels>, window: &mut Window) -> Point<Pixels> {
-        let config = self.editor.config();
-        let cursor_pos = self.editor.get_cursor_position();
-        let scroll_row = self.editor.scroll_row();
+        let editor = self.editor.borrow();
+        let config = editor.config();
+        let cursor_pos = editor.get_cursor_position();
+        let scroll_row = editor.scroll_row();
         let visual_row = cursor_pos.row.saturating_sub(scroll_row);
-        let line = self
-            .editor
+        let line = editor
             .get_buffer()
             .get_line(cursor_pos.row)
             .unwrap_or_else(|| String::new());
@@ -88,7 +88,7 @@ impl EditorElement {
     }
 
     fn paint_editor_background(&self, window: &mut Window, bounds: Bounds<Pixels>) {
-        let config = self.editor.config();
+        let config = self.editor.borrow().config().clone();
         let bg_color: Hsla = config.editor_bg_color.into();
 
         if bg_color.is_opaque() {
@@ -108,7 +108,7 @@ impl EditorElement {
     }
 
     fn paint_gutter_background(&self, window: &mut Window, bounds: Bounds<Pixels>) {
-        let config = self.editor.config();
+        let config = self.editor.borrow().config().clone();
         let bg_color: Hsla = config.gutter_bg_color.into();
 
         if bg_color.is_opaque() {
@@ -128,10 +128,11 @@ impl EditorElement {
     }
 
     fn paint_active_line_background(&self, window: &mut Window, bounds: Bounds<Pixels>) {
-        let config = self.editor.config();
-        let cursor_pos = self.editor.get_cursor_position();
+        let editor = self.editor.borrow();
+        let config = editor.config();
+        let cursor_pos = editor.get_cursor_position();
         let bg_color: Hsla = config.active_line_bg_color.into();
-        let visible_range = self.editor.visible_row_range(bounds.size.height.into());
+        let visible_range = editor.visible_row_range(bounds.size.height.into());
 
         // Only paint active line if it's visible
         if bg_color.is_opaque()
@@ -151,16 +152,17 @@ impl EditorElement {
     }
 
     fn paint_selection(&self, window: &mut Window, bounds: Bounds<Pixels>) {
-        let config = self.editor.config();
-        let visible_range = self.editor.visible_row_range(bounds.size.height.into());
+        let editor = self.editor.borrow();
+        let config = editor.config();
+        let visible_range = editor.visible_row_range(bounds.size.height.into());
 
-        if let Some((start, end)) = self.editor.get_selection_range() {
+        if let Some((start, end)) = editor.get_selection_range() {
             let selection_color = rgba(0x264f78ff);
 
             for row in start.row..=end.row {
                 // Only paint selection for visible rows
                 if row >= visible_range.start && row < visible_range.end {
-                    if let Some(line) = self.editor.get_buffer().get_line(row) {
+                    if let Some(line) = editor.get_buffer().get_line(row) {
                         let line_bounds = self.line_bounds(row, bounds);
 
                         let start_col = if row == start.row { start.col } else { 0 };
@@ -242,11 +244,14 @@ impl EditorElement {
     }
 
     fn paint_lines(&mut self, cx: &mut App, window: &mut Window, bounds: Bounds<Pixels>) {
-        let _config = self.editor.config();
-        let visible_range = self.editor.visible_row_range(bounds.size.height.into());
+        let visible_range = self
+            .editor
+            .borrow()
+            .visible_row_range(bounds.size.height.into());
 
         for row in visible_range {
-            if let Some(line) = self.editor.get_buffer().get_line(row) {
+            let line = self.editor.borrow().get_buffer().get_line(row);
+            if let Some(line) = line {
                 let line_bounds = self.line_bounds(row, bounds);
                 self.paint_line_number(cx, window, row + 1, line_bounds, bounds);
                 self.paint_line(cx, window, line, row, line_bounds);
@@ -262,7 +267,7 @@ impl EditorElement {
         line_bounds: Bounds<Pixels>,
         editor_bounds: Bounds<Pixels>,
     ) {
-        let config = self.editor.config();
+        let config = self.editor.borrow().config().clone();
         let line_number_str = SharedString::new(line_number.to_string());
         let line_number_len = line_number_str.len();
         let gutter_padding = px(10.0);
@@ -310,14 +315,15 @@ impl EditorElement {
         let line = line.into();
 
         // Get syntax highlighted text runs
-        let config = self.editor.config();
+        let config = self.editor.borrow().config().clone();
         let font_family = config.font_family.clone();
         let font_size = config.font_size;
         let line_height = config.line_height;
         let font_size_f32: f32 = font_size.into();
-        let text_runs = self
-            .editor
-            .highlight_line(&line, line_index, font_family, font_size_f32);
+        let text_runs =
+            self.editor
+                .borrow_mut()
+                .highlight_line(&line, line_index, font_family, font_size_f32);
 
         let shaped_line =
             window
@@ -328,9 +334,10 @@ impl EditorElement {
     }
 
     fn paint_cursor(&self, window: &mut Window, bounds: Bounds<Pixels>) {
-        let config = self.editor.config();
-        let cursor_pos_row = self.editor.get_cursor_position().row;
-        let visible_range = self.editor.visible_row_range(bounds.size.height.into());
+        let editor = self.editor.borrow();
+        let config = editor.config();
+        let cursor_pos_row = editor.get_cursor_position().row;
+        let visible_range = editor.visible_row_range(bounds.size.height.into());
 
         // Only paint cursor if it's visible
         if cursor_pos_row >= visible_range.start && cursor_pos_row < visible_range.end {
@@ -353,94 +360,77 @@ impl EditorElement {
 }
 
 impl IntoElement for EditorElement {
-    type Element = Self;
+    type Element = Stateful<Div>;
 
     fn into_element(self) -> Self::Element {
-        self
-    }
-}
+        let editor_id = self.editor.borrow().id().to_string();
+        let editor_clone = self.editor.clone();
+        let editor_for_render = self.editor.clone();
 
-impl InteractiveElement for EditorElement {
-    fn interactivity(&mut self) -> &mut Interactivity {
-        &mut self.interactivity
-    }
-}
+        div()
+            .id(ElementId::Name(editor_id.into()))
+            .size_full()
+            .on_mouse_down(MouseButton::Left, move |event, _window, _cx| {
+                let mut editor = editor_clone.borrow_mut();
 
-impl Element for EditorElement {
-    type RequestLayoutState = ();
-    type PrepaintState = Option<Hitbox>;
+                // Calculate position from mouse coordinates
+                // We need to use the event position and bounds to figure out where the click was
+                // For now, we'll use a simple approximation based on the event position
+                let config = editor.config();
+                let line_height = config.line_height;
+                let gutter_width = config.gutter_width + config.gutter_padding;
+                let scroll_row = editor.scroll_row();
 
-    fn id(&self) -> Option<ElementId> {
-        Some(self.editor.id().clone())
-    }
+                // Calculate relative position within the editor area
+                let editor_x = event.position.x.max(gutter_width) - gutter_width;
+                let editor_y = event.position.y;
 
-    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
-        None
-    }
+                // Calculate row from y position
+                let row_float = editor_y / line_height;
+                let clicked_row = row_float.floor() as usize + scroll_row;
+                let max_row = editor.get_buffer().line_count().saturating_sub(1);
+                let row = clicked_row.min(max_row);
 
-    fn request_layout(
-        &mut self,
-        _: Option<&GlobalElementId>,
-        _: Option<&gpui::InspectorElementId>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> (LayoutId, Self::RequestLayoutState) {
-        let mut style = Style::default();
-        style.flex_grow = 1.0;
-        style.size.width = relative(1.0).into();
-        style.size.height = relative(1.0).into();
-        let layout_id = window.request_layout(style, None, cx);
-        (layout_id, ())
-    }
+                // Calculate column from x position (rough approximation)
+                let char_width = config.font_size * 0.6;
+                let col_float = editor_x / char_width;
+                let clicked_col = col_float.floor() as usize;
 
-    fn prepaint(
-        &mut self,
-        global_id: Option<&GlobalElementId>,
-        inspector_id: Option<&gpui::InspectorElementId>,
-        bounds: Bounds<Pixels>,
-        _: &mut Self::RequestLayoutState,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> Self::PrepaintState {
-        self.interactivity.prepaint(
-            global_id,
-            inspector_id,
-            bounds,
-            bounds.size,
-            window,
-            cx,
-            |_, _, _, _, _| {},
-        );
+                // Get the actual line to clamp column properly
+                let max_col = editor
+                    .get_buffer()
+                    .get_line(row)
+                    .map(|line| line.len())
+                    .unwrap_or(0);
+                let col = clicked_col.min(max_col);
 
-        // Insert a hitbox for scroll handling
-        Some(window.insert_hitbox(bounds, HitboxBehavior::Normal))
-    }
+                let position = CursorPosition::new(row, col);
 
-    fn paint(
-        &mut self,
-        global_id: Option<&GlobalElementId>,
-        inspector_id: Option<&gpui::InspectorElementId>,
-        bounds: Bounds<Pixels>,
-        _: &mut Self::RequestLayoutState,
-        hitbox: &mut Self::PrepaintState,
-        window: &mut Window,
-        cx: &mut App,
-    ) {
-        self.interactivity.paint(
-            global_id,
-            inspector_id,
-            bounds,
-            hitbox.as_ref(),
-            window,
-            cx,
-            |_, _, _| {},
-        );
+                // Clear selection and set cursor position
+                editor.clear_selection();
+                editor.set_cursor_position(position);
+                editor.ensure_cursor_visible();
+            })
+            .child(
+                canvas(
+                    move |_bounds, _window, _cx| {
+                        // Prepaint - nothing needed here
+                    },
+                    move |bounds, _, window, cx| {
+                        // Create a temporary EditorElement for rendering
+                        let mut temp_element = EditorElement {
+                            editor: editor_for_render.clone(),
+                        };
 
-        self.paint_gutter_background(window, bounds);
-        self.paint_editor_background(window, bounds);
-        self.paint_active_line_background(window, bounds);
-        self.paint_selection(window, bounds);
-        self.paint_lines(cx, window, bounds);
-        self.paint_cursor(window, bounds);
+                        temp_element.paint_gutter_background(window, bounds);
+                        temp_element.paint_editor_background(window, bounds);
+                        temp_element.paint_active_line_background(window, bounds);
+                        temp_element.paint_selection(window, bounds);
+                        temp_element.paint_lines(cx, window, bounds);
+                        temp_element.paint_cursor(window, bounds);
+                    },
+                )
+                .size_full(),
+            )
     }
 }

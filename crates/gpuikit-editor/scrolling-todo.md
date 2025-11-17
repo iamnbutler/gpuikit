@@ -16,7 +16,7 @@
 - [ ] Add scroll position persistence across sessions
 - [ ] Handle selection dragging with auto-scroll at viewport edges
 - [ ] Add horizontal scrolling for long lines (when wrapping disabled)
-- [ ] Update mouse click position calculation to account for scroll offset
+- [x] Update mouse click position calculation to account for scroll offset
 - [ ] Add scroll position indicator overlay (optional, minimal)
 - [ ] Implement viewport-aware find/replace scrolling
 - [ ] Add tests for scroll position calculations

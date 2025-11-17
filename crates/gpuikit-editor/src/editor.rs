@@ -315,6 +315,121 @@ impl Editor {
         }
     }
 
+    /// Move the cursor to the start of the current line (Home key)
+    pub fn move_to_line_start(&mut self, with_selection: bool) {
+        if !with_selection {
+            self.clear_selection();
+        }
+        self.cursor_position.col = 0;
+        self.goal_column = None;
+        self.ensure_cursor_visible();
+    }
+
+    /// Move the cursor to the end of the current line (End key)
+    pub fn move_to_line_end(&mut self, with_selection: bool) {
+        if !with_selection {
+            self.clear_selection();
+        }
+        let line_len = self
+            .buffer
+            .get_line(self.cursor_position.row)
+            .map(|line| line.len())
+            .unwrap_or(0);
+        self.cursor_position.col = line_len;
+        self.goal_column = None;
+        self.ensure_cursor_visible();
+    }
+
+    /// Move the cursor to the start of the document (Ctrl+Home)
+    pub fn move_to_document_start(&mut self, with_selection: bool) {
+        if !with_selection {
+            self.clear_selection();
+        }
+        self.cursor_position.row = 0;
+        self.cursor_position.col = 0;
+        self.goal_column = None;
+        self.set_scroll_row(0);
+    }
+
+    /// Move the cursor to the end of the document (Ctrl+End)
+    pub fn move_to_document_end(&mut self, with_selection: bool) {
+        if !with_selection {
+            self.clear_selection();
+        }
+        let last_row = self.buffer.line_count().saturating_sub(1);
+        let last_col = self
+            .buffer
+            .get_line(last_row)
+            .map(|line| line.len())
+            .unwrap_or(0);
+        self.cursor_position.row = last_row;
+        self.cursor_position.col = last_col;
+        self.goal_column = None;
+        self.ensure_cursor_visible();
+    }
+
+    /// Scroll up by one page (PageUp key)
+    pub fn page_up(&mut self, with_selection: bool) {
+        const DEFAULT_VIEWPORT_HEIGHT: usize = 25;
+        let page_size = DEFAULT_VIEWPORT_HEIGHT.saturating_sub(1); // Leave one line for context
+
+        if !with_selection {
+            self.clear_selection();
+        }
+
+        // Move cursor up by page_size
+        let new_row = self.cursor_position.row.saturating_sub(page_size);
+        self.cursor_position.row = new_row;
+
+        // Scroll the viewport up
+        self.scroll_row = self.scroll_row.saturating_sub(page_size);
+
+        // Adjust column position if needed
+        let line = self.buffer.get_line(self.cursor_position.row);
+        if let Some(line) = line {
+            let max_col = line.len();
+            if let Some(goal) = self.goal_column {
+                self.cursor_position.col = goal.min(max_col);
+            } else {
+                self.cursor_position.col = self.cursor_position.col.min(max_col);
+            }
+        } else {
+            self.cursor_position.col = 0;
+        }
+    }
+
+    /// Scroll down by one page (PageDown key)
+    pub fn page_down(&mut self, with_selection: bool) {
+        const DEFAULT_VIEWPORT_HEIGHT: usize = 25;
+        let page_size = DEFAULT_VIEWPORT_HEIGHT.saturating_sub(1); // Leave one line for context
+        let max_row = self.buffer.line_count().saturating_sub(1);
+
+        if !with_selection {
+            self.clear_selection();
+        }
+
+        // Move cursor down by page_size
+        let new_row = (self.cursor_position.row + page_size).min(max_row);
+        self.cursor_position.row = new_row;
+
+        // Scroll the viewport down
+        let max_scroll = self.buffer.line_count().saturating_sub(1);
+        self.scroll_row = (self.scroll_row + page_size).min(max_scroll);
+
+        // Adjust column position if needed
+        let line = self.buffer.get_line(self.cursor_position.row);
+        if let Some(line) = line {
+            let max_col = line.len();
+            if let Some(goal) = self.goal_column {
+                self.cursor_position.col = goal.min(max_col);
+            } else {
+                self.cursor_position.col = self.cursor_position.col.min(max_col);
+            }
+        } else {
+            self.cursor_position.col = 0;
+        }
+    }
+
     pub fn select_all(&mut self) {
         // Reset goal column when selecting all
         self.goal_column = None;
@@ -937,5 +1052,153 @@ mod scrolling_tests {
                 "Text run color should be the same after scrolling back"
             );
         }
+    }
+
+    #[test]
+    fn test_page_up() {
+        let lines: Vec<String> = (0..100).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_page_up", lines);
+
+        // Start at line 50
+        editor.set_cursor_position(CursorPosition::new(50, 5));
+        editor.set_scroll_row(45);
+
+        // Page up
+        editor.page_up(false);
+
+        // Should move up by ~24 lines (page size - 1)
+        assert!(editor.cursor_position().row < 50);
+        assert!(editor.cursor_position().row >= 26);
+        assert!(editor.scroll_row() < 45);
+
+        // Page up from top should stay at top
+        editor.set_cursor_position(CursorPosition::new(5, 0));
+        editor.set_scroll_row(0);
+        editor.page_up(false);
+        assert_eq!(editor.cursor_position().row, 0);
+        assert_eq!(editor.scroll_row(), 0);
+    }
+
+    #[test]
+    fn test_page_down() {
+        let lines: Vec<String> = (0..100).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_page_down", lines);
+
+        // Start at line 10
+        editor.set_cursor_position(CursorPosition::new(10, 5));
+        editor.set_scroll_row(5);
+
+        // Page down
+        editor.page_down(false);
+
+        // Should move down by ~24 lines (page size - 1)
+        assert!(editor.cursor_position().row > 10);
+        assert!(editor.cursor_position().row <= 34);
+        assert!(editor.scroll_row() > 5);
+
+        // Page down from near bottom should stop at last line
+        editor.set_cursor_position(CursorPosition::new(95, 0));
+        editor.set_scroll_row(90);
+        editor.page_down(false);
+        assert_eq!(editor.cursor_position().row, 99);
+    }
+
+    #[test]
+    fn test_home_key() {
+        let mut editor = Editor::new("test_home", vec!["Hello, World!".to_string()]);
+
+        // Start at middle of line
+        editor.set_cursor_position(CursorPosition::new(0, 7));
+
+        // Press Home
+        editor.move_to_line_start(false);
+
+        assert_eq!(editor.cursor_position().row, 0);
+        assert_eq!(editor.cursor_position().col, 0);
+        assert_eq!(editor.goal_column, None);
+    }
+
+    #[test]
+    fn test_end_key() {
+        let mut editor = Editor::new("test_end", vec!["Hello, World!".to_string()]);
+
+        // Start at beginning of line
+        editor.set_cursor_position(CursorPosition::new(0, 0));
+
+        // Press End
+        editor.move_to_line_end(false);
+
+        assert_eq!(editor.cursor_position().row, 0);
+        assert_eq!(editor.cursor_position().col, 13); // "Hello, World!" is 13 characters
+        assert_eq!(editor.goal_column, None);
+    }
+
+    #[test]
+    fn test_document_start() {
+        let lines: Vec<String> = (0..50).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_doc_start", lines);
+
+        // Start at middle of document
+        editor.set_cursor_position(CursorPosition::new(25, 3));
+        editor.set_scroll_row(20);
+
+        // Go to document start
+        editor.move_to_document_start(false);
+
+        assert_eq!(editor.cursor_position().row, 0);
+        assert_eq!(editor.cursor_position().col, 0);
+        assert_eq!(editor.scroll_row(), 0);
+        assert_eq!(editor.goal_column, None);
+    }
+
+    #[test]
+    fn test_document_end() {
+        let lines = vec![
+            "First line".to_string(),
+            "Second line".to_string(),
+            "Last line here".to_string(),
+        ];
+        let mut editor = Editor::new("test_doc_end", lines);
+
+        // Start at beginning
+        editor.set_cursor_position(CursorPosition::new(0, 0));
+        editor.set_scroll_row(0);
+
+        // Go to document end
+        editor.move_to_document_end(false);
+
+        assert_eq!(editor.cursor_position().row, 2);
+        assert_eq!(editor.cursor_position().col, 14); // "Last line here" is 14 characters
+        assert_eq!(editor.goal_column, None);
+    }
+
+    #[test]
+    fn test_navigation_with_selection() {
+        let lines: Vec<String> = (0..10).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_nav_selection", lines);
+
+        // Start with a selection
+        editor.set_cursor_position(CursorPosition::new(2, 0));
+        editor.selection_anchor = Some(CursorPosition::new(1, 0));
+
+        // Test that navigation without shift clears selection
+        editor.move_to_line_end(false);
+        assert_eq!(editor.selection_anchor, None);
+
+        // Set up selection again
+        editor.selection_anchor = Some(CursorPosition::new(2, 0));
+
+        // Test that navigation with shift preserves selection
+        editor.move_to_line_end(true);
+        assert!(editor.selection_anchor.is_some());
+
+        // Test with page navigation
+        editor.selection_anchor = Some(CursorPosition::new(2, 0));
+        editor.page_down(false);
+        assert_eq!(editor.selection_anchor, None);
+
+        editor.selection_anchor = Some(CursorPosition::new(2, 0));
+        editor.page_down(true);
+        assert!(editor.selection_anchor.is_some());
     }
 }

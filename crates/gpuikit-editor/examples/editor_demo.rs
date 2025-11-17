@@ -19,6 +19,18 @@ actions!(
         MoveDownWithShift,
         MoveLeftWithShift,
         MoveRightWithShift,
+        PageUp,
+        PageDown,
+        PageUpWithShift,
+        PageDownWithShift,
+        Home,
+        End,
+        HomeWithShift,
+        EndWithShift,
+        DocumentStart,
+        DocumentEnd,
+        DocumentStartWithShift,
+        DocumentEndWithShift,
         Backspace,
         Delete,
         InsertNewline,
@@ -188,6 +200,86 @@ impl EditorView {
         cx: &mut Context<Self>,
     ) {
         self.editor.move_right(true);
+        cx.notify();
+    }
+
+    fn page_up(&mut self, _: &PageUp, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.page_up(false);
+        cx.notify();
+    }
+
+    fn page_down(&mut self, _: &PageDown, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.page_down(false);
+        cx.notify();
+    }
+
+    fn page_up_with_shift(
+        &mut self,
+        _: &PageUpWithShift,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.editor.page_up(true);
+        cx.notify();
+    }
+
+    fn page_down_with_shift(
+        &mut self,
+        _: &PageDownWithShift,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.editor.page_down(true);
+        cx.notify();
+    }
+
+    fn home(&mut self, _: &Home, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.move_to_line_start(false);
+        cx.notify();
+    }
+
+    fn end(&mut self, _: &End, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.move_to_line_end(false);
+        cx.notify();
+    }
+
+    fn home_with_shift(&mut self, _: &HomeWithShift, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.move_to_line_start(true);
+        cx.notify();
+    }
+
+    fn end_with_shift(&mut self, _: &EndWithShift, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.move_to_line_end(true);
+        cx.notify();
+    }
+
+    fn document_start(&mut self, _: &DocumentStart, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.move_to_document_start(false);
+        cx.notify();
+    }
+
+    fn document_end(&mut self, _: &DocumentEnd, _window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.move_to_document_end(false);
+        cx.notify();
+    }
+
+    fn document_start_with_shift(
+        &mut self,
+        _: &DocumentStartWithShift,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.editor.move_to_document_start(true);
+        cx.notify();
+    }
+
+    fn document_end_with_shift(
+        &mut self,
+        _: &DocumentEndWithShift,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.editor.move_to_document_end(true);
         cx.notify();
     }
 
@@ -503,6 +595,18 @@ impl Render for EditorView {
                     .on_action(cx.listener(Self::move_down_with_shift))
                     .on_action(cx.listener(Self::move_left_with_shift))
                     .on_action(cx.listener(Self::move_right_with_shift))
+                    .on_action(cx.listener(Self::page_up))
+                    .on_action(cx.listener(Self::page_down))
+                    .on_action(cx.listener(Self::page_up_with_shift))
+                    .on_action(cx.listener(Self::page_down_with_shift))
+                    .on_action(cx.listener(Self::home))
+                    .on_action(cx.listener(Self::end))
+                    .on_action(cx.listener(Self::home_with_shift))
+                    .on_action(cx.listener(Self::end_with_shift))
+                    .on_action(cx.listener(Self::document_start))
+                    .on_action(cx.listener(Self::document_end))
+                    .on_action(cx.listener(Self::document_start_with_shift))
+                    .on_action(cx.listener(Self::document_end_with_shift))
                     .on_action(cx.listener(Self::backspace))
                     .on_action(cx.listener(Self::delete))
                     .on_action(cx.listener(Self::insert_newline))
@@ -631,6 +735,38 @@ fn load_keymaps(cx: &mut App) {
             "MoveRightWithShift" => bindings.push(KeyBinding::new(
                 &spec.keystrokes,
                 MoveRightWithShift,
+                context,
+            )),
+            "PageUp" => bindings.push(KeyBinding::new(&spec.keystrokes, PageUp, context)),
+            "PageDown" => bindings.push(KeyBinding::new(&spec.keystrokes, PageDown, context)),
+            "PageUpWithShift" => {
+                bindings.push(KeyBinding::new(&spec.keystrokes, PageUpWithShift, context))
+            }
+            "PageDownWithShift" => bindings.push(KeyBinding::new(
+                &spec.keystrokes,
+                PageDownWithShift,
+                context,
+            )),
+            "Home" => bindings.push(KeyBinding::new(&spec.keystrokes, Home, context)),
+            "End" => bindings.push(KeyBinding::new(&spec.keystrokes, End, context)),
+            "HomeWithShift" => {
+                bindings.push(KeyBinding::new(&spec.keystrokes, HomeWithShift, context))
+            }
+            "EndWithShift" => {
+                bindings.push(KeyBinding::new(&spec.keystrokes, EndWithShift, context))
+            }
+            "DocumentStart" => {
+                bindings.push(KeyBinding::new(&spec.keystrokes, DocumentStart, context))
+            }
+            "DocumentEnd" => bindings.push(KeyBinding::new(&spec.keystrokes, DocumentEnd, context)),
+            "DocumentStartWithShift" => bindings.push(KeyBinding::new(
+                &spec.keystrokes,
+                DocumentStartWithShift,
+                context,
+            )),
+            "DocumentEndWithShift" => bindings.push(KeyBinding::new(
+                &spec.keystrokes,
+                DocumentEndWithShift,
                 context,
             )),
             "Backspace" => bindings.push(KeyBinding::new(&spec.keystrokes, Backspace, context)),

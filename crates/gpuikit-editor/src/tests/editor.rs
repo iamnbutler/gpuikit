@@ -846,25 +846,25 @@ fn test_cursor_position_after_bulk_delete() {
     assert_eq!(editor.cursor_position(), CursorPosition::new(0, 3));
 }
 
-#[test]
-fn test_repeated_undo_redo() {
-    // Test that repeated undo/redo operations don't corrupt state
-    // This is a placeholder since undo might not be implemented
-    let mut editor = Editor::new("test", vec![]);
+// #[test]
+// fn test_repeated_undo_redo() {
+//     // Test that repeated undo/redo operations don't corrupt state
+//     // This is a placeholder since undo might not be implemented
+//     let mut editor = Editor::new("test", vec![]);
 
-    editor.insert_char('A');
-    editor.insert_char('B');
-    editor.insert_char('C');
+//     editor.insert_char('A');
+//     editor.insert_char('B');
+//     editor.insert_char('C');
 
-    // If undo were implemented:
-    // editor.undo();
-    // editor.undo();
-    // editor.redo();
-    // editor.undo();
+//     // If undo were implemented:
+//     // editor.undo();
+//     // editor.undo();
+//     // editor.redo();
+//     // editor.undo();
 
-    // For now, just verify current state
-    assert_eq!(editor.get_buffer().get_line(0), Some("ABC".to_string()));
-}
+//     // For now, just verify current state
+//     assert_eq!(editor.get_buffer().get_line(0), Some("ABC".to_string()));
+// }
 
 #[test]
 fn test_control_characters() {

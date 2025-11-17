@@ -1,7 +1,7 @@
 //! GPUI Element implementation for rendering an Editor
 
 use crate::buffer::TextBuffer;
-use crate::editor::{CursorPosition, Editor};
+use crate::editor::Editor;
 use gpui::{canvas, Stateful, *};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -364,53 +364,11 @@ impl IntoElement for EditorElement {
 
     fn into_element(self) -> Self::Element {
         let editor_id = self.editor.borrow().id().to_string();
-        let editor_clone = self.editor.clone();
         let editor_for_render = self.editor.clone();
 
         div()
             .id(ElementId::Name(editor_id.into()))
             .size_full()
-            .on_mouse_down(MouseButton::Left, move |event, _window, _cx| {
-                let mut editor = editor_clone.borrow_mut();
-
-                // Calculate position from mouse coordinates
-                // We need to use the event position and bounds to figure out where the click was
-                // For now, we'll use a simple approximation based on the event position
-                let config = editor.config();
-                let line_height = config.line_height;
-                let gutter_width = config.gutter_width + config.gutter_padding;
-                let scroll_row = editor.scroll_row();
-
-                // Calculate relative position within the editor area
-                let editor_x = event.position.x.max(gutter_width) - gutter_width;
-                let editor_y = event.position.y;
-
-                // Calculate row from y position
-                let row_float = editor_y / line_height;
-                let clicked_row = row_float.floor() as usize + scroll_row;
-                let max_row = editor.get_buffer().line_count().saturating_sub(1);
-                let row = clicked_row.min(max_row);
-
-                // Calculate column from x position (rough approximation)
-                let char_width = config.font_size * 0.6;
-                let col_float = editor_x / char_width;
-                let clicked_col = col_float.floor() as usize;
-
-                // Get the actual line to clamp column properly
-                let max_col = editor
-                    .get_buffer()
-                    .get_line(row)
-                    .map(|line| line.len())
-                    .unwrap_or(0);
-                let col = clicked_col.min(max_col);
-
-                let position = CursorPosition::new(row, col);
-
-                // Clear selection and set cursor position
-                editor.clear_selection();
-                editor.set_cursor_position(position);
-                editor.ensure_cursor_visible();
-            })
             .child(
                 canvas(
                     move |_bounds, _window, _cx| {

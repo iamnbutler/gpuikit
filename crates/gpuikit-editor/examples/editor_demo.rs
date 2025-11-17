@@ -659,6 +659,51 @@ impl Render for EditorView {
                             cx.notify();
                         }
                     }))
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, event: &MouseDownEvent, window, cx| {
+                            // Get editor configuration
+                            let config = this.editor.config();
+                            let line_height = config.line_height;
+                            let gutter_width = config.gutter_width + config.gutter_padding;
+                            let scroll_row = this.editor.scroll_row();
+
+                            // Calculate relative position within the editor area
+                            let editor_x = (event.position.x - gutter_width).max(px(0.));
+                            let editor_y = event.position.y;
+
+                            // Calculate row from y position
+                            let row_float = editor_y / line_height;
+                            let clicked_row = row_float.floor() as usize + scroll_row;
+                            let max_row = this.editor.get_buffer().line_count().saturating_sub(1);
+                            let row = clicked_row.min(max_row);
+
+                            // Calculate column from x position (rough approximation)
+                            let char_width = config.font_size * 0.6; // Rough approximation
+                            let col_float = editor_x / char_width;
+                            let clicked_col = col_float.floor() as usize;
+
+                            // Get the actual line to clamp column properly
+                            let max_col = this
+                                .editor
+                                .get_buffer()
+                                .get_line(row)
+                                .map(|line| line.len())
+                                .unwrap_or(0);
+                            let col = clicked_col.min(max_col);
+
+                            let position = CursorPosition::new(row, col);
+
+                            // Clear selection and set cursor position
+                            this.editor.clear_selection();
+                            this.editor.set_cursor_position(position);
+                            this.editor.ensure_cursor_visible();
+
+                            // Focus the editor when clicked
+                            this.focus_handle.focus(window);
+                            cx.notify();
+                        }),
+                    )
                     .child(EditorElement::new(self.editor.clone())),
             )
             .child(

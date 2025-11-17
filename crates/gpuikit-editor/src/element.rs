@@ -355,32 +355,7 @@ impl EditorElement {
 impl IntoElement for EditorElement {
     type Element = Self;
 
-    fn into_element(mut self) -> Self::Element {
-        let editor = self.editor.clone();
-
-        self.interactivity
-            .on_scroll_wheel(move |event, _window, _cx| {
-                let mut editor = editor.clone();
-
-                // Calculate scroll delta in lines
-                let lines_to_scroll = match event.delta {
-                    ScrollDelta::Lines(lines) => {
-                        // Scroll by the number of lines specified
-                        -lines.y as isize
-                    }
-                    ScrollDelta::Pixels(pixels) => {
-                        // Convert pixels to lines
-                        let line_height: f32 = editor.config().line_height.into();
-                        let pixels_y: f32 = pixels.y.into();
-                        -(pixels_y / line_height).round() as isize
-                    }
-                };
-
-                if lines_to_scroll != 0 {
-                    editor.scroll_by(lines_to_scroll);
-                }
-            });
-
+    fn into_element(self) -> Self::Element {
         self
     }
 }

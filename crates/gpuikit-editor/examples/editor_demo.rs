@@ -535,6 +535,26 @@ impl Render for EditorView {
                             }
                         },
                     ))
+                    .on_scroll_wheel(cx.listener(|this, event: &ScrollWheelEvent, _window, cx| {
+                        // Calculate scroll delta in lines
+                        let lines_to_scroll = match event.delta {
+                            ScrollDelta::Lines(lines) => {
+                                // Scroll by the number of lines specified
+                                -lines.y as isize
+                            }
+                            ScrollDelta::Pixels(pixels) => {
+                                // Convert pixels to lines
+                                let line_height: f32 = this.editor.config().line_height.into();
+                                let pixels_y: f32 = pixels.y.into();
+                                -(pixels_y / line_height).round() as isize
+                            }
+                        };
+
+                        if lines_to_scroll != 0 {
+                            this.editor.scroll_by(lines_to_scroll);
+                            cx.notify();
+                        }
+                    }))
                     .child(EditorElement::new(self.editor.clone())),
             )
             .child(

@@ -6,12 +6,10 @@ A work-in-progress modular UI toolkit for GPUI applications.
 
 **Crates**
 
-|                  |                                                |                                                                                                             |
-| ----t------------ | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `gpuikit`        | Main crate with core components and re-exports | [![crates.io](https://img.shields.io/crates/v/gpuikit.svg)](https://crates.io/crates/gpuikit)               |
-| `gpuikit-theme`  | Theming module                                 | [![crates.io](https://img.shields.io/crates/v/gpuikit-theme.svg)](https://crates.io/crates/gpuikit-theme)   |
-| `gpuikit-keymap` | Keyboard shortcut and keymap management        | [![crates.io](https://img.shields.io/crates/v/gpuikit-keymap.svg)](https://crates.io/crates/gpuikit-keymap) |
-| `gpuikit-editor` | Text editor component                          | [![crates.io](https://img.shields.io/crates/v/gpuikit-editor.svg)](https://crates.io/crates/gpuikit-editor) |
+- [`gpuikit` - ![crates.io](https://img.shields.io/crates/v/gpuikit.svg)](https://crates.io/crates/gpuikit) - Main crate with core components and re-exports
+- [`gpuikit-theme` - ![crates.io](https://img.shields.io/crates/v/gpuikit-theme.svg)](https://crates.io/crates/gpuikit-theme) - Theming module
+- [`gpuikit-keymap` - ![crates.io](https://img.shields.io/crates/v/gpuikit-keymap.svg)](https://crates.io/crates/gpuikit-keymap) - Keyboard shortcut and keymap management
+- [`gpuikit-editor` - ![crates.io](https://img.shields.io/crates/v/gpuikit-editor.svg)](https://crates.io/crates/gpuikit-editor) - Text editor component
 
 ## Usage
 

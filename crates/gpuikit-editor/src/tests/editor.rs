@@ -1,4 +1,5 @@
-use gpui_editor::{CursorPosition, Editor, TextBuffer};
+#[allow(unused)]
+use crate::*;
 
 #[test]
 fn test_empty_buffer_has_one_line() {

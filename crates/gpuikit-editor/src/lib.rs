@@ -13,6 +13,7 @@
 pub mod buffer;
 pub mod editor;
 pub mod element;
+mod tests;
 
 pub mod syntax_highlighter;
 

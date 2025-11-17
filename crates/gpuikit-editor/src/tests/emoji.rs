@@ -1,3 +1,6 @@
+#[allow(unused)]
+use crate::*;
+
 #[test]
 fn test_insert_basic_emoji() {
     let mut editor = Editor::new("test", vec![]);

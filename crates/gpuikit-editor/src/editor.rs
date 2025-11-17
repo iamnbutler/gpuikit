@@ -1,6 +1,7 @@
+use gpui::{px, rgb, ElementId, Pixels, Rgba, SharedString, TextRun};
+
 use crate::buffer::{GapBuffer, TextBuffer};
 use crate::syntax_highlighter::SyntaxHighlighter;
-use gpui::*;
 
 #[derive(Clone)]
 pub struct EditorConfig {
@@ -56,6 +57,7 @@ pub struct Editor {
     syntax_highlighter: SyntaxHighlighter,
     language: String,
     current_theme: String,
+    scroll_row: usize,
 }
 
 impl Editor {
@@ -79,6 +81,7 @@ impl Editor {
             syntax_highlighter,
             language,
             current_theme: String::new(),
+            scroll_row: 0,
         }
     }
 
@@ -456,5 +459,203 @@ impl Editor {
             .clear_state_from_line(self.cursor_position.row, &self.language);
 
         self.goal_column = None;
+    }
+
+    pub fn scroll_row(&self) -> usize {
+        self.scroll_row
+    }
+
+    pub fn set_scroll_row(&mut self, row: usize) {
+        let max_scroll = self.buffer.line_count().saturating_sub(1);
+        self.scroll_row = row.min(max_scroll);
+    }
+
+    pub fn visible_row_range(&self, viewport_height: f32) -> std::ops::Range<usize> {
+        let line_height_f32: f32 = self.config.line_height.into();
+        let visible_rows = (viewport_height / line_height_f32).floor() as usize;
+        let start = self.scroll_row;
+        let end = (start + visible_rows).min(self.buffer.line_count());
+        start..end
+    }
+
+    pub fn scroll_by(&mut self, delta: isize) {
+        if delta < 0 {
+            self.scroll_row = self.scroll_row.saturating_sub(delta.abs() as usize);
+        } else {
+            let max_scroll = self.buffer.line_count().saturating_sub(1);
+            self.scroll_row = (self.scroll_row + delta as usize).min(max_scroll);
+        }
+    }
+}
+
+#[cfg(test)]
+mod scrolling_tests {
+    use super::*;
+
+    #[test]
+    fn test_set_scroll_row() {
+        let lines = vec![
+            "Line 1".to_string(),
+            "Line 2".to_string(),
+            "Line 3".to_string(),
+            "Line 4".to_string(),
+            "Line 5".to_string(),
+        ];
+        let mut editor = Editor::new("test_editor", lines);
+
+        editor.set_scroll_row(2);
+        assert_eq!(editor.scroll_row(), 2);
+
+        // Test clamping to max
+        editor.set_scroll_row(100);
+        assert_eq!(editor.scroll_row(), 4); // 5 lines, max scroll is 4
+    }
+
+    #[test]
+    fn test_visible_row_range() {
+        let lines: Vec<String> = (0..20).map(|i| format!("Line {}", i)).collect();
+        let editor = Editor::new("test_editor", lines);
+
+        // Assuming default line height of 20px
+        let viewport_height = 100.0; // Should show 5 lines
+        let range = editor.visible_row_range(viewport_height);
+        assert_eq!(range, 0..5);
+    }
+
+    #[test]
+    fn test_visible_row_range_with_scroll() {
+        let lines: Vec<String> = (0..20).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        editor.set_scroll_row(5);
+        let viewport_height = 100.0; // Should show 5 lines
+        let range = editor.visible_row_range(viewport_height);
+        assert_eq!(range, 5..10);
+    }
+
+    #[test]
+    fn test_visible_row_range_at_end() {
+        let lines: Vec<String> = (0..20).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        editor.set_scroll_row(17);
+        let viewport_height = 100.0; // Should show 5 lines, but only 3 available
+        let range = editor.visible_row_range(viewport_height);
+        assert_eq!(range, 17..20); // Should clamp to buffer end
+    }
+
+    #[test]
+    fn test_scroll_by_positive() {
+        let lines: Vec<String> = (0..20).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        editor.scroll_by(3);
+        assert_eq!(editor.scroll_row(), 3);
+
+        editor.scroll_by(2);
+        assert_eq!(editor.scroll_row(), 5);
+    }
+
+    #[test]
+    fn test_scroll_by_negative() {
+        let lines: Vec<String> = (0..20).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        editor.set_scroll_row(10);
+        editor.scroll_by(-3);
+        assert_eq!(editor.scroll_row(), 7);
+
+        editor.scroll_by(-10);
+        assert_eq!(editor.scroll_row(), 0); // Should clamp to 0
+    }
+
+    #[test]
+    fn test_scroll_by_beyond_bounds() {
+        let lines: Vec<String> = (0..10).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        // Scroll beyond end
+        editor.scroll_by(100);
+        assert_eq!(editor.scroll_row(), 9); // 10 lines, max scroll is 9
+
+        // Scroll before start
+        editor.scroll_by(-200);
+        assert_eq!(editor.scroll_row(), 0);
+    }
+
+    #[test]
+    fn test_empty_buffer_scroll() {
+        let editor = Editor::new("test_editor", vec![]);
+        assert_eq!(editor.scroll_row(), 0);
+
+        let range = editor.visible_row_range(100.0);
+        assert_eq!(range, 0..1); // Empty buffer has 1 empty line
+    }
+
+    #[test]
+    fn test_single_line_buffer_scroll() {
+        let mut editor = Editor::new("test_editor", vec!["Single line".to_string()]);
+
+        editor.set_scroll_row(5);
+        assert_eq!(editor.scroll_row(), 0); // Should clamp to 0 since only 1 line
+
+        let range = editor.visible_row_range(100.0);
+        assert_eq!(range, 0..1);
+    }
+
+    #[test]
+    fn test_scroll_preserves_cursor_visibility() {
+        // This test documents expected behavior for auto-scrolling
+        // which will be implemented in a future TODO item
+        let lines: Vec<String> = (0..20).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        // Set cursor at line 10
+        editor.set_cursor_position(CursorPosition::new(10, 0));
+
+        // Currently, scrolling doesn't auto-adjust for cursor visibility
+        // This will be implemented as part of the auto-scroll TODO
+        editor.set_scroll_row(0);
+        assert_eq!(editor.scroll_row(), 0);
+        assert_eq!(editor.cursor_position().row, 10);
+
+        // In the future, we'd expect auto-scroll to make cursor visible
+        // For now, we just verify the scroll and cursor are independent
+    }
+
+    #[test]
+    fn test_large_viewport_shows_all_lines() {
+        let lines: Vec<String> = (0..5).map(|i| format!("Line {}", i)).collect();
+        let editor = Editor::new("test_editor", lines);
+
+        let viewport_height = 1000.0; // Very large viewport
+        let range = editor.visible_row_range(viewport_height);
+        assert_eq!(range, 0..5); // Should show all 5 lines
+    }
+
+    #[test]
+    fn test_tiny_viewport() {
+        let lines: Vec<String> = (0..10).map(|i| format!("Line {}", i)).collect();
+        let editor = Editor::new("test_editor", lines);
+
+        let viewport_height = 25.0; // Slightly more than one line
+        let range = editor.visible_row_range(viewport_height);
+        assert_eq!(range, 0..1); // Should show at least 1 line
+    }
+
+    #[test]
+    fn test_scroll_state_persists_through_edits() {
+        let lines: Vec<String> = (0..20).map(|i| format!("Line {}", i)).collect();
+        let mut editor = Editor::new("test_editor", lines);
+
+        editor.set_scroll_row(5);
+        assert_eq!(editor.scroll_row(), 5);
+
+        // Insert a character (edit the buffer)
+        editor.set_cursor_position(CursorPosition::new(6, 0));
+        editor.insert_char('X');
+
+        // Scroll position should persist
+        assert_eq!(editor.scroll_row(), 5);
     }
 }

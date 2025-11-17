@@ -1,0 +1,27 @@
+- [ ] Add mouse wheel event handler to increment/decrement scroll_row
+- [ ] Implement PageUp/PageDown keyboard shortcuts
+- [ ] Implement Home/End keyboard shortcuts  
+- [ ] Implement Ctrl+Home/Ctrl+End for document start/end
+- [ ] Add auto-scroll when cursor moves above visible range
+- [ ] Add auto-scroll when cursor moves below visible range
+- [ ] Add scroll margin (keep N lines visible above/below cursor)
+- [ ] Implement smooth scrolling animation with velocity tracking
+- [ ] Add momentum/inertia for mouse wheel scrolling
+- [ ] Handle scroll bounds clamping when buffer shrinks
+- [ ] Preserve scroll position during buffer edits above viewport
+- [ ] Add scroll_to_line(n) method for jump navigation
+- [ ] Implement center_cursor_in_viewport() method
+- [ ] Add trackpad gesture support for scrolling
+- [ ] Cache visible line layouts for performance
+- [ ] Add scroll position persistence across sessions
+- [ ] Handle selection dragging with auto-scroll at viewport edges
+- [ ] Add horizontal scrolling for long lines (when wrapping disabled)
+- [ ] Update mouse click position calculation to account for scroll offset
+- [ ] Add scroll position indicator overlay (optional, minimal)
+- [ ] Implement viewport-aware find/replace scrolling
+- [ ] Add tests for scroll position calculations
+- [ ] Add tests for auto-scroll behavior
+- [ ] Update position mapping for wrapped lines (future)
+- [ ] Update scroll calculations for variable line heights (future)
+- [ ] Add folded region scroll handling (future)
+- [ ] Update minimap to show scroll position (future)

@@ -1,7 +1,7 @@
 use gpui::{
-    div, px, size, App, AppContext, Application, Bounds, Context, ElementId, FocusHandle,
-    FontWeight, IntoElement, Menu, ParentElement, Render, Styled, TitlebarOptions, Window,
-    WindowBounds, WindowOptions,
+    div, px, size, App, AppContext, Application, Bounds, Context, FocusHandle, FontWeight,
+    IntoElement, Menu, ParentElement, Render, Styled, TitlebarOptions, Window, WindowBounds,
+    WindowOptions,
 };
 use gpuikit::elements::button::button;
 use gpuikit_theme::{self, ActiveTheme};
@@ -34,13 +34,6 @@ impl Render for Showcase {
             .text_color(theme.fg)
             .child(
                 div()
-                    .text_2xl()
-                    .font_weight(FontWeight::BOLD)
-                    .text_color(theme.fg)
-                    .child("GPUIKit Component Showcase"),
-            )
-            .child(
-                div()
                     .flex()
                     .flex_col()
                     .gap_2()
@@ -49,7 +42,7 @@ impl Render for Showcase {
                             .text_lg()
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_color(theme.fg_muted)
-                            .child("Button Examples"),
+                            .child("Button"),
                     )
                     .child(
                         div()
@@ -84,47 +77,18 @@ impl Render for Showcase {
                             ),
                     ),
             )
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .mt_4()
-                    .child(
-                        div()
-                            .text_lg()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(theme.fg_muted)
-                            .child("Dynamic Button Creation"),
-                    )
-                    .child(div().flex().gap_2().children((0..5).map(|i| {
-                        button(
-                            ElementId::Name(format!("btn-{}", i + 1).into()),
-                            format!("Button {}", i + 1),
-                        )
-                        .on_click({
-                            let index = i + 1;
-                            move |_event, _window, _cx| {
-                                println!("Dynamic button {} clicked", index);
-                            }
-                        })
-                    }))),
-            )
     }
 }
 
 fn main() {
     Application::new().run(|cx: &mut App| {
-        // Initialize global systems
         gpuikit::init(cx);
 
-        // Set up the application menu
         cx.set_menus(vec![Menu {
             name: "GPUIKit Showcase".into(),
             items: vec![],
         }]);
 
-        // Open the main window
         let window = cx
             .open_window(
                 WindowOptions {
@@ -142,7 +106,6 @@ fn main() {
             )
             .unwrap();
 
-        // Focus the window
         window
             .update(cx, |showcase, window, cx| {
                 window.focus(&showcase.focus_handle);

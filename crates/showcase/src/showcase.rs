@@ -1,9 +1,12 @@
 use gpui::{
-    div, px, size, App, AppContext, Application, Bounds, Context, FocusHandle, FontWeight,
+    div, img, px, size, App, AppContext, Application, Bounds, Context, FocusHandle, FontWeight,
     IntoElement, Menu, ParentElement, Render, Styled, TitlebarOptions, Window, WindowBounds,
     WindowOptions,
 };
-use gpuikit::elements::button::button;
+use gpuikit::{
+    elements::{avatar::avatar, button::button},
+    layout::{h_stack, v_stack},
+};
 use gpuikit_theme::{self, ActiveTheme};
 
 struct Showcase {
@@ -24,18 +27,14 @@ impl Render for Showcase {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
 
-        div()
-            .flex()
-            .flex_col()
+        v_stack()
             .gap_4()
             .p_8()
             .size_full()
             .bg(theme.bg)
             .text_color(theme.fg)
             .child(
-                div()
-                    .flex()
-                    .flex_col()
+                v_stack()
                     .gap_2()
                     .child(
                         div()
@@ -45,8 +44,7 @@ impl Render for Showcase {
                             .child("Button"),
                     )
                     .child(
-                        div()
-                            .flex()
+                        h_stack()
                             .gap_2()
                             .child(button("click-me", "Click Me").on_click(cx.listener(
                                 |showcase, _event, _window, cx| {
@@ -63,8 +61,7 @@ impl Render for Showcase {
                             ))),
                     )
                     .child(
-                        div()
-                            .flex()
+                        h_stack()
                             .items_center()
                             .gap_2()
                             .mt_2()
@@ -76,6 +73,20 @@ impl Render for Showcase {
                                     .child(format!("{}", self.click_count)),
                             ),
                     ),
+            )
+            .child(
+                v_stack()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(theme.fg_muted)
+                            .child("Avatar"),
+                    )
+                    .child(h_stack().gap_2().child(
+                        avatar("https://avatars.githubusercontent.com/u/1714999?v=4").size(px(32.)),
+                    )),
             )
     }
 }

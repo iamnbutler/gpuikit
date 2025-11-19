@@ -1,5 +1,6 @@
+use crate::{layout::h_stack, traits};
 use gpui::{
-    div, prelude::FluentBuilder, rems, App, ClickEvent, ElementId, FontWeight, InteractiveElement,
+    prelude::FluentBuilder, rems, App, ClickEvent, ElementId, FontWeight, InteractiveElement,
     IntoElement, MouseButton, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
     Styled, Window,
 };
@@ -9,6 +10,13 @@ pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Butto
     let label = label.into();
     let id = id.into();
     Button::new(id, label)
+}
+
+// todo: style through ButtonVariant
+#[derive(Default)]
+pub enum ButtonVariant {
+    #[default]
+    Filled,
 }
 
 #[derive(IntoElement)]
@@ -50,12 +58,11 @@ impl RenderOnce for Button {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
 
-        div()
+        h_stack()
             .id(self.id)
             .h(rems(1.0))
             .px(rems(0.5))
             .gap(rems(0.25))
-            .flex()
             .flex_none()
             .items_center()
             .justify_center()
@@ -89,5 +96,24 @@ impl RenderOnce for Button {
                 },
             )
             .child(self.label)
+    }
+}
+
+impl traits::clickable::Clickable for Button {
+    fn disabled(&self) -> bool {
+        self.disabled
+    }
+
+    fn on_click(mut self, handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> Self {
+        self.handler = Some(Box::new(handler));
+        self
+    }
+}
+
+impl traits::button::Button for Button {
+    type Variant = ButtonVariant;
+
+    fn variant(&self) -> Self::Variant {
+        ButtonVariant::default()
     }
 }

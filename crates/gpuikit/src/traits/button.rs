@@ -3,7 +3,7 @@ use super::clickable::Clickable;
 /// A button is a clickable element that dispatches some
 /// handler when clicked.
 pub trait Button: Clickable {
-    type Variant;
+    type Variant: Default;
 
     fn variant(&self) -> Self::Variant;
 }

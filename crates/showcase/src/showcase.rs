@@ -1,5 +1,5 @@
 use gpui::{
-    div, img, px, size, App, AppContext, Application, Bounds, Context, FocusHandle, FontWeight,
+    div, px, size, App, AppContext, Application, Bounds, Context, FocusHandle, FontWeight,
     IntoElement, Menu, ParentElement, Render, Styled, TitlebarOptions, Window, WindowBounds,
     WindowOptions,
 };

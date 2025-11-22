@@ -1,24 +1,21 @@
 //! gpuikit
 
+use gpui::App;
 pub use gpuikit_theme as theme;
 
+pub mod elements;
 pub mod error;
 pub mod fs;
 pub mod layout;
 pub mod resource;
+pub mod traits;
+pub mod utils;
 
-pub mod style {
-    use gpuikit_theme::Theme;
-
-    pub trait Themed {
-        fn themed(self, theme: &Theme) -> Self;
-    }
-
-    // todo: is Themed useful?
-    //
-    // I could see most gpuikit components being something like:
-    //
-    // pub trait Component: IntoElement + Themed {}
-    //
-    // where Themed eventually gets more style helpers...
+/// Initialize gpuikit - this sets up & loads themes, sets up global state, etc.
+///
+/// This must be called as soon as possible after your `gpui::Application` is created,
+/// as calling a gpuikit component before initialization will panic.
+pub fn init(cx: &mut App) {
+    gpuikit_theme::init(cx);
+    utils::element_manager::init(cx);
 }

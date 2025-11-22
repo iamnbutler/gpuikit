@@ -1,8 +1,12 @@
 //! A simple theme system for gpui-kit
 
-use gpui::{App, Global, Hsla, SharedString};
+use gpui::{hsla, App, Global, Hsla, SharedString};
 use std::collections::HashMap;
 use std::sync::Arc;
+
+pub fn init(cx: &mut App) {
+    cx.set_global(GlobalTheme::default());
+}
 
 /// Available theme variants
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,6 +41,64 @@ pub struct Theme {
 
     /// Outline color for focus states
     pub outline: Hsla,
+
+    /// Muted foreground color for secondary text
+    pub fg_muted: Hsla,
+
+    /// Disabled foreground color
+    pub fg_disabled: Hsla,
+
+    /// Secondary surface color for nested cards/panels
+    pub surface_secondary: Hsla,
+
+    /// Tertiary surface color for deeply nested elements
+    pub surface_tertiary: Hsla,
+
+    /// Secondary border color for hover states
+    pub border_secondary: Hsla,
+
+    /// Subtle border color for minimal separation
+    pub border_subtle: Hsla,
+
+    /// Accent color for primary actions
+    pub accent: Hsla,
+
+    /// Accent background color
+    pub accent_bg: Hsla,
+
+    /// Accent background hover color
+    pub accent_bg_hover: Hsla,
+
+    /// Danger color for errors and destructive actions
+    pub danger: Hsla,
+
+    /// Selection color for text and items
+    pub selection: Hsla,
+
+    // UI element specific colors
+    /// Button background color
+    pub button_bg: Hsla,
+
+    /// Button background hover color
+    pub button_bg_hover: Hsla,
+
+    /// Button background active/pressed color
+    pub button_bg_active: Hsla,
+
+    /// Button border color
+    pub button_border: Hsla,
+
+    /// Input background color
+    pub input_bg: Hsla,
+
+    /// Input border color
+    pub input_border: Hsla,
+
+    /// Input border hover color
+    pub input_border_hover: Hsla,
+
+    /// Input border focused color
+    pub input_border_focused: Hsla,
 }
 
 impl Theme {
@@ -50,6 +112,25 @@ impl Theme {
             surface: parse_hex("#3c3836"),
             border: parse_hex("#504945"),
             outline: parse_hex("#458588"),
+            fg_muted: parse_hex("#a89984"),
+            fg_disabled: parse_hex("#7c6f64"),
+            surface_secondary: parse_hex("#504945"),
+            surface_tertiary: parse_hex("#665c54"),
+            border_secondary: parse_hex("#7c6f64"),
+            border_subtle: parse_hex("#3c3836"),
+            accent: parse_hex("#8ec07c"),
+            accent_bg: hsla(104.0 / 360.0, 0.35, 0.63, 0.15),
+            accent_bg_hover: hsla(104.0 / 360.0, 0.35, 0.63, 0.25),
+            danger: parse_hex("#fb4934"),
+            selection: hsla(55.0 / 360.0, 0.56, 0.64, 0.25),
+            button_bg: parse_hex("#504945"),
+            button_bg_hover: parse_hex("#665c54"),
+            button_bg_active: parse_hex("#7c6f64"),
+            button_border: parse_hex("#7c6f64"),
+            input_bg: parse_hex("#3c3836"),
+            input_border: parse_hex("#504945"),
+            input_border_hover: parse_hex("#665c54"),
+            input_border_focused: parse_hex("#8ec07c"),
         }
     }
 
@@ -63,6 +144,25 @@ impl Theme {
             surface: parse_hex("#ebdbb2"),
             border: parse_hex("#d5c4a1"),
             outline: parse_hex("#076678"),
+            fg_muted: parse_hex("#665c54"),
+            fg_disabled: parse_hex("#a89984"),
+            surface_secondary: parse_hex("#d5c4a1"),
+            surface_tertiary: parse_hex("#bdae93"),
+            border_secondary: parse_hex("#a89984"),
+            border_subtle: parse_hex("#ebdbb2"),
+            accent: parse_hex("#427b58"),
+            accent_bg: hsla(145.0 / 360.0, 0.30, 0.38, 0.10),
+            accent_bg_hover: hsla(145.0 / 360.0, 0.30, 0.38, 0.15),
+            danger: parse_hex("#cc241d"),
+            selection: hsla(48.0 / 360.0, 0.87, 0.61, 0.15),
+            button_bg: parse_hex("#ebdbb2"),
+            button_bg_hover: parse_hex("#d5c4a1"),
+            button_bg_active: parse_hex("#bdae93"),
+            button_border: parse_hex("#a89984"),
+            input_bg: parse_hex("#fbf1c7"),
+            input_border: parse_hex("#d5c4a1"),
+            input_border_hover: parse_hex("#bdae93"),
+            input_border_focused: parse_hex("#427b58"),
         }
     }
 
@@ -247,6 +347,25 @@ mod tests {
             surface: parse_hex("#111111"),
             border: parse_hex("#222222"),
             outline: parse_hex("#0066cc"),
+            fg_muted: parse_hex("#888888"),
+            fg_disabled: parse_hex("#555555"),
+            surface_secondary: parse_hex("#1a1a1a"),
+            surface_tertiary: parse_hex("#222222"),
+            border_secondary: parse_hex("#333333"),
+            border_subtle: parse_hex("#111111"),
+            accent: parse_hex("#0066cc"),
+            accent_bg: hsla(210.0 / 360.0, 1.0, 0.4, 0.15),
+            accent_bg_hover: hsla(210.0 / 360.0, 1.0, 0.4, 0.25),
+            danger: parse_hex("#cc0000"),
+            selection: hsla(210.0 / 360.0, 1.0, 0.5, 0.25),
+            button_bg: parse_hex("#222222"),
+            button_bg_hover: parse_hex("#333333"),
+            button_bg_active: parse_hex("#444444"),
+            button_border: parse_hex("#333333"),
+            input_bg: parse_hex("#111111"),
+            input_border: parse_hex("#222222"),
+            input_border_hover: parse_hex("#333333"),
+            input_border_focused: parse_hex("#0066cc"),
         };
 
         themes.add(custom);

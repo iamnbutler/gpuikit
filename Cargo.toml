@@ -4,7 +4,8 @@ members = [
     "crates/gpuikit",
     "crates/gpuikit-editor",
     "crates/gpuikit-keymap",
-    "crates/gpuikit-theme"
+    "crates/gpuikit-theme",
+    "crates/showcase"
 ]
 
 default-members = ["crates/gpuikit"]

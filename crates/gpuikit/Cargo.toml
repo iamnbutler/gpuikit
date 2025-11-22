@@ -31,10 +31,6 @@ log = { workspace = true }
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
 
-[[example]]
-name = "file_dialog"
-path = "../../examples/file_dialog.rs"
-
 [features]
 default = []
 

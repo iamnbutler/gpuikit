@@ -1,0 +1,23 @@
+[package]
+name = "showcase"
+publish = false
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "A showcase of the gpuikit components & patterns"
+
+[[bin]]
+name = "showcase"
+path = "src/showcase.rs"
+
+[dependencies]
+# Internal workspace dependencies
+gpuikit = { workspace = true }
+gpuikit-theme = { workspace = true }
+gpuikit-keymap = { workspace = true }
+
+# GPUI framework
+gpui = { workspace = true }

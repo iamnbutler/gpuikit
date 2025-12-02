@@ -19,10 +19,12 @@
 //! ```
 
 mod elements;
+mod inline_style;
 mod parser;
 mod style;
 
 pub use elements::*;
+pub use inline_style::*;
 pub use parser::*;
 pub use style::*;
 
@@ -146,8 +148,11 @@ struct MarkdownRenderer {
     in_link: Option<LinkContext>,
     in_image: Option<ImageContext>,
     list_stack: Vec<ListContext>,
-    current_text: String,
     link_counter: usize,
+
+    // Rich text tracking
+    current_text: RichText,
+    active_style: InlineStyle,
 }
 
 #[derive(Clone, Debug)]
@@ -178,8 +183,9 @@ impl MarkdownRenderer {
             in_link: None,
             in_image: None,
             list_stack: Vec::new(),
-            current_text: String::new(),
             link_counter: 0,
+            current_text: RichText::new(),
+            active_style: InlineStyle::default(),
         }
     }
 
@@ -201,8 +207,8 @@ impl MarkdownRenderer {
             Event::End(tag) => self.handle_end_tag(tag, cx),
             Event::Text(text) => self.handle_text(text),
             Event::Code(code) => self.handle_inline_code(code),
-            Event::SoftBreak => self.current_text.push(' '),
-            Event::HardBreak => self.current_text.push('\n'),
+            Event::SoftBreak => self.current_text.push(" ", self.active_style),
+            Event::HardBreak => self.current_text.push("\n", self.active_style),
             Event::Rule => self.push_divider(cx),
             Event::TaskListMarker(checked) => self.handle_task_marker(*checked),
             Event::Html(_) | Event::InlineHtml(_) => {
@@ -233,8 +239,14 @@ impl MarkdownRenderer {
                 });
             }
             Tag::Item => {}
-            Tag::Emphasis | Tag::Strong | Tag::Strikethrough => {
-                // TODO: Track inline formatting for rich text
+            Tag::Emphasis => {
+                self.active_style.italic = true;
+            }
+            Tag::Strong => {
+                self.active_style.bold = true;
+            }
+            Tag::Strikethrough => {
+                self.active_style.strikethrough = true;
             }
             Tag::Link { dest_url, .. } => {
                 self.in_link = Some(LinkContext {
@@ -287,8 +299,14 @@ impl MarkdownRenderer {
             TagEnd::Item => {
                 self.flush_list_item(cx);
             }
-            TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough => {
-                // TODO: Track inline formatting for rich text
+            TagEnd::Emphasis => {
+                self.active_style.italic = false;
+            }
+            TagEnd::Strong => {
+                self.active_style.bold = false;
+            }
+            TagEnd::Strikethrough => {
+                self.active_style.strikethrough = false;
             }
             TagEnd::Link => {
                 self.flush_link(cx);
@@ -315,21 +333,21 @@ impl MarkdownRenderer {
         if let Some(ref mut img_ctx) = self.in_image {
             img_ctx.alt = text.to_string();
         } else {
-            self.current_text.push_str(text);
+            self.current_text.push(text, self.active_style);
         }
     }
 
     fn handle_inline_code(&mut self, code: &str) {
         // For now, just add as text with backticks
         // TODO: Use inline_code element when we support inline element mixing
-        self.current_text.push('`');
-        self.current_text.push_str(code);
-        self.current_text.push('`');
+        self.current_text.push("`", self.active_style);
+        self.current_text.push(code, self.active_style);
+        self.current_text.push("`", self.active_style);
     }
 
     fn handle_task_marker(&mut self, checked: bool) {
         let marker = if checked { "☑ " } else { "☐ " };
-        self.current_text.push_str(marker);
+        self.current_text.push(marker, self.active_style);
     }
 
     fn flush_paragraph(&mut self, cx: &App) {
@@ -337,8 +355,8 @@ impl MarkdownRenderer {
             return;
         }
 
-        let text = std::mem::take(&mut self.current_text);
-        let element = elements::paragraph(text, &self.style.body, cx);
+        let rich_text = std::mem::take(&mut self.current_text);
+        let element = elements::rich_paragraph(&rich_text, &self.style.body, cx);
         self.elements.push(element.into_any_element());
     }
 
@@ -347,7 +365,7 @@ impl MarkdownRenderer {
             return;
         }
 
-        let text = std::mem::take(&mut self.current_text);
+        let rich_text = std::mem::take(&mut self.current_text);
         let heading_style = match level {
             elements::HeadingLevel::H1 => &self.style.h1,
             elements::HeadingLevel::H2 => &self.style.h2,
@@ -357,7 +375,7 @@ impl MarkdownRenderer {
             elements::HeadingLevel::H6 => &self.style.h6,
         };
 
-        let element = elements::heading(text, heading_style, cx);
+        let element = elements::rich_heading(&rich_text, heading_style, cx);
         self.elements.push(element.into_any_element());
     }
 
@@ -366,9 +384,9 @@ impl MarkdownRenderer {
             return;
         }
 
-        let text = std::mem::take(&mut self.current_text);
-        let element = elements::block_quote(
-            text,
+        let rich_text = std::mem::take(&mut self.current_text);
+        let element = elements::rich_block_quote(
+            &rich_text,
             &self.style.body,
             self.style.block_quote_border,
             self.style.block_quote_text,
@@ -382,7 +400,10 @@ impl MarkdownRenderer {
             return;
         }
 
-        let text = std::mem::take(&mut self.current_text);
+        // Code blocks don't use rich text - they're monospace plain text
+        let text = self.current_text.to_plain_text();
+        self.current_text.clear();
+
         let element = elements::code_block(
             text,
             None, // TODO: Track language from CodeBlock tag
@@ -400,7 +421,7 @@ impl MarkdownRenderer {
             return;
         }
 
-        let text = std::mem::take(&mut self.current_text);
+        let rich_text = std::mem::take(&mut self.current_text);
 
         let marker = if let Some(list_ctx) = self.list_stack.last_mut() {
             if list_ctx.ordered {
@@ -415,7 +436,8 @@ impl MarkdownRenderer {
         };
 
         let indent_level = self.list_stack.len().saturating_sub(1);
-        let element = elements::list_item(text, marker, indent_level, &self.style.body, cx);
+        let element =
+            elements::rich_list_item(&rich_text, marker, indent_level, &self.style.body, cx);
         self.elements.push(element.into_any_element());
     }
 
@@ -429,7 +451,10 @@ impl MarkdownRenderer {
             return;
         }
 
-        let text = std::mem::take(&mut self.current_text);
+        // Links use plain text for now (the link styling takes precedence)
+        let text = self.current_text.to_plain_text();
+        self.current_text.clear();
+
         let id: SharedString = format!("md-link-{}", self.link_counter).into();
         self.link_counter += 1;
 

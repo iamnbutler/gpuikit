@@ -1,11 +1,11 @@
 //! Typography and styling for markdown rendering.
 //!
-//! Uses a perfect fourth (1.333) typescale for harmonious visual hierarchy.
+//! Uses a minor third (1.2) typescale for balanced visual hierarchy.
 
 use gpui::{FontWeight, Hsla, SharedString};
 
-/// The typescale ratio (perfect fourth).
-pub const TYPESCALE_RATIO: f32 = 1.333;
+/// The typescale ratio (minor third).
+pub const TYPESCALE_RATIO: f32 = 1.2;
 
 /// Base font size in rems.
 pub const BASE_SIZE: f32 = 1.0;
@@ -43,22 +43,21 @@ impl TextStyle {
     /// Level 1 is the largest (h1), level 6 is the smallest (h6).
     pub fn heading(level: u8) -> Self {
         let scale_power = match level {
-            1 => 5,
-            2 => 4,
-            3 => 3,
-            4 => 2,
-            5 => 1,
-            _ => 0,
+            1 => 4,
+            2 => 3,
+            3 => 2,
+            4 => 1,
+            _ => 0, // H5, H6 are base size
         };
 
         let size = BASE_SIZE * TYPESCALE_RATIO.powi(scale_power);
 
         Self {
             size,
-            line_height: 1.25,
+            line_height: 1.2,
             weight: FontWeight::BOLD,
             color: None,
-            margin_top: size * 0.75,
+            margin_top: 0.0,
         }
     }
 
@@ -66,7 +65,7 @@ impl TextStyle {
     pub fn body() -> Self {
         Self {
             size: BASE_SIZE,
-            line_height: 1.6,
+            line_height: 1.5,
             weight: FontWeight::NORMAL,
             color: None,
             margin_top: 0.0,
@@ -145,7 +144,7 @@ impl Default for MarkdownStyle {
 
             code_font_family: SharedString::from("monospace"),
 
-            block_spacing: 1.0,
+            block_spacing: 0.5,
 
             code_block_bg: None,
             code_block_border: None,
@@ -219,6 +218,25 @@ mod tests {
 
         let ratio = h1.size / h2.size;
         assert!((ratio - TYPESCALE_RATIO).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_heading_sizes() {
+        let h4 = TextStyle::heading(4);
+        let h5 = TextStyle::heading(5);
+        let h6 = TextStyle::heading(6);
+        let body = TextStyle::body();
+
+        assert!(
+            (h4.size - TYPESCALE_RATIO).abs() < 0.01,
+            "H4 should be one typescale step above base"
+        );
+        assert!((h5.size - BASE_SIZE).abs() < 0.01, "H5 should be base size");
+        assert!((h6.size - BASE_SIZE).abs() < 0.01, "H6 should be base size");
+        assert!(
+            (body.size - BASE_SIZE).abs() < 0.01,
+            "Body should be base size"
+        );
     }
 
     #[test]

@@ -32,7 +32,17 @@ _This will also be italic_
 **This text will be bold**
 __This will also be bold__
 
+~~This text will be strikethrough~~
+
 _You **can** combine them_
+
+Here is some **bold text** in the middle of a sentence.
+
+This sentence has *italic*, **bold**, and ~~strikethrough~~ all together.
+
+**Bold with *nested italic* inside** and *italic with **nested bold** inside*.
+
+A paragraph with ~~strikethrough **bold strikethrough** and *italic strikethrough*~~ text.
 
 ## Lists
 

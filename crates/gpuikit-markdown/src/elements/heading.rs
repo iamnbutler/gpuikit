@@ -1,8 +1,9 @@
 //! Heading element for markdown.
 
-use gpui::{div, prelude::*, rems, App, ParentElement, Styled};
+use gpui::{div, prelude::*, rems, App, ParentElement, SharedString, Styled, StyledText};
 use gpuikit_theme::ActiveTheme;
 
+use crate::inline_style::RichText;
 use crate::style::TextStyle;
 
 /// Heading level (h1-h6).
@@ -29,13 +30,34 @@ impl From<pulldown_cmark::HeadingLevel> for HeadingLevel {
     }
 }
 
-/// Render a heading element.
-pub fn heading(text: String, style: &TextStyle, cx: &App) -> impl IntoElement {
+/// Render a heading element with plain text.
+pub fn heading(text: impl Into<String>, style: &TextStyle, cx: &App) -> impl IntoElement {
+    let text: String = text.into();
+    let theme = cx.theme();
+    let text_color = style.color.unwrap_or(theme.fg);
+
     div()
         .text_size(rems(style.size))
         .line_height(rems(style.size * style.line_height))
         .font_weight(style.weight)
-        .text_color(style.color.unwrap_or(cx.theme().fg))
+        .text_color(text_color)
         .mt(rems(style.margin_top))
         .child(text)
+}
+
+/// Render a heading element with rich text (supporting bold, italic, strikethrough).
+pub fn rich_heading(rich_text: &RichText, style: &TextStyle, cx: &App) -> impl IntoElement {
+    let theme = cx.theme();
+    let text_color = style.color.unwrap_or(theme.fg);
+    let (text, highlights) = rich_text.to_highlights();
+
+    let styled_text: SharedString = text.into();
+
+    div()
+        .text_size(rems(style.size))
+        .line_height(rems(style.size * style.line_height))
+        .font_weight(style.weight)
+        .text_color(text_color)
+        .mt(rems(style.margin_top))
+        .child(StyledText::new(styled_text).with_highlights(highlights))
 }

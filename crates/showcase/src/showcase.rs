@@ -1,7 +1,7 @@
 use gpui::{
     div, px, size, App, AppContext, Application, Bounds, Context, Entity, FocusHandle, FontWeight,
-    IntoElement, Menu, ParentElement, Render, Styled, TitlebarOptions, Window, WindowBounds,
-    WindowOptions,
+    InteractiveElement, IntoElement, Menu, ParentElement, Render, StatefulInteractiveElement,
+    Styled, TitlebarOptions, Window, WindowBounds, WindowOptions,
 };
 use gpuikit::{
     elements::{
@@ -13,7 +13,80 @@ use gpuikit::{
     },
     layout::{h_stack, v_stack},
 };
+use gpuikit_markdown::{Markdown, MarkdownElement};
 use gpuikit_theme::{self, ActiveTheme};
+
+const EXAMPLE_MARKDOWN: &str = r#"# Markdown syntax guide
+
+## Headers
+
+# This is a Heading h1
+## This is a Heading h2
+###### This is a Heading h6
+
+## Emphasis
+
+*This text will be italic*
+_This will also be italic_
+
+**This text will be bold**
+__This will also be bold__
+
+_You **can** combine them_
+
+## Lists
+
+### Unordered
+
+* Item 1
+* Item 2
+* Item 2a
+* Item 2b
+    * Item 3a
+    * Item 3b
+
+### Ordered
+
+1. Item 1
+2. Item 2
+3. Item 3
+    1. Item 3a
+    2. Item 3b
+
+## Images
+
+![Zed Logo](https://zed.dev/img/logo.svg)
+
+## Links
+
+Check out [Zed](https://zed.dev) - a high-performance code editor.
+
+You may also like [GPUI](https://github.com/zed-industries/zed/tree/main/crates/gpui).
+
+## Blockquotes
+
+> Markdown is a lightweight markup language with plain-text-formatting syntax, created in 2004 by John Gruber with Aaron Swartz.
+>
+>> Markdown is often used to format readme files, for writing messages in online discussion forums, and to create rich text using a plain text editor.
+
+## Tables
+
+| Left columns  | Right columns |
+| ------------- |:-------------:|
+| left foo      | right foo     |
+| left bar      | right bar     |
+| left baz      | right baz     |
+
+## Blocks of code
+
+```
+let message = 'Hello world';
+alert(message);
+```
+
+## Inline code
+
+This web site is using `markedjs/marked`."#;
 
 #[derive(Clone, PartialEq)]
 enum ColorOption {
@@ -32,6 +105,7 @@ struct Showcase {
     selected_color: ColorOption,
     toggle: Entity<Toggle>,
     toggle_enabled: bool,
+    markdown: Entity<Markdown>,
 }
 
 impl Showcase {
@@ -80,6 +154,8 @@ impl Showcase {
         })
         .detach();
 
+        let markdown = cx.new(|cx| Markdown::new(EXAMPLE_MARKDOWN, cx));
+
         Self {
             focus_handle: cx.focus_handle(),
             click_count: 0,
@@ -89,6 +165,7 @@ impl Showcase {
             selected_color: ColorOption::Blue,
             toggle,
             toggle_enabled: false,
+            markdown,
         }
     }
 }
@@ -248,6 +325,29 @@ impl Render for Showcase {
                                         }),
                                 ),
                             ),
+                    ),
+            )
+            .child(
+                v_stack()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(theme.fg_muted)
+                            .child("Markdown"),
+                    )
+                    .child(
+                        div()
+                            .id("markdown-container")
+                            .p_4()
+                            .rounded_md()
+                            .border_1()
+                            .border_color(theme.border)
+                            .bg(theme.surface)
+                            .max_h(px(400.0))
+                            .overflow_y_scroll()
+                            .child(MarkdownElement::new(self.markdown.clone())),
                     ),
             )
     }

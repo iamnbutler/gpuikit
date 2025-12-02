@@ -32,7 +32,8 @@ use gpui::{
     div, prelude::*, rems, App, Context, Entity, IntoElement, ParentElement, SharedString, Styled,
     Window,
 };
-use pulldown_cmark::{Event, Tag, TagEnd};
+use gpuikit_theme::ActiveTheme;
+use pulldown_cmark::{Alignment, Event, Tag, TagEnd};
 
 /// A markdown document that can be rendered as a GPUI element.
 ///
@@ -150,6 +151,13 @@ struct MarkdownRenderer {
     list_stack: Vec<ListContext>,
     link_counter: usize,
 
+    // Table state
+    in_table: bool,
+    table_alignments: Vec<Alignment>,
+    table_rows: Vec<Vec<RichText>>,
+    current_row: Vec<RichText>,
+    in_table_head: bool,
+
     // Rich text tracking
     current_text: RichText,
     active_style: InlineStyle,
@@ -184,6 +192,11 @@ impl MarkdownRenderer {
             in_image: None,
             list_stack: Vec::new(),
             link_counter: 0,
+            in_table: false,
+            table_alignments: Vec::new(),
+            table_rows: Vec::new(),
+            current_row: Vec::new(),
+            in_table_head: false,
             current_text: RichText::new(),
             active_style: InlineStyle::default(),
         }
@@ -211,12 +224,8 @@ impl MarkdownRenderer {
             Event::HardBreak => self.current_text.push("\n", self.active_style),
             Event::Rule => self.push_divider(cx),
             Event::TaskListMarker(checked) => self.handle_task_marker(*checked),
-            Event::Html(_) | Event::InlineHtml(_) => {
-                // TODO: HTML rendering
-            }
-            Event::FootnoteReference(_) | Event::InlineMath(_) | Event::DisplayMath(_) => {
-                // TODO: Footnotes and math
-            }
+            Event::Html(_) | Event::InlineHtml(_) => {}
+            Event::FootnoteReference(_) | Event::InlineMath(_) | Event::DisplayMath(_) => {}
         }
     }
 
@@ -261,24 +270,38 @@ impl MarkdownRenderer {
                     alt: title.to_string(),
                 });
             }
-            Tag::Table(_) | Tag::TableHead | Tag::TableRow | Tag::TableCell => {
-                // TODO: Table rendering
+            Tag::Table(alignments) => {
+                self.in_table = true;
+                self.table_alignments = alignments.clone();
+                self.table_rows.clear();
+            }
+            Tag::TableHead => {
+                self.in_table_head = true;
+                self.current_row.clear();
+            }
+            Tag::TableRow => {
+                self.current_row.clear();
+            }
+            Tag::TableCell => {
+                self.current_text.clear();
             }
             Tag::FootnoteDefinition(_)
             | Tag::MetadataBlock(_)
             | Tag::DefinitionList
             | Tag::DefinitionListTitle
             | Tag::DefinitionListDefinition
-            | Tag::HtmlBlock => {
-                // TODO: These elements
-            }
+            | Tag::HtmlBlock => {}
         }
     }
 
     fn handle_end_tag(&mut self, tag: &TagEnd, cx: &App) {
         match tag {
             TagEnd::Paragraph => {
-                self.flush_paragraph(cx);
+                if self.in_block_quote {
+                    self.flush_block_quote(cx);
+                } else {
+                    self.flush_paragraph(cx);
+                }
             }
             TagEnd::Heading(level) => {
                 let heading_level: elements::HeadingLevel = (*level).into();
@@ -287,7 +310,6 @@ impl MarkdownRenderer {
             }
             TagEnd::BlockQuote(_) => {
                 self.in_block_quote = false;
-                self.flush_block_quote(cx);
             }
             TagEnd::CodeBlock => {
                 self.in_code_block = false;
@@ -314,22 +336,35 @@ impl MarkdownRenderer {
             TagEnd::Image => {
                 self.flush_image(cx);
             }
-            TagEnd::Table | TagEnd::TableHead | TagEnd::TableRow | TagEnd::TableCell => {
-                // TODO: Table rendering
+            TagEnd::Table => {
+                self.flush_table(cx);
+                self.in_table = false;
+            }
+            TagEnd::TableHead => {
+                self.in_table_head = false;
+                if !self.current_row.is_empty() {
+                    self.table_rows.push(std::mem::take(&mut self.current_row));
+                }
+            }
+            TagEnd::TableRow => {
+                if !self.current_row.is_empty() {
+                    self.table_rows.push(std::mem::take(&mut self.current_row));
+                }
+            }
+            TagEnd::TableCell => {
+                self.current_row
+                    .push(std::mem::take(&mut self.current_text));
             }
             TagEnd::FootnoteDefinition
             | TagEnd::MetadataBlock(_)
             | TagEnd::DefinitionList
             | TagEnd::DefinitionListTitle
             | TagEnd::DefinitionListDefinition
-            | TagEnd::HtmlBlock => {
-                // TODO: These elements
-            }
+            | TagEnd::HtmlBlock => {}
         }
     }
 
     fn handle_text(&mut self, text: &str) {
-        // If we're in an image tag, this is the alt text
         if let Some(ref mut img_ctx) = self.in_image {
             img_ctx.alt = text.to_string();
         } else {
@@ -338,8 +373,6 @@ impl MarkdownRenderer {
     }
 
     fn handle_inline_code(&mut self, code: &str) {
-        // For now, just add as text with backticks
-        // TODO: Use inline_code element when we support inline element mixing
         self.current_text.push("`", self.active_style);
         self.current_text.push(code, self.active_style);
         self.current_text.push("`", self.active_style);
@@ -400,13 +433,12 @@ impl MarkdownRenderer {
             return;
         }
 
-        // Code blocks don't use rich text - they're monospace plain text
         let text = self.current_text.to_plain_text();
         self.current_text.clear();
 
         let element = elements::code_block(
             text,
-            None, // TODO: Track language from CodeBlock tag
+            None,
             &self.style.code,
             &self.style.code_font_family,
             self.style.code_block_bg,
@@ -451,7 +483,6 @@ impl MarkdownRenderer {
             return;
         }
 
-        // Links use plain text for now (the link styling takes precedence)
         let text = self.current_text.to_plain_text();
         self.current_text.clear();
 
@@ -468,7 +499,6 @@ impl MarkdownRenderer {
             None => return,
         };
 
-        // Clear any collected text (alt text is stored in img_ctx)
         self.current_text.clear();
 
         let alt = if img_ctx.alt.is_empty() {
@@ -479,6 +509,71 @@ impl MarkdownRenderer {
 
         let element = elements::image(img_ctx.url, alt, cx);
         self.elements.push(element.into_any_element());
+    }
+
+    fn flush_table(&mut self, cx: &App) {
+        if self.table_rows.is_empty() {
+            return;
+        }
+
+        let rows = std::mem::take(&mut self.table_rows);
+        let alignments = std::mem::take(&mut self.table_alignments);
+
+        let element = self.render_table(rows, alignments, cx);
+        self.elements.push(element.into_any_element());
+    }
+
+    fn render_table(
+        &self,
+        rows: Vec<Vec<RichText>>,
+        alignments: Vec<Alignment>,
+        cx: &App,
+    ) -> impl IntoElement {
+        let theme = cx.theme();
+        let border_color = theme.border;
+
+        div()
+            .flex()
+            .flex_col()
+            .border_1()
+            .border_color(border_color)
+            .rounded_sm()
+            .overflow_hidden()
+            .children(rows.into_iter().enumerate().map(|(row_idx, row)| {
+                let is_header = row_idx == 0;
+                let bg = if is_header {
+                    theme.surface
+                } else if row_idx % 2 == 0 {
+                    theme.bg
+                } else {
+                    theme.surface.opacity(0.5)
+                };
+
+                div()
+                    .flex()
+                    .flex_row()
+                    .bg(bg)
+                    .when(row_idx > 0, |el| el.border_t_1().border_color(border_color))
+                    .children(row.into_iter().enumerate().map(|(col_idx, cell)| {
+                        let alignment = alignments.get(col_idx).copied().unwrap_or(Alignment::None);
+                        let (text, highlights) = cell.to_highlights();
+                        let styled_text: SharedString = text.into();
+
+                        div()
+                            .flex_1()
+                            .px_2()
+                            .py_1()
+                            .text_size(rems(self.style.body.size))
+                            .when(col_idx > 0, |el| el.border_l_1().border_color(border_color))
+                            .when(is_header, |el| el.font_weight(gpui::FontWeight::SEMIBOLD))
+                            .map(|el| match alignment {
+                                Alignment::Left | Alignment::None => el,
+                                Alignment::Center => el.text_center(),
+                                Alignment::Right => el.text_right(),
+                            })
+                            .child(gpui::StyledText::new(styled_text).with_highlights(highlights))
+                    }))
+            }))
     }
 
     fn push_divider(&mut self, cx: &App) {

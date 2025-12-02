@@ -3,7 +3,7 @@
 //! This module provides re-exports and utilities for working with pulldown-cmark.
 
 // Re-export commonly used types from pulldown-cmark
-pub use pulldown_cmark::{Alignment, CodeBlockKind, LinkType, Options, Parser};
+pub use pulldown_cmark::{CodeBlockKind, LinkType, Options, Parser};
 
 /// Default parsing options with GFM support enabled.
 pub fn default_options() -> Options {

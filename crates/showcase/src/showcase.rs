@@ -1,27 +1,76 @@
 use gpui::{
-    div, img, px, size, App, AppContext, Application, Bounds, Context, FocusHandle, FontWeight,
+    div, px, size, App, AppContext, Application, Bounds, Context, Entity, FocusHandle, FontWeight,
     IntoElement, Menu, ParentElement, Render, Styled, TitlebarOptions, Window, WindowBounds,
     WindowOptions,
 };
 use gpuikit::{
-    elements::{avatar::avatar, button::button, icon_button::icon_button},
+    elements::{
+        avatar::avatar,
+        button::button,
+        dropdown::{dropdown, DropdownState},
+        icon_button::icon_button,
+    },
     layout::{h_stack, v_stack},
     DefaultIcons,
 };
 use gpuikit_theme::{self, ActiveTheme, Themeable};
 
+#[derive(Clone, PartialEq, Debug)]
+enum Size {
+    Small,
+    Medium,
+    Large,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+enum Priority {
+    Low,
+    Normal,
+    High,
+    Critical,
+}
+
 struct Showcase {
     focus_handle: FocusHandle,
     click_count: usize,
     toggled_count: usize,
+    size_dropdown: Entity<DropdownState<Size>>,
+    priority_dropdown: Entity<DropdownState<Priority>>,
 }
 
 impl Showcase {
-    fn new(cx: &mut Context<Self>) -> Self {
+    fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let size_dropdown = cx.new(|_cx| {
+            DropdownState::new(dropdown(
+                "size-dropdown",
+                vec![
+                    (Size::Small, "Small"),
+                    (Size::Medium, "Medium"),
+                    (Size::Large, "Large"),
+                ],
+                Size::Medium,
+            ))
+        });
+
+        let priority_dropdown = cx.new(|_cx| {
+            DropdownState::new(dropdown(
+                "priority-dropdown",
+                vec![
+                    (Priority::Low, "Low"),
+                    (Priority::Normal, "Normal"),
+                    (Priority::High, "High"),
+                    (Priority::Critical, "Critical"),
+                ],
+                Priority::Normal,
+            ))
+        });
+
         Self {
             focus_handle: cx.focus_handle(),
             click_count: 0,
             toggled_count: 0,
+            size_dropdown,
+            priority_dropdown,
         }
     }
 }
@@ -184,6 +233,79 @@ impl Render for Showcase {
                             .text_lg()
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_color(theme.fg_muted())
+                            .child("Dropdown"),
+                    )
+                    .child(
+                        h_stack()
+                            .gap_4()
+                            .items_start()
+                            .child(
+                                v_stack()
+                                    .gap_1()
+                                    .child(
+                                        div().text_sm().text_color(theme.fg_muted()).child("Size"),
+                                    )
+                                    .child(self.size_dropdown.clone()),
+                            )
+                            .child(
+                                v_stack()
+                                    .gap_1()
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .text_color(theme.fg_muted())
+                                            .child("Priority"),
+                                    )
+                                    .child(self.priority_dropdown.clone()),
+                            ),
+                    )
+                    .child(
+                        h_stack()
+                            .gap_4()
+                            .items_center()
+                            .mt_2()
+                            .child(
+                                h_stack()
+                                    .gap_2()
+                                    .items_center()
+                                    .text_color(theme.fg_muted())
+                                    .child("Selected size:")
+                                    .child(
+                                        div()
+                                            .text_color(theme.accent())
+                                            .font_weight(FontWeight::BOLD)
+                                            .child(format!(
+                                                "{:?}",
+                                                self.size_dropdown.read(cx).selected
+                                            )),
+                                    ),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_2()
+                                    .items_center()
+                                    .text_color(theme.fg_muted())
+                                    .child("Selected priority:")
+                                    .child(
+                                        div()
+                                            .text_color(theme.accent())
+                                            .font_weight(FontWeight::BOLD)
+                                            .child(format!(
+                                                "{:?}",
+                                                self.priority_dropdown.read(cx).selected
+                                            )),
+                                    ),
+                            ),
+                    ),
+            )
+            .child(
+                v_stack()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(theme.fg_muted())
                             .child("Avatar"),
                     )
                     .child(h_stack().gap_2().child(
@@ -217,7 +339,7 @@ fn main() {
                         })),
                         ..Default::default()
                     },
-                    |_window, cx| cx.new(Showcase::new),
+                    |window, cx| cx.new(|cx| Showcase::new(window, cx)),
                 )
                 .unwrap();
 

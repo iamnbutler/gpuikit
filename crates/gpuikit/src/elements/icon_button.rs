@@ -84,12 +84,13 @@ impl RenderOnce for IconButton {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         // Get or create persistent state for this button if internal state is enabled
         // Note: must happen before borrowing theme to avoid borrow conflicts
+        // Uses use_keyed_state with the button's ID to ensure each button has its own state
         let state: Option<Entity<ToggleState>> = if self.use_internal_state {
-            Some(
-                window.use_state(cx, |_window, _cx: &mut Context<ToggleState>| ToggleState {
-                    toggled: false,
-                }),
-            )
+            Some(window.use_keyed_state(
+                self.id.clone(),
+                cx,
+                |_window, _cx: &mut Context<ToggleState>| ToggleState { toggled: false },
+            ))
         } else {
             None
         };

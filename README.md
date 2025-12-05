@@ -1,5 +1,7 @@
 # gpuikit
 
+<img width="2400" height="1424" alt="CleanShot 2025-12-05 at 14 31 13@2x" src="https://github.com/user-attachments/assets/4d3bddc5-83c2-4afc-b767-01047bdf46fa" />
+
 A work-in-progress modular UI toolkit for GPUI applications.
 
 🚧 Note: Expect every release to have many, undocumented breaking changes for now. Use at your own risk and pin your verisons 🚧

@@ -25,7 +25,7 @@ pub struct IconButton {
     use_internal_state: bool,
     handler: Option<Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>>,
     /// Called when toggle state changes (only used with internal state)
-    on_toggle: Option<Box<dyn Fn(bool, &mut Window, &mut App) + 'static>>,
+    on_toggle: Option<Box<dyn Fn(&bool, &mut Window, &mut App) + 'static>>,
 }
 
 impl IconButton {
@@ -74,7 +74,8 @@ impl IconButton {
     /// Register a callback for when the toggle state changes.
     /// Only fires when using internal state management via `use_state()`.
     /// The callback receives the new toggled state.
-    pub fn on_toggle(mut self, handler: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self {
+    /// Accepts `&bool` to enable use with `cx.listener()`.
+    pub fn on_toggle(mut self, handler: impl Fn(&bool, &mut Window, &mut App) + 'static) -> Self {
         self.on_toggle = Some(Box::new(handler));
         self
     }
@@ -142,7 +143,7 @@ impl RenderOnce for IconButton {
 
                             let new_state = state.read(cx).toggled;
                             if let Some(ref on_toggle) = on_toggle {
-                                on_toggle(new_state, window, cx);
+                                on_toggle(&new_state, window, cx);
                             }
                         }
 

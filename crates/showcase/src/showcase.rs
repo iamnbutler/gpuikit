@@ -13,6 +13,7 @@ use gpuikit_theme::{self, ActiveTheme, Themeable};
 struct Showcase {
     focus_handle: FocusHandle,
     click_count: usize,
+    toggled_count: usize,
 }
 
 impl Showcase {
@@ -20,6 +21,7 @@ impl Showcase {
         Self {
             focus_handle: cx.focus_handle(),
             click_count: 0,
+            toggled_count: 0,
         }
     }
 }
@@ -123,28 +125,54 @@ impl Render for Showcase {
                             .child(
                                 icon_button("toggle-star", DefaultIcons::star())
                                     .use_state()
-                                    .on_toggle(|toggled, _window, _cx| {
-                                        println!("Star toggled: {}", toggled);
-                                    }),
+                                    .on_toggle(cx.listener(|showcase, toggled, _window, cx| {
+                                        if *toggled {
+                                            showcase.toggled_count += 1;
+                                        } else {
+                                            showcase.toggled_count =
+                                                showcase.toggled_count.saturating_sub(1);
+                                        }
+                                        cx.notify();
+                                    })),
                             )
                             .child(
                                 icon_button("toggle-heart", DefaultIcons::heart())
                                     .use_state()
-                                    .on_toggle(|toggled, _window, _cx| {
-                                        println!("Heart toggled: {}", toggled);
-                                    }),
+                                    .on_toggle(cx.listener(|showcase, toggled, _window, cx| {
+                                        if *toggled {
+                                            showcase.toggled_count += 1;
+                                        } else {
+                                            showcase.toggled_count =
+                                                showcase.toggled_count.saturating_sub(1);
+                                        }
+                                        cx.notify();
+                                    })),
                             )
                             .child(
                                 icon_button("toggle-bell", DefaultIcons::bell())
                                     .use_state()
-                                    .on_toggle(|toggled, _window, _cx| {
-                                        println!("Bell toggled: {}", toggled);
-                                    }),
+                                    .on_toggle(cx.listener(|showcase, toggled, _window, cx| {
+                                        if *toggled {
+                                            showcase.toggled_count += 1;
+                                        } else {
+                                            showcase.toggled_count =
+                                                showcase.toggled_count.saturating_sub(1);
+                                        }
+                                        cx.notify();
+                                    })),
                             )
                             .child(
-                                div()
+                                h_stack()
+                                    .gap_2()
+                                    .items_center()
                                     .text_color(theme.fg_muted())
-                                    .child("(toggle buttons with internal state)"),
+                                    .child("Toggled:")
+                                    .child(
+                                        div()
+                                            .text_color(theme.accent())
+                                            .font_weight(FontWeight::BOLD)
+                                            .child(format!("{}", self.toggled_count)),
+                                    ),
                             ),
                     ),
             )

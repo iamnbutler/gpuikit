@@ -89,22 +89,31 @@ impl Render for Showcase {
                         h_stack()
                             .gap_2()
                             .items_center()
-                            .child(icon_button("icon-normal", DefaultIcons::star()))
+                            .child(icon_button("icon-star", DefaultIcons::star()))
+                            .child(icon_button("icon-heart", DefaultIcons::heart()))
+                            .child(icon_button("icon-gear", DefaultIcons::gear()))
+                            .child(icon_button("icon-bell", DefaultIcons::bell()))
+                            .child(icon_button("icon-home", DefaultIcons::home()))
+                            .child(icon_button("icon-search", DefaultIcons::magnifying_glass()))
+                            .child(icon_button("icon-plus", DefaultIcons::plus()))
+                            .child(icon_button("icon-trash", DefaultIcons::trash())),
+                    )
+                    .child(
+                        h_stack()
+                            .gap_2()
+                            .items_center()
                             .child(
-                                icon_button("icon-selected", DefaultIcons::star()).selected(true),
+                                icon_button("icon-selected", DefaultIcons::check_circled())
+                                    .selected(true),
                             )
                             .child(
-                                icon_button("icon-disabled", DefaultIcons::star()).disabled(true),
-                            )
-                            .child(
-                                icon_button("icon-selected-disabled", DefaultIcons::star())
-                                    .selected(true)
+                                icon_button("icon-disabled", DefaultIcons::lock_closed())
                                     .disabled(true),
                             )
                             .child(
                                 div()
                                     .text_color(theme.fg_muted())
-                                    .child("(normal / selected / disabled / selected+disabled)"),
+                                    .child("(selected / disabled)"),
                             ),
                     ),
             )

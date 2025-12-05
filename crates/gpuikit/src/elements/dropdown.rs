@@ -377,11 +377,6 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
                             Icons::chevron_down()
                                 .size(px(12.))
                                 .text_color(theme.fg_muted())
-                                .when(is_open, |icon| {
-                                    icon.with_transformation(Transformation::rotate(
-                                        gpui::percentage(0.5),
-                                    ))
-                                }),
                         ),
                     ),
             )

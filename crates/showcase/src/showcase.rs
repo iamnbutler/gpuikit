@@ -1,19 +1,56 @@
 use gpui::{
-    div, px, size, App, AppContext, Application, Bounds, Context, Entity, FocusHandle, FontWeight,
-    IntoElement, Menu, ParentElement, Render, Styled, TitlebarOptions, Window, WindowBounds,
-    WindowOptions,
+    App, AppContext, Application, Bounds, Context, Entity, FocusHandle, FontWeight, InteractiveElement, IntoElement, Menu, ParentElement, Render, StatefulInteractiveElement, Styled, TitlebarOptions, Window, WindowBounds, WindowOptions, div, px, size
 };
 use gpuikit::{
-    elements::{
+    DefaultIcons, elements::{
         avatar::avatar,
         button::button,
-        dropdown::{dropdown, DropdownState},
+        dropdown::{DropdownState, dropdown},
         icon_button::icon_button,
-    },
-    layout::{h_stack, v_stack},
-    DefaultIcons,
+        separator::{separator, vertical_separator}
+    }, layout::{h_stack, v_stack}
 };
+use gpuikit_markdown::{Markdown, MarkdownElement};
 use gpuikit_theme::{self, ActiveTheme, Themeable};
+
+const SAMPLE_MARKDOWN: &str = r#"# Markdown Showcase
+
+This is a **bold** statement and this is *italic*.
+
+## Features
+
+- Bullet lists
+- **Bold** and *italic* text
+- `inline code`
+
+### Code Blocks
+
+```rust
+fn main() {
+    println!("Hello, GPUI!");
+}
+```
+
+### Blockquotes
+
+> This is a blockquote.
+> It can span multiple lines.
+
+### Links & More
+
+Visit [GPUI](https://zed.dev) for more info.
+
+---
+
+1. Numbered lists
+2. Work too
+3. Like this
+
+| Column 1 | Column 2 |
+|----------|----------|
+| Cell A   | Cell B   |
+| Cell C   | Cell D   |
+"#;
 
 #[derive(Clone, PartialEq, Debug)]
 enum Size {
@@ -36,6 +73,7 @@ struct Showcase {
     toggled_count: usize,
     size_dropdown: Entity<DropdownState<Size>>,
     priority_dropdown: Entity<DropdownState<Priority>>,
+    markdown: Entity<Markdown>,
 }
 
 impl Showcase {
@@ -65,12 +103,15 @@ impl Showcase {
             ))
         });
 
+        let markdown = cx.new(|cx| Markdown::new(SAMPLE_MARKDOWN, cx));
+
         Self {
             focus_handle: cx.focus_handle(),
             click_count: 0,
             toggled_count: 0,
             size_dropdown,
             priority_dropdown,
+            markdown,
         }
     }
 }
@@ -79,12 +120,18 @@ impl Render for Showcase {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
 
+        h_stack()
+            .bg(theme.bg())
+            .text_color(theme.fg())
+            .size_full()
+            .overflow_hidden()
+            .child(
         v_stack()
             .gap_4()
             .p_8()
-            .size_full()
-            .bg(theme.bg())
-            .text_color(theme.fg())
+            .h_full()
+            .flex_1()
+
             .child(
                 v_stack()
                     .gap_2()
@@ -126,6 +173,7 @@ impl Render for Showcase {
                             ),
                     ),
             )
+            .child(separator())
             .child(
                 v_stack()
                     .gap_2()
@@ -225,6 +273,7 @@ impl Render for Showcase {
                             ),
                     ),
             )
+            .child(separator())
             .child(
                 v_stack()
                     .gap_2()
@@ -298,6 +347,7 @@ impl Render for Showcase {
                             ),
                     ),
             )
+            .child(separator())
             .child(
                 v_stack()
                     .gap_2()
@@ -311,7 +361,18 @@ impl Render for Showcase {
                     .child(h_stack().gap_2().child(
                         avatar("https://avatars.githubusercontent.com/u/1714999?v=4").size(px(32.)),
                     )),
-            )
+            ))
+        .child(vertical_separator())
+        .child(
+            v_stack()
+                .id("markdown-panel")
+                .gap_4()
+                .p_8()
+                .overflow_y_scroll()
+                .min_h_full()
+                .flex_1()
+                .child(MarkdownElement::new(self.markdown.clone())),
+        )
     }
 }
 
@@ -335,7 +396,7 @@ fn main() {
                         }),
                         window_bounds: Some(WindowBounds::Windowed(Bounds {
                             origin: Default::default(),
-                            size: size(px(800.0), px(600.0)),
+                            size: size(px(1200.0), px(680.0)),
                         })),
                         ..Default::default()
                     },

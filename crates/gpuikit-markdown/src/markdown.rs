@@ -209,7 +209,6 @@ impl MarkdownRenderer {
 
         div()
             .w_full()
-            .overflow_hidden()
             .flex()
             .flex_col()
             .gap(rems(self.style.block_spacing))

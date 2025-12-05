@@ -115,6 +115,37 @@ impl Render for Showcase {
                                     .text_color(theme.fg_muted())
                                     .child("(selected / disabled)"),
                             ),
+                    )
+                    .child(
+                        h_stack()
+                            .gap_2()
+                            .items_center()
+                            .child(
+                                icon_button("toggle-star", DefaultIcons::star())
+                                    .use_state()
+                                    .on_toggle(|toggled, _window, _cx| {
+                                        println!("Star toggled: {}", toggled);
+                                    }),
+                            )
+                            .child(
+                                icon_button("toggle-heart", DefaultIcons::heart())
+                                    .use_state()
+                                    .on_toggle(|toggled, _window, _cx| {
+                                        println!("Heart toggled: {}", toggled);
+                                    }),
+                            )
+                            .child(
+                                icon_button("toggle-bell", DefaultIcons::bell())
+                                    .use_state()
+                                    .on_toggle(|toggled, _window, _cx| {
+                                        println!("Bell toggled: {}", toggled);
+                                    }),
+                            )
+                            .child(
+                                div()
+                                    .text_color(theme.fg_muted())
+                                    .child("(toggle buttons with internal state)"),
+                            ),
                     ),
             )
             .child(

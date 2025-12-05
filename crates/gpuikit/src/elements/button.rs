@@ -4,7 +4,7 @@ use gpui::{
     IntoElement, MouseButton, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
     Styled, Window,
 };
-use gpuikit_theme::ActiveTheme;
+use gpuikit_theme::{ActiveTheme, Themeable};
 
 pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Button {
     let label = label.into();
@@ -69,20 +69,20 @@ impl RenderOnce for Button {
             .rounded(rems(0.25))
             .text_xs()
             .font_weight(FontWeight::MEDIUM)
-            .bg(theme.button_bg)
-            .text_color(theme.fg)
+            .bg(theme.button_bg())
+            .text_color(theme.fg())
             .whitespace_nowrap()
             .when(!self.disabled, |button| {
                 button
-                    .hover(|div| div.bg(theme.button_bg_hover))
-                    .active(|div| div.bg(theme.button_bg_active))
+                    .hover(|div| div.bg(theme.button_bg_hover()))
+                    .active(|div| div.bg(theme.button_bg_active()))
                     .cursor_pointer()
             })
             .when(self.disabled, |button| {
                 button
                     .opacity(0.65)
                     .cursor_not_allowed()
-                    .text_color(theme.fg_muted)
+                    .text_color(theme.fg_muted())
             })
             .when_some(
                 self.handler.filter(|_| !self.disabled),

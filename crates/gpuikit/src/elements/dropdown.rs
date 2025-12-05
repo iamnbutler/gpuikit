@@ -1,20 +1,46 @@
-//! Dropdown component for gpuikit
+//! Dropdown component for gpuikit.
+//!
+//! Provides a type-safe dropdown selector with customizable options.
+//!
+//! # Example
+//!
+//! ```ignore
+//! // Create a dropdown with enum options
+//! #[derive(Clone, PartialEq)]
+//! enum Size { Small, Medium, Large }
+//!
+//! let dropdown_state = cx.new(|_cx| {
+//!     DropdownState::new(
+//!         dropdown(
+//!             "size-dropdown",
+//!             vec![
+//!                 (Size::Small, "Small"),
+//!                 (Size::Medium, "Medium"),
+//!                 (Size::Large, "Large"),
+//!             ],
+//!             Size::Medium,
+//!         )
+//!         .on_change(|value, _window, _cx| {
+//!             println!("Selected: {:?}", value);
+//!         })
+//!     )
+//! });
+//! ```
 
-use crate::layout::{h_stack, v_stack};
-use crate::utils::element_manager::ElementManagerExt;
 use gpui::{
-    anchored, deferred, div, prelude::*, rems, App, Context, DismissEvent, ElementId, Entity,
-    EventEmitter, FocusHandle, Focusable, FontWeight, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
+    anchored, deferred, div, prelude::*, px, App, Context, DismissEvent, ElementId, Entity,
+    EventEmitter, FocusHandle, Focusable, IntoElement, ParentElement, Render, SharedString, Styled,
+    Transformation, Window,
 };
-use gpuikit_theme::ActiveTheme;
+use gpuikit_theme::{ActiveTheme, Themeable};
+
+use crate::icons::Icons;
 use std::rc::Rc;
 
-/// Event emitted when the dropdown selection changes
+/// Event emitted when the dropdown selection changes.
 pub struct DropdownChanged;
 
-/// A single option in a dropdown menu
-#[derive(Clone)]
+/// A single option in the dropdown menu.
 pub struct DropdownOption {
     pub label: SharedString,
 }
@@ -27,7 +53,7 @@ impl DropdownOption {
     }
 }
 
-/// The popup menu portion of a dropdown
+/// The popup menu that displays dropdown options.
 pub struct DropdownMenu {
     options: Vec<DropdownOption>,
     selected_index: usize,
@@ -78,46 +104,48 @@ impl DropdownMenu {
 
 impl Render for DropdownMenu {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme();
         let focus_handle = self.focus_handle.clone();
+        let theme = cx.theme();
 
-        v_stack()
+        div()
             .id("dropdown-menu")
             .track_focus(&focus_handle)
             .on_mouse_down_out(cx.listener(|this, _, window, cx| {
                 this.dismiss(window, cx);
             }))
-            .min_w(rems(7.5))
-            .max_h(rems(20.0))
+            .min_w(px(120.))
+            .max_h(px(480.))
             .overflow_y_scroll()
             .on_scroll_wheel(|_, _, cx| {
                 cx.stop_propagation();
             })
-            .bg(theme.surface)
+            .bg(theme.surface())
             .border_1()
-            .border_color(theme.border)
-            .rounded(rems(0.25))
+            .border_color(theme.border())
+            .rounded_md()
             .shadow_lg()
-            .py(rems(0.25))
+            .py_1()
+            .flex()
+            .flex_col()
             .children(self.options.iter().enumerate().map(|(index, option)| {
                 let is_selected = index == self.selected_index;
                 let label = option.label.clone();
-                let theme = theme.clone();
+                let theme = cx.theme();
 
                 div()
                     .id(ElementId::NamedInteger(
                         "dropdown-option".into(),
                         index as u64,
                     ))
-                    .px(rems(0.5))
-                    .py(rems(0.25))
-                    .text_sm()
+                    .px_3()
+                    .py_1()
+                    .text_xs()
                     .cursor_pointer()
                     .when(is_selected, |this| {
-                        this.bg(theme.accent_bg).text_color(theme.accent)
+                        this.bg(theme.accent()).text_color(theme.bg())
                     })
-                    .when(!is_selected, |this| this.text_color(theme.fg))
-                    .hover(|style| style.bg(theme.button_bg_hover))
+                    .when(!is_selected, |this| this.text_color(theme.fg()))
+                    .hover(|style| style.bg(theme.surface_secondary()))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.select(index, window, cx);
                     }))
@@ -126,14 +154,40 @@ impl Render for DropdownMenu {
     }
 }
 
-/// Builder for creating a Dropdown component
+/// Builder for creating a dropdown component.
+///
+/// Use the [`dropdown`] function to create an instance.
 pub struct Dropdown<T: Clone + PartialEq + 'static> {
     id: ElementId,
     options: Vec<(T, SharedString)>,
     selected: T,
     on_change: Option<Rc<dyn Fn(T, &mut Window, &mut App)>>,
     full_width: bool,
-    disabled: bool,
+}
+
+/// Creates a new dropdown builder.
+///
+/// # Arguments
+///
+/// * `id` - Unique identifier for the dropdown
+/// * `options` - Vector of (value, label) tuples
+/// * `selected` - The currently selected value
+///
+/// # Example
+///
+/// ```ignore
+/// dropdown(
+///     "my-dropdown",
+///     vec![("a", "Option A"), ("b", "Option B")],
+///     "a",
+/// )
+/// ```
+pub fn dropdown<T: Clone + PartialEq + 'static>(
+    id: impl Into<ElementId>,
+    options: Vec<(T, impl Into<SharedString>)>,
+    selected: T,
+) -> Dropdown<T> {
+    Dropdown::new(id, options, selected)
 }
 
 impl<T: Clone + PartialEq + 'static> Dropdown<T> {
@@ -151,35 +205,37 @@ impl<T: Clone + PartialEq + 'static> Dropdown<T> {
             selected,
             on_change: None,
             full_width: false,
-            disabled: false,
         }
     }
 
+    /// Register a callback for when the selection changes.
     pub fn on_change(mut self, handler: impl Fn(T, &mut Window, &mut App) + 'static) -> Self {
         self.on_change = Some(Rc::new(handler));
         self
     }
 
+    /// Make the dropdown expand to fill available width.
     pub fn full_width(mut self, full_width: bool) -> Self {
         self.full_width = full_width;
         self
     }
-
-    pub fn disabled(mut self, disabled: bool) -> Self {
-        self.disabled = disabled;
-        self
-    }
 }
 
-/// Stateful wrapper for Dropdown that manages the menu visibility
+/// Stateful dropdown component that manages the menu popup.
+///
+/// Create using [`Dropdown`] and wrap in an Entity:
+///
+/// ```ignore
+/// let state = cx.new(|_cx| DropdownState::new(dropdown(...)));
+/// ```
 pub struct DropdownState<T: Clone + PartialEq + 'static> {
     id: ElementId,
     options: Vec<(T, SharedString)>,
+    /// The currently selected value.
     pub selected: T,
     menu: Option<Entity<DropdownMenu>>,
     on_change: Option<Rc<dyn Fn(T, &mut Window, &mut App)>>,
     full_width: bool,
-    disabled: bool,
 }
 
 impl<T: Clone + PartialEq + 'static> EventEmitter<DropdownChanged> for DropdownState<T> {}
@@ -193,18 +249,10 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
             menu: None,
             on_change: dropdown.on_change,
             full_width: dropdown.full_width,
-            disabled: dropdown.disabled,
         }
     }
 
-    pub fn set_selected(&mut self, value: T, cx: &mut Context<Self>) {
-        if self.selected != value {
-            self.selected = value;
-            cx.emit(DropdownChanged);
-            cx.notify();
-        }
-    }
-
+    /// Get the label of the currently selected option.
     fn selected_label(&self) -> SharedString {
         self.options
             .iter()
@@ -213,6 +261,7 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
             .unwrap_or_else(|| "Select...".into())
     }
 
+    /// Get the index of the currently selected option.
     fn selected_index(&self) -> usize {
         self.options
             .iter()
@@ -220,11 +269,19 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
             .unwrap_or(0)
     }
 
-    fn toggle_menu(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.disabled {
-            return;
-        }
+    /// Update the selected value programmatically.
+    pub fn set_selected(&mut self, value: T, cx: &mut Context<Self>) {
+        self.selected = value;
+        cx.emit(DropdownChanged);
+        cx.notify();
+    }
 
+    /// Check if the menu is currently open.
+    pub fn is_open(&self) -> bool {
+        self.menu.is_some()
+    }
+
+    fn toggle_menu(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.menu.is_some() {
             self.menu = None;
             cx.notify();
@@ -276,86 +333,68 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
         self.menu = Some(menu);
         cx.notify();
     }
-}
 
-impl<T: Clone + PartialEq + 'static> Render for DropdownState<T> {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme();
+    pub fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let is_open = self.menu.is_some();
         let label = self.selected_label();
         let full_width = self.full_width;
-        let disabled = self.disabled;
+        let theme = cx.theme();
+
+        let border_color = if is_open {
+            theme.input_border_focused()
+        } else {
+            theme.input_border()
+        };
 
         div()
             .relative()
             .when(full_width, |this| this.w_full())
             .child(
-                h_stack()
+                div()
                     .id(self.id.clone())
+                    .flex()
                     .items_center()
                     .justify_between()
-                    .gap(rems(0.5))
-                    .px(rems(0.5))
-                    .h(rems(1.5))
-                    .min_w(rems(6.0))
+                    .gap_2()
+                    .px_2()
+                    .py_1()
+                    .min_w(px(100.))
                     .when(full_width, |this| this.w_full())
-                    .bg(theme.input_bg)
+                    .bg(theme.input_bg())
                     .border_1()
-                    .border_color(if is_open {
-                        theme.input_border_focused
-                    } else {
-                        theme.input_border
-                    })
-                    .rounded(rems(0.25))
-                    .text_sm()
-                    .font_weight(FontWeight::NORMAL)
-                    .text_color(if disabled {
-                        theme.fg_disabled
-                    } else {
-                        theme.fg
-                    })
-                    .when(!disabled, |this| {
-                        this.cursor_pointer()
-                            .hover(|style| style.border_color(theme.input_border_hover))
-                            .on_mouse_down(MouseButton::Left, |_, window, _| {
-                                window.prevent_default()
-                            })
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.toggle_menu(window, cx);
-                            }))
-                    })
-                    .when(disabled, |this| this.cursor_not_allowed().opacity(0.65))
+                    .border_color(border_color)
+                    .rounded_sm()
+                    .text_xs()
+                    .text_color(theme.fg())
+                    .cursor_pointer()
+                    .hover(|style| style.border_color(theme.input_border_hover()))
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.toggle_menu(window, cx);
+                    }))
                     .child(label)
                     .child(
-                        div()
-                            .text_xs()
-                            .text_color(theme.fg_muted)
-                            .child(if is_open { "▲" } else { "▼" }),
+                        div().flex().items_center().justify_center().child(
+                            Icons::chevron_down()
+                                .size(px(12.))
+                                .text_color(theme.fg_muted())
+                                .when(is_open, |icon| {
+                                    icon.with_transformation(Transformation::rotate(
+                                        gpui::percentage(0.5),
+                                    ))
+                                }),
+                        ),
                     ),
             )
             .when_some(self.menu.clone(), |this, menu| {
                 this.child(
-                    deferred(anchored().child(div().occlude().mt(rems(0.25)).child(menu)))
-                        .with_priority(1),
+                    deferred(anchored().child(div().occlude().mt_1().child(menu))).with_priority(1),
                 )
             })
     }
 }
 
-/// Convenience function to create a dropdown builder
-pub fn dropdown<T: Clone + PartialEq + 'static>(
-    id: impl Into<ElementId>,
-    options: Vec<(T, impl Into<SharedString>)>,
-    selected: T,
-) -> Dropdown<T> {
-    Dropdown::new(id, options, selected)
-}
-
-/// Convenience function to create a dropdown with auto-generated ID
-pub fn dropdown_auto<T: Clone + PartialEq + 'static>(
-    cx: &App,
-    options: Vec<(T, impl Into<SharedString>)>,
-    selected: T,
-) -> Dropdown<T> {
-    Dropdown::new(cx.next_id_named("dropdown"), options, selected)
+impl<T: Clone + PartialEq + 'static> Render for DropdownState<T> {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.render(window, cx)
+    }
 }

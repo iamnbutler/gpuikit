@@ -1,172 +1,359 @@
-//! A simple theme system for gpui-kit
+//! A trait-based theme system for gpuikit
+//!
+//! The `Themeable` trait defines the color contract that gpuikit components use.
+//! Consumers can implement this trait for their own theme types.
 
 use gpui::{hsla, App, Global, Hsla, SharedString};
-use std::collections::HashMap;
 use std::sync::Arc;
+
+/// Core theme trait that defines the color contract for UI components.
+///
+/// Implement this trait for your own theme type to customize colors.
+/// Only a small set of "primitive" colors are required - everything else
+/// has sensible defaults derived from them.
+pub trait Themeable {
+    // === Required methods (the primitives) ===
+
+    /// Primary foreground/text color
+    fn fg(&self) -> Hsla;
+
+    /// Primary background color
+    fn bg(&self) -> Hsla;
+
+    /// Surface color for cards, panels, elevated elements
+    fn surface(&self) -> Hsla;
+
+    /// Border color for dividers and boundaries
+    fn border(&self) -> Hsla;
+
+    /// Accent color for primary actions and focus states
+    fn accent(&self) -> Hsla;
+
+    // === Optional methods with defaults ===
+
+    /// Muted foreground for secondary text
+    fn fg_muted(&self) -> Hsla {
+        self.fg().opacity(0.7)
+    }
+
+    /// Disabled foreground color
+    fn fg_disabled(&self) -> Hsla {
+        self.fg().opacity(0.4)
+    }
+
+    /// Secondary surface for nested panels
+    fn surface_secondary(&self) -> Hsla {
+        self.surface()
+    }
+
+    /// Tertiary surface for deeply nested elements
+    fn surface_tertiary(&self) -> Hsla {
+        self.surface_secondary()
+    }
+
+    /// Secondary border for hover states
+    fn border_secondary(&self) -> Hsla {
+        self.border()
+    }
+
+    /// Subtle border for minimal separation
+    fn border_subtle(&self) -> Hsla {
+        self.border().opacity(0.5)
+    }
+
+    /// Focus outline color
+    fn outline(&self) -> Hsla {
+        self.accent()
+    }
+
+    /// Accent background (for tags, badges)
+    fn accent_bg(&self) -> Hsla {
+        self.accent().opacity(0.15)
+    }
+
+    /// Accent background hover state
+    fn accent_bg_hover(&self) -> Hsla {
+        self.accent().opacity(0.25)
+    }
+
+    /// Danger/error color
+    fn danger(&self) -> Hsla {
+        hsla(0.0, 0.7, 0.5, 1.0)
+    }
+
+    /// Selection highlight color
+    fn selection(&self) -> Hsla {
+        self.accent().opacity(0.3)
+    }
+
+    // === Component-specific defaults ===
+
+    fn button_bg(&self) -> Hsla {
+        self.surface()
+    }
+
+    fn button_bg_hover(&self) -> Hsla {
+        self.surface_secondary()
+    }
+
+    fn button_bg_active(&self) -> Hsla {
+        self.surface_tertiary()
+    }
+
+    fn button_border(&self) -> Hsla {
+        self.border()
+    }
+
+    fn input_bg(&self) -> Hsla {
+        self.surface()
+    }
+
+    fn input_border(&self) -> Hsla {
+        self.border()
+    }
+
+    fn input_border_hover(&self) -> Hsla {
+        self.border_secondary()
+    }
+
+    fn input_border_focused(&self) -> Hsla {
+        self.accent()
+    }
+}
 
 pub fn init(cx: &mut App) {
     cx.set_global(GlobalTheme::default());
 }
 
-/// Available theme variants
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ThemeVariant {
+    #[default]
     Dark,
     Light,
 }
 
-impl Default for ThemeVariant {
-    fn default() -> Self {
-        ThemeVariant::Dark
-    }
-}
-
-/// Core theme structure with essential color tokens
+/// A concrete theme implementation with stored color values.
 #[derive(Debug, Clone)]
 pub struct Theme {
     pub name: SharedString,
     pub variant: ThemeVariant,
 
-    /// Foreground color for text
-    pub fg: Hsla,
+    // Primitives
+    fg_color: Hsla,
+    bg_color: Hsla,
+    surface_color: Hsla,
+    border_color: Hsla,
+    accent_color: Hsla,
 
-    /// Background color for the main application
-    pub bg: Hsla,
+    // Overrides (None = use default from trait)
+    fg_muted_color: Option<Hsla>,
+    fg_disabled_color: Option<Hsla>,
+    surface_secondary_color: Option<Hsla>,
+    surface_tertiary_color: Option<Hsla>,
+    border_secondary_color: Option<Hsla>,
+    border_subtle_color: Option<Hsla>,
+    outline_color: Option<Hsla>,
+    accent_bg_color: Option<Hsla>,
+    accent_bg_hover_color: Option<Hsla>,
+    danger_color: Option<Hsla>,
+    selection_color: Option<Hsla>,
+    button_bg_color: Option<Hsla>,
+    button_bg_hover_color: Option<Hsla>,
+    button_bg_active_color: Option<Hsla>,
+    button_border_color: Option<Hsla>,
+    input_bg_color: Option<Hsla>,
+    input_border_color: Option<Hsla>,
+    input_border_hover_color: Option<Hsla>,
+    input_border_focused_color: Option<Hsla>,
+}
 
-    /// Surface color for cards, panels, and elevated surfaces
-    pub surface: Hsla,
+impl Themeable for Theme {
+    fn fg(&self) -> Hsla {
+        self.fg_color
+    }
+    fn bg(&self) -> Hsla {
+        self.bg_color
+    }
+    fn surface(&self) -> Hsla {
+        self.surface_color
+    }
+    fn border(&self) -> Hsla {
+        self.border_color
+    }
+    fn accent(&self) -> Hsla {
+        self.accent_color
+    }
 
-    /// Border color for dividers and component boundaries
-    pub border: Hsla,
-
-    /// Outline color for focus states
-    pub outline: Hsla,
-
-    /// Muted foreground color for secondary text
-    pub fg_muted: Hsla,
-
-    /// Disabled foreground color
-    pub fg_disabled: Hsla,
-
-    /// Secondary surface color for nested cards/panels
-    pub surface_secondary: Hsla,
-
-    /// Tertiary surface color for deeply nested elements
-    pub surface_tertiary: Hsla,
-
-    /// Secondary border color for hover states
-    pub border_secondary: Hsla,
-
-    /// Subtle border color for minimal separation
-    pub border_subtle: Hsla,
-
-    /// Accent color for primary actions
-    pub accent: Hsla,
-
-    /// Accent background color
-    pub accent_bg: Hsla,
-
-    /// Accent background hover color
-    pub accent_bg_hover: Hsla,
-
-    /// Danger color for errors and destructive actions
-    pub danger: Hsla,
-
-    /// Selection color for text and items
-    pub selection: Hsla,
-
-    // UI element specific colors
-    /// Button background color
-    pub button_bg: Hsla,
-
-    /// Button background hover color
-    pub button_bg_hover: Hsla,
-
-    /// Button background active/pressed color
-    pub button_bg_active: Hsla,
-
-    /// Button border color
-    pub button_border: Hsla,
-
-    /// Input background color
-    pub input_bg: Hsla,
-
-    /// Input border color
-    pub input_border: Hsla,
-
-    /// Input border hover color
-    pub input_border_hover: Hsla,
-
-    /// Input border focused color
-    pub input_border_focused: Hsla,
+    fn fg_muted(&self) -> Hsla {
+        self.fg_muted_color
+            .unwrap_or_else(|| self.fg().opacity(0.7))
+    }
+    fn fg_disabled(&self) -> Hsla {
+        self.fg_disabled_color
+            .unwrap_or_else(|| self.fg().opacity(0.4))
+    }
+    fn surface_secondary(&self) -> Hsla {
+        self.surface_secondary_color
+            .unwrap_or_else(|| self.surface())
+    }
+    fn surface_tertiary(&self) -> Hsla {
+        self.surface_tertiary_color
+            .unwrap_or_else(|| self.surface_secondary())
+    }
+    fn border_secondary(&self) -> Hsla {
+        self.border_secondary_color.unwrap_or_else(|| self.border())
+    }
+    fn border_subtle(&self) -> Hsla {
+        self.border_subtle_color
+            .unwrap_or_else(|| self.border().opacity(0.5))
+    }
+    fn outline(&self) -> Hsla {
+        self.outline_color.unwrap_or_else(|| self.accent())
+    }
+    fn accent_bg(&self) -> Hsla {
+        self.accent_bg_color
+            .unwrap_or_else(|| self.accent().opacity(0.15))
+    }
+    fn accent_bg_hover(&self) -> Hsla {
+        self.accent_bg_hover_color
+            .unwrap_or_else(|| self.accent().opacity(0.25))
+    }
+    fn danger(&self) -> Hsla {
+        self.danger_color
+            .unwrap_or_else(|| hsla(0.0, 0.7, 0.5, 1.0))
+    }
+    fn selection(&self) -> Hsla {
+        self.selection_color
+            .unwrap_or_else(|| self.accent().opacity(0.3))
+    }
+    fn button_bg(&self) -> Hsla {
+        self.button_bg_color.unwrap_or_else(|| self.surface())
+    }
+    fn button_bg_hover(&self) -> Hsla {
+        self.button_bg_hover_color
+            .unwrap_or_else(|| self.surface_secondary())
+    }
+    fn button_bg_active(&self) -> Hsla {
+        self.button_bg_active_color
+            .unwrap_or_else(|| self.surface_tertiary())
+    }
+    fn button_border(&self) -> Hsla {
+        self.button_border_color.unwrap_or_else(|| self.border())
+    }
+    fn input_bg(&self) -> Hsla {
+        self.input_bg_color.unwrap_or_else(|| self.surface())
+    }
+    fn input_border(&self) -> Hsla {
+        self.input_border_color.unwrap_or_else(|| self.border())
+    }
+    fn input_border_hover(&self) -> Hsla {
+        self.input_border_hover_color
+            .unwrap_or_else(|| self.border_secondary())
+    }
+    fn input_border_focused(&self) -> Hsla {
+        self.input_border_focused_color
+            .unwrap_or_else(|| self.accent())
+    }
 }
 
 impl Theme {
+    /// Create a new theme with just the required primitives.
+    /// All other colors will use sensible defaults.
+    pub fn new(
+        name: impl Into<SharedString>,
+        variant: ThemeVariant,
+        fg: Hsla,
+        bg: Hsla,
+        surface: Hsla,
+        border: Hsla,
+        accent: Hsla,
+    ) -> Self {
+        Theme {
+            name: name.into(),
+            variant,
+            fg_color: fg,
+            bg_color: bg,
+            surface_color: surface,
+            border_color: border,
+            accent_color: accent,
+            fg_muted_color: None,
+            fg_disabled_color: None,
+            surface_secondary_color: None,
+            surface_tertiary_color: None,
+            border_secondary_color: None,
+            border_subtle_color: None,
+            outline_color: None,
+            accent_bg_color: None,
+            accent_bg_hover_color: None,
+            danger_color: None,
+            selection_color: None,
+            button_bg_color: None,
+            button_bg_hover_color: None,
+            button_bg_active_color: None,
+            button_border_color: None,
+            input_bg_color: None,
+            input_border_color: None,
+            input_border_hover_color: None,
+            input_border_focused_color: None,
+        }
+    }
+
     /// Create a Gruvbox Dark theme
     pub fn gruvbox_dark() -> Self {
-        Theme {
-            name: SharedString::from("Gruvbox Dark"),
-            variant: ThemeVariant::Dark,
-            fg: parse_hex("#ebdbb2"),
-            bg: parse_hex("#282828"),
-            surface: parse_hex("#3c3836"),
-            border: parse_hex("#504945"),
-            outline: parse_hex("#458588"),
-            fg_muted: parse_hex("#a89984"),
-            fg_disabled: parse_hex("#7c6f64"),
-            surface_secondary: parse_hex("#504945"),
-            surface_tertiary: parse_hex("#665c54"),
-            border_secondary: parse_hex("#7c6f64"),
-            border_subtle: parse_hex("#3c3836"),
-            accent: parse_hex("#8ec07c"),
-            accent_bg: hsla(104.0 / 360.0, 0.35, 0.63, 0.15),
-            accent_bg_hover: hsla(104.0 / 360.0, 0.35, 0.63, 0.25),
-            danger: parse_hex("#fb4934"),
-            selection: hsla(55.0 / 360.0, 0.56, 0.64, 0.25),
-            button_bg: parse_hex("#504945"),
-            button_bg_hover: parse_hex("#665c54"),
-            button_bg_active: parse_hex("#7c6f64"),
-            button_border: parse_hex("#7c6f64"),
-            input_bg: parse_hex("#3c3836"),
-            input_border: parse_hex("#504945"),
-            input_border_hover: parse_hex("#665c54"),
-            input_border_focused: parse_hex("#8ec07c"),
-        }
+        let mut theme = Theme::new(
+            "Gruvbox Dark",
+            ThemeVariant::Dark,
+            parse_hex("#ebdbb2"), // fg
+            parse_hex("#282828"), // bg
+            parse_hex("#3c3836"), // surface
+            parse_hex("#504945"), // border
+            parse_hex("#8ec07c"), // accent
+        );
+        theme.fg_muted_color = Some(parse_hex("#a89984"));
+        theme.fg_disabled_color = Some(parse_hex("#7c6f64"));
+        theme.surface_secondary_color = Some(parse_hex("#504945"));
+        theme.surface_tertiary_color = Some(parse_hex("#665c54"));
+        theme.border_secondary_color = Some(parse_hex("#7c6f64"));
+        theme.border_subtle_color = Some(parse_hex("#3c3836"));
+        theme.outline_color = Some(parse_hex("#458588"));
+        theme.danger_color = Some(parse_hex("#fb4934"));
+        theme.selection_color = Some(hsla(55.0 / 360.0, 0.56, 0.64, 0.25));
+        theme.button_bg_color = Some(parse_hex("#504945"));
+        theme.button_bg_hover_color = Some(parse_hex("#665c54"));
+        theme.button_bg_active_color = Some(parse_hex("#7c6f64"));
+        theme.button_border_color = Some(parse_hex("#7c6f64"));
+        theme.input_border_hover_color = Some(parse_hex("#665c54"));
+        theme
     }
 
     /// Create a Gruvbox Light theme
     pub fn gruvbox_light() -> Self {
-        Theme {
-            name: SharedString::from("Gruvbox Light"),
-            variant: ThemeVariant::Light,
-            fg: parse_hex("#3c3836"),
-            bg: parse_hex("#fbf1c7"),
-            surface: parse_hex("#ebdbb2"),
-            border: parse_hex("#d5c4a1"),
-            outline: parse_hex("#076678"),
-            fg_muted: parse_hex("#665c54"),
-            fg_disabled: parse_hex("#a89984"),
-            surface_secondary: parse_hex("#d5c4a1"),
-            surface_tertiary: parse_hex("#bdae93"),
-            border_secondary: parse_hex("#a89984"),
-            border_subtle: parse_hex("#ebdbb2"),
-            accent: parse_hex("#427b58"),
-            accent_bg: hsla(145.0 / 360.0, 0.30, 0.38, 0.10),
-            accent_bg_hover: hsla(145.0 / 360.0, 0.30, 0.38, 0.15),
-            danger: parse_hex("#cc241d"),
-            selection: hsla(48.0 / 360.0, 0.87, 0.61, 0.15),
-            button_bg: parse_hex("#ebdbb2"),
-            button_bg_hover: parse_hex("#d5c4a1"),
-            button_bg_active: parse_hex("#bdae93"),
-            button_border: parse_hex("#a89984"),
-            input_bg: parse_hex("#fbf1c7"),
-            input_border: parse_hex("#d5c4a1"),
-            input_border_hover: parse_hex("#bdae93"),
-            input_border_focused: parse_hex("#427b58"),
-        }
+        let mut theme = Theme::new(
+            "Gruvbox Light",
+            ThemeVariant::Light,
+            parse_hex("#3c3836"), // fg
+            parse_hex("#fbf1c7"), // bg
+            parse_hex("#ebdbb2"), // surface
+            parse_hex("#d5c4a1"), // border
+            parse_hex("#427b58"), // accent
+        );
+        theme.fg_muted_color = Some(parse_hex("#665c54"));
+        theme.fg_disabled_color = Some(parse_hex("#a89984"));
+        theme.surface_secondary_color = Some(parse_hex("#d5c4a1"));
+        theme.surface_tertiary_color = Some(parse_hex("#bdae93"));
+        theme.border_secondary_color = Some(parse_hex("#a89984"));
+        theme.border_subtle_color = Some(parse_hex("#ebdbb2"));
+        theme.outline_color = Some(parse_hex("#076678"));
+        theme.danger_color = Some(parse_hex("#cc241d"));
+        theme.selection_color = Some(hsla(48.0 / 360.0, 0.87, 0.61, 0.15));
+        theme.button_bg_color = Some(parse_hex("#ebdbb2"));
+        theme.button_bg_hover_color = Some(parse_hex("#d5c4a1"));
+        theme.button_bg_active_color = Some(parse_hex("#bdae93"));
+        theme.button_border_color = Some(parse_hex("#a89984"));
+        theme.input_border_hover_color = Some(parse_hex("#bdae93"));
+        theme
     }
 
-    /// Get the global theme instance
     pub fn get_global(cx: &App) -> &Arc<Theme> {
         &cx.global::<GlobalTheme>().0
     }
@@ -178,7 +365,6 @@ impl Default for Theme {
     }
 }
 
-/// Global container for the application-wide theme
 #[derive(Clone, Debug)]
 pub struct GlobalTheme(pub Arc<Theme>);
 
@@ -192,7 +378,6 @@ impl Default for GlobalTheme {
 
 /// Trait for accessing the current theme from an App context
 pub trait ActiveTheme {
-    /// Returns a reference to the currently active theme
     fn theme(&self) -> &Arc<Theme>;
 }
 
@@ -202,76 +387,6 @@ impl ActiveTheme for App {
     }
 }
 
-/// Simple theme collection manager
-#[derive(Debug, Default)]
-pub struct Themes {
-    themes: HashMap<SharedString, Arc<Theme>>,
-    active: Option<SharedString>,
-}
-
-impl Themes {
-    /// Create a new theme collection with built-in themes
-    pub fn new() -> Self {
-        let mut themes = HashMap::new();
-
-        // Add built-in themes
-        let gruvbox_dark = Theme::gruvbox_dark();
-        let gruvbox_light = Theme::gruvbox_light();
-
-        themes.insert(gruvbox_dark.name.clone(), Arc::new(gruvbox_dark));
-        themes.insert(gruvbox_light.name.clone(), Arc::new(gruvbox_light));
-
-        Self {
-            themes,
-            active: Some(SharedString::from("Gruvbox Dark")),
-        }
-    }
-
-    /// Add a custom theme
-    pub fn add(&mut self, theme: Theme) {
-        self.themes.insert(theme.name.clone(), Arc::new(theme));
-    }
-
-    /// Get a theme by name
-    pub fn get(&self, name: &str) -> Option<Arc<Theme>> {
-        self.themes.get(name).cloned()
-    }
-
-    /// Set the active theme by name
-    pub fn set_active(&mut self, name: impl Into<SharedString>) -> Option<Arc<Theme>> {
-        let name = name.into();
-        if let Some(theme) = self.themes.get(&name) {
-            self.active = Some(name);
-            Some(theme.clone())
-        } else {
-            None
-        }
-    }
-
-    /// Get the active theme
-    pub fn active(&self) -> Option<Arc<Theme>> {
-        self.active
-            .as_ref()
-            .and_then(|name| self.themes.get(name).cloned())
-    }
-
-    /// List all available theme names
-    pub fn list(&self) -> Vec<SharedString> {
-        self.themes.keys().cloned().collect()
-    }
-
-    /// Apply the active theme globally
-    pub fn apply_global(&self, cx: &mut App) -> Option<Arc<Theme>> {
-        if let Some(theme) = self.active() {
-            cx.set_global(GlobalTheme(theme.clone()));
-            Some(theme)
-        } else {
-            None
-        }
-    }
-}
-
-/// Helper function to parse hex color strings
 fn parse_hex(hex: &str) -> Hsla {
     let hex = hex.trim_start_matches('#');
 
@@ -279,7 +394,6 @@ fn parse_hex(hex: &str) -> Hsla {
     let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
     let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
 
-    // Convert RGB to HSLA
     let r = r as f32 / 255.0;
     let g = g as f32 / 255.0;
     let b = b as f32 / 255.0;
@@ -323,61 +437,29 @@ mod tests {
     }
 
     #[test]
-    fn test_themes_manager() {
-        let mut themes = Themes::new();
+    fn test_minimal_theme() {
+        // Create a theme with just primitives - all else uses defaults
+        let theme = Theme::new(
+            "Minimal",
+            ThemeVariant::Dark,
+            parse_hex("#ffffff"),
+            parse_hex("#000000"),
+            parse_hex("#111111"),
+            parse_hex("#333333"),
+            parse_hex("#0066cc"),
+        );
 
-        // Should have built-in themes
-        assert!(themes.get("Gruvbox Dark").is_some());
-        assert!(themes.get("Gruvbox Light").is_some());
-
-        // Active theme should be set
-        assert!(themes.active().is_some());
-
-        // Should be able to switch themes
-        let light_theme = themes.set_active("Gruvbox Light");
-        assert!(light_theme.is_some());
-        assert_eq!(themes.active().unwrap().variant, ThemeVariant::Light);
-
-        // Can add custom themes
-        let custom = Theme {
-            name: SharedString::from("Custom"),
-            variant: ThemeVariant::Dark,
-            fg: parse_hex("#ffffff"),
-            bg: parse_hex("#000000"),
-            surface: parse_hex("#111111"),
-            border: parse_hex("#222222"),
-            outline: parse_hex("#0066cc"),
-            fg_muted: parse_hex("#888888"),
-            fg_disabled: parse_hex("#555555"),
-            surface_secondary: parse_hex("#1a1a1a"),
-            surface_tertiary: parse_hex("#222222"),
-            border_secondary: parse_hex("#333333"),
-            border_subtle: parse_hex("#111111"),
-            accent: parse_hex("#0066cc"),
-            accent_bg: hsla(210.0 / 360.0, 1.0, 0.4, 0.15),
-            accent_bg_hover: hsla(210.0 / 360.0, 1.0, 0.4, 0.25),
-            danger: parse_hex("#cc0000"),
-            selection: hsla(210.0 / 360.0, 1.0, 0.5, 0.25),
-            button_bg: parse_hex("#222222"),
-            button_bg_hover: parse_hex("#333333"),
-            button_bg_active: parse_hex("#444444"),
-            button_border: parse_hex("#333333"),
-            input_bg: parse_hex("#111111"),
-            input_border: parse_hex("#222222"),
-            input_border_hover: parse_hex("#333333"),
-            input_border_focused: parse_hex("#0066cc"),
-        };
-
-        themes.add(custom);
-        assert!(themes.get("Custom").is_some());
+        // Derived values should work
+        assert_eq!(theme.button_bg(), theme.surface());
+        assert_eq!(theme.input_border_focused(), theme.accent());
     }
 
     #[test]
     fn test_hex_parsing() {
         let color = parse_hex("#ffffff");
-        assert_eq!(color.l, 1.0); // White should have lightness of 1.0
+        assert_eq!(color.l, 1.0);
 
         let color = parse_hex("#000000");
-        assert_eq!(color.l, 0.0); // Black should have lightness of 0.0
+        assert_eq!(color.l, 0.0);
     }
 }

@@ -6,11 +6,11 @@
 //!
 //! ```ignore
 //! use gpui::Application;
-//! use gpuikit::{Assets, init};
+//! use gpuikit::init;
 //!
 //! fn main() {
 //!     Application::new()
-//!         .with_assets(Assets)
+//!         .with_assets(gpuikit::assets())
 //!         .run(|cx| {
 //!             init(cx);
 //!             // ... your app code
@@ -35,21 +35,24 @@ pub mod utils;
 pub use icons::Icons as DefaultIcons;
 
 /// Embedded assets for gpuikit (icons, fonts, etc.)
-///
-/// Must be passed to `Application::new().with_assets()` before calling `.run()`.
+#[derive(RustEmbed)]
+#[folder = "assets"]
+pub struct Assets;
+
+/// Returns the gpuikit asset source for use with `Application::new().with_assets()`.
 ///
 /// # Example
 /// ```ignore
 /// Application::new()
-///     .with_assets(gpuikit::Assets)
+///     .with_assets(gpuikit::assets())
 ///     .run(|cx| {
 ///         gpuikit::init(cx);
 ///         // ...
 ///     });
 /// ```
-#[derive(RustEmbed)]
-#[folder = "assets"]
-pub struct Assets;
+pub fn assets() -> resource::ResourceSource<Assets> {
+    resource::ResourceSource::new()
+}
 
 /// Initialize gpuikit - sets up themes and global state.
 ///

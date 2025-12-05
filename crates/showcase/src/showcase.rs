@@ -136,7 +136,7 @@ impl Render for Showcase {
 
 fn main() {
     Application::new()
-        .with_assets(gpuikit::Assets)
+        .with_assets(gpuikit::assets())
         .run(|cx: &mut App| {
             gpuikit::init(cx);
 

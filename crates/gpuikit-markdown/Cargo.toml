@@ -1,0 +1,27 @@
+[package]
+name = "gpuikit-markdown"
+description = "Markdown rendering for gpuikit"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "gpuikit_markdown"
+path = "src/markdown.rs"
+
+[dependencies]
+gpuikit-theme.workspace = true
+gpui.workspace = true
+log.workspace = true
+
+pulldown-cmark = { version = "0.12", default-features = false, features = ["simd"] }
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

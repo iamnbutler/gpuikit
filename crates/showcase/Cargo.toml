@@ -16,6 +16,7 @@ path = "src/showcase.rs"
 [dependencies]
 # Internal workspace dependencies
 gpuikit = { workspace = true }
+gpuikit-markdown = { workspace = true }
 gpuikit-theme = { workspace = true }
 gpuikit-keymap = { workspace = true }
 

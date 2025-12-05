@@ -62,6 +62,6 @@ pub fn assets() -> resource::ResourceSource<Assets> {
 /// # Panics
 /// Calling a gpuikit component before initialization will panic.
 pub fn init(cx: &mut App) {
-    gpuikit_theme::init(cx);
+    theme::init(cx);
     utils::element_manager::init(cx);
 }

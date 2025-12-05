@@ -135,36 +135,38 @@ impl Render for Showcase {
 }
 
 fn main() {
-    Application::new().run(|cx: &mut App| {
-        gpuikit::init(cx);
+    Application::new()
+        .with_assets(gpuikit::Assets)
+        .run(|cx: &mut App| {
+            gpuikit::init(cx);
 
-        cx.set_menus(vec![Menu {
-            name: "GPUIKit Showcase".into(),
-            items: vec![],
-        }]);
+            cx.set_menus(vec![Menu {
+                name: "GPUIKit Showcase".into(),
+                items: vec![],
+            }]);
 
-        let window = cx
-            .open_window(
-                WindowOptions {
-                    titlebar: Some(TitlebarOptions {
-                        title: Some("GPUIKit Component Showcase".into()),
+            let window = cx
+                .open_window(
+                    WindowOptions {
+                        titlebar: Some(TitlebarOptions {
+                            title: Some("GPUIKit Component Showcase".into()),
+                            ..Default::default()
+                        }),
+                        window_bounds: Some(WindowBounds::Windowed(Bounds {
+                            origin: Default::default(),
+                            size: size(px(800.0), px(600.0)),
+                        })),
                         ..Default::default()
-                    }),
-                    window_bounds: Some(WindowBounds::Windowed(Bounds {
-                        origin: Default::default(),
-                        size: size(px(800.0), px(600.0)),
-                    })),
-                    ..Default::default()
-                },
-                |_window, cx| cx.new(Showcase::new),
-            )
-            .unwrap();
+                    },
+                    |_window, cx| cx.new(Showcase::new),
+                )
+                .unwrap();
 
-        window
-            .update(cx, |showcase, window, cx| {
-                window.focus(&showcase.focus_handle);
-                cx.activate(true);
-            })
-            .unwrap();
-    });
+            window
+                .update(cx, |showcase, window, cx| {
+                    window.focus(&showcase.focus_handle);
+                    cx.activate(true);
+                })
+                .unwrap();
+        });
 }

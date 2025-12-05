@@ -1,11 +1,12 @@
 use gpui::{
-    div, img, px, size, svg, App, AppContext, Application, Bounds, Context, FocusHandle,
-    FontWeight, IntoElement, Menu, ParentElement, Render, Styled, TitlebarOptions, Window,
-    WindowBounds, WindowOptions,
+    div, img, px, size, App, AppContext, Application, Bounds, Context, FocusHandle, FontWeight,
+    IntoElement, Menu, ParentElement, Render, Styled, TitlebarOptions, Window, WindowBounds,
+    WindowOptions,
 };
 use gpuikit::{
     elements::{avatar::avatar, button::button, icon_button::icon_button},
     layout::{h_stack, v_stack},
+    DefaultIcons,
 };
 use gpuikit_theme::{self, ActiveTheme, Themeable};
 
@@ -88,17 +89,15 @@ impl Render for Showcase {
                         h_stack()
                             .gap_2()
                             .items_center()
-                            .child(icon_button("icon-normal", svg().path("icons/star.svg")))
+                            .child(icon_button("icon-normal", DefaultIcons::star()))
                             .child(
-                                icon_button("icon-selected", svg().path("icons/star.svg"))
-                                    .selected(true),
+                                icon_button("icon-selected", DefaultIcons::star()).selected(true),
                             )
                             .child(
-                                icon_button("icon-disabled", svg().path("icons/star.svg"))
-                                    .disabled(true),
+                                icon_button("icon-disabled", DefaultIcons::star()).disabled(true),
                             )
                             .child(
-                                icon_button("icon-selected-disabled", svg().path("icons/star.svg"))
+                                icon_button("icon-selected-disabled", DefaultIcons::star())
                                     .selected(true)
                                     .disabled(true),
                             )

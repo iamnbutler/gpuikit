@@ -6,10 +6,13 @@ pub use gpuikit_theme as theme;
 pub mod elements;
 pub mod error;
 pub mod fs;
+pub mod icons;
 pub mod layout;
 pub mod resource;
 pub mod traits;
 pub mod utils;
+
+pub use icons::Icons as DefaultIcons;
 
 /// Initialize gpuikit - this sets up & loads themes, sets up global state, etc.
 ///

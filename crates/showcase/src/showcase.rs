@@ -7,7 +7,7 @@ use gpuikit::{
     elements::{avatar::avatar, button::button},
     layout::{h_stack, v_stack},
 };
-use gpuikit_theme::{self, ActiveTheme};
+use gpuikit_theme::{self, ActiveTheme, Themeable};
 
 struct Showcase {
     focus_handle: FocusHandle,
@@ -31,8 +31,8 @@ impl Render for Showcase {
             .gap_4()
             .p_8()
             .size_full()
-            .bg(theme.bg)
-            .text_color(theme.fg)
+            .bg(theme.bg())
+            .text_color(theme.fg())
             .child(
                 v_stack()
                     .gap_2()
@@ -40,7 +40,7 @@ impl Render for Showcase {
                         div()
                             .text_lg()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(theme.fg_muted)
+                            .text_color(theme.fg_muted())
                             .child("Button"),
                     )
                     .child(
@@ -68,7 +68,7 @@ impl Render for Showcase {
                             .child("Click count:")
                             .child(
                                 div()
-                                    .text_color(theme.accent)
+                                    .text_color(theme.accent())
                                     .font_weight(FontWeight::BOLD)
                                     .child(format!("{}", self.click_count)),
                             ),
@@ -81,7 +81,7 @@ impl Render for Showcase {
                         div()
                             .text_lg()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(theme.fg_muted)
+                            .text_color(theme.fg_muted())
                             .child("Avatar"),
                     )
                     .child(h_stack().gap_2().child(

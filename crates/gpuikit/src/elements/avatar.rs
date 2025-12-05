@@ -2,7 +2,7 @@ use gpui::{
     div, img, rems, AbsoluteLength, App, ImageSource, Img, IntoElement, ParentElement, RenderOnce,
     Styled, Window,
 };
-use gpuikit_theme::ActiveTheme;
+use gpuikit_theme::{ActiveTheme, Themeable};
 
 pub fn avatar(src: impl Into<ImageSource>) -> Avatar {
     Avatar::new(src)
@@ -37,7 +37,7 @@ impl RenderOnce for Avatar {
             self.image
                 .size(image_size)
                 .rounded_full()
-                .bg(cx.theme().surface),
+                .bg(cx.theme().surface()),
         )
     }
 }

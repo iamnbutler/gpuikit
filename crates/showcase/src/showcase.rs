@@ -1,10 +1,10 @@
 use gpui::{
-    div, img, px, size, App, AppContext, Application, Bounds, Context, FocusHandle, FontWeight,
-    IntoElement, Menu, ParentElement, Render, Styled, TitlebarOptions, Window, WindowBounds,
-    WindowOptions,
+    div, img, px, size, svg, App, AppContext, Application, Bounds, Context, FocusHandle,
+    FontWeight, IntoElement, Menu, ParentElement, Render, Styled, TitlebarOptions, Window,
+    WindowBounds, WindowOptions,
 };
 use gpuikit::{
-    elements::{avatar::avatar, button::button},
+    elements::{avatar::avatar, button::button, icon_button::icon_button},
     layout::{h_stack, v_stack},
 };
 use gpuikit_theme::{self, ActiveTheme, Themeable};
@@ -71,6 +71,41 @@ impl Render for Showcase {
                                     .text_color(theme.accent())
                                     .font_weight(FontWeight::BOLD)
                                     .child(format!("{}", self.click_count)),
+                            ),
+                    ),
+            )
+            .child(
+                v_stack()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(theme.fg_muted())
+                            .child("Icon Button"),
+                    )
+                    .child(
+                        h_stack()
+                            .gap_2()
+                            .items_center()
+                            .child(icon_button("icon-normal", svg().path("icons/star.svg")))
+                            .child(
+                                icon_button("icon-selected", svg().path("icons/star.svg"))
+                                    .selected(true),
+                            )
+                            .child(
+                                icon_button("icon-disabled", svg().path("icons/star.svg"))
+                                    .disabled(true),
+                            )
+                            .child(
+                                icon_button("icon-selected-disabled", svg().path("icons/star.svg"))
+                                    .selected(true)
+                                    .disabled(true),
+                            )
+                            .child(
+                                div()
+                                    .text_color(theme.fg_muted())
+                                    .child("(normal / selected / disabled / selected+disabled)"),
                             ),
                     ),
             )

@@ -30,9 +30,11 @@
 use gpui::{
     anchored, deferred, div, prelude::*, px, App, Context, DismissEvent, ElementId, Entity,
     EventEmitter, FocusHandle, Focusable, IntoElement, ParentElement, Render, SharedString, Styled,
-    Window,
+    Transformation, Window,
 };
 use gpuikit_theme::{ActiveTheme, Themeable};
+
+use crate::icons::Icons;
 use std::rc::Rc;
 
 /// Event emitted when the dropdown selection changes.
@@ -137,7 +139,7 @@ impl Render for DropdownMenu {
                     ))
                     .px_3()
                     .py_1()
-                    .text_sm()
+                    .text_xs()
                     .cursor_pointer()
                     .when(is_selected, |this| {
                         this.bg(theme.accent()).text_color(theme.bg())
@@ -362,7 +364,7 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
                     .border_1()
                     .border_color(border_color)
                     .rounded_sm()
-                    .text_sm()
+                    .text_xs()
                     .text_color(theme.fg())
                     .cursor_pointer()
                     .hover(|style| style.border_color(theme.input_border_hover()))
@@ -371,10 +373,16 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
                     }))
                     .child(label)
                     .child(
-                        div()
-                            .text_xs()
-                            .text_color(theme.fg_muted())
-                            .child(if is_open { "▲" } else { "▼" }),
+                        div().flex().items_center().justify_center().child(
+                            Icons::chevron_down()
+                                .size(px(12.))
+                                .text_color(theme.fg_muted())
+                                .when(is_open, |icon| {
+                                    icon.with_transformation(Transformation::rotate(
+                                        gpui::percentage(0.5),
+                                    ))
+                                }),
+                        ),
                     ),
             )
             .when_some(self.menu.clone(), |this, menu| {

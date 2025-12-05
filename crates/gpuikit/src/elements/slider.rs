@@ -7,7 +7,7 @@ use gpui::{
     MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels, Point,
     Render, SharedString, Styled, Window,
 };
-use gpuikit_theme::ActiveTheme;
+use gpuikit_theme::{ActiveTheme, Themeable};
 use std::ops::RangeInclusive;
 
 /// Event emitted when the slider value changes
@@ -160,17 +160,17 @@ impl Render for Slider {
         let track_height = rems(0.25);
         let thumb_size = rems(0.75);
 
-        let track_color = theme.surface_secondary;
+        let track_color = theme.surface_secondary();
         let fill_color = if disabled {
-            theme.fg_disabled
+            theme.fg_disabled()
         } else {
-            theme.accent
+            theme.accent()
         };
-        let thumb_color = theme.fg;
+        let thumb_color = theme.fg();
         let thumb_border = if is_dragging {
-            theme.accent
+            theme.accent()
         } else {
-            theme.border_secondary
+            theme.border_secondary()
         };
 
         v_stack()
@@ -186,9 +186,9 @@ impl Render for Slider {
                             this.child(
                                 div()
                                     .text_color(if disabled {
-                                        theme.fg_disabled
+                                        theme.fg_disabled()
                                     } else {
-                                        theme.fg_muted
+                                        theme.fg_muted()
                                     })
                                     .child(label),
                             )
@@ -197,9 +197,9 @@ impl Render for Slider {
                             this.child(
                                 div()
                                     .text_color(if disabled {
-                                        theme.fg_disabled
+                                        theme.fg_disabled()
                                     } else {
-                                        theme.fg
+                                        theme.fg()
                                     })
                                     .child(display_value),
                             )

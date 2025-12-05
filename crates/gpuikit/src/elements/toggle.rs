@@ -6,7 +6,7 @@ use gpui::{
     div, prelude::*, rems, App, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
     MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
 };
-use gpuikit_theme::ActiveTheme;
+use gpuikit_theme::{ActiveTheme, Themeable};
 
 /// Event emitted when the toggle state changes
 pub struct ToggleChanged {
@@ -81,25 +81,25 @@ impl Render for Toggle {
         let thumb_margin = rems(0.125);
 
         let track_bg = if disabled {
-            theme.surface_tertiary
+            theme.surface_tertiary()
         } else if enabled {
-            theme.accent
+            theme.accent()
         } else {
-            theme.surface_secondary
+            theme.surface_secondary()
         };
 
         let thumb_bg = if disabled {
-            theme.fg_disabled
+            theme.fg_disabled()
         } else {
-            theme.fg
+            theme.fg()
         };
 
         let track_border = if disabled {
-            theme.border_subtle
+            theme.border_subtle()
         } else if enabled {
-            theme.accent
+            theme.accent()
         } else {
-            theme.border
+            theme.border()
         };
 
         h_stack()
@@ -126,9 +126,9 @@ impl Render for Toggle {
                     .when(!disabled, |this| {
                         this.hover(|style| {
                             style.border_color(if enabled {
-                                theme.accent
+                                theme.accent()
                             } else {
-                                theme.border_secondary
+                                theme.border_secondary()
                             })
                         })
                     })
@@ -149,9 +149,9 @@ impl Render for Toggle {
                     div()
                         .text_sm()
                         .text_color(if disabled {
-                            theme.fg_disabled
+                            theme.fg_disabled()
                         } else {
-                            theme.fg
+                            theme.fg()
                         })
                         .child(label),
                 )

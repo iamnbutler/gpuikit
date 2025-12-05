@@ -1,7 +1,7 @@
 //! Block quote element for markdown.
 
 use gpui::{div, prelude::*, px, rems, App, ParentElement, SharedString, Styled, StyledText};
-use gpuikit_theme::ActiveTheme;
+use gpuikit_theme::{ActiveTheme, Themeable};
 
 use crate::inline_style::RichText;
 use crate::style::TextStyle;
@@ -18,12 +18,13 @@ pub fn block_quote(
     let theme = cx.theme();
 
     div()
+        .w_full()
         .pl(rems(1.0))
         .border_l(px(3.0))
-        .border_color(border_color.unwrap_or(theme.border))
+        .border_color(border_color.unwrap_or(theme.border()))
         .text_size(rems(style.size))
         .line_height(rems(style.size * style.line_height))
-        .text_color(text_color.unwrap_or(theme.fg_muted))
+        .text_color(text_color.unwrap_or(theme.fg_muted()))
         .italic()
         .child(text)
 }
@@ -42,12 +43,13 @@ pub fn rich_block_quote(
     let styled_text: SharedString = text.into();
 
     div()
+        .w_full()
         .pl(rems(1.0))
         .border_l(px(3.0))
-        .border_color(border_color.unwrap_or(theme.border))
+        .border_color(border_color.unwrap_or(theme.border()))
         .text_size(rems(style.size))
         .line_height(rems(style.size * style.line_height))
-        .text_color(text_color.unwrap_or(theme.fg_muted))
+        .text_color(text_color.unwrap_or(theme.fg_muted()))
         .italic()
         .child(StyledText::new(styled_text).with_highlights(highlights))
 }

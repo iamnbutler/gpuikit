@@ -1,7 +1,7 @@
 //! Code block element for markdown.
 
 use gpui::{div, prelude::*, rems, App, ParentElement, SharedString, Styled};
-use gpuikit_theme::ActiveTheme;
+use gpuikit_theme::{ActiveTheme, Themeable};
 
 use crate::style::TextStyle;
 
@@ -23,13 +23,13 @@ pub fn code_block(
         .px(rems(1.0))
         .py(rems(0.75))
         .rounded(rems(0.375))
-        .bg(bg.unwrap_or(theme.surface))
+        .bg(bg.unwrap_or(theme.surface()))
         .border_1()
-        .border_color(border.unwrap_or(theme.border))
+        .border_color(border.unwrap_or(theme.border()))
         .text_size(rems(style.size))
         .line_height(rems(style.size * style.line_height))
         .font_family(font_family.clone())
-        .text_color(style.color.unwrap_or(theme.fg))
+        .text_color(style.color.unwrap_or(theme.fg()))
         .overflow_hidden()
         .child(text)
 }
@@ -46,7 +46,7 @@ pub fn inline_code(
     div()
         .px(rems(0.25))
         .rounded(rems(0.25))
-        .bg(bg.unwrap_or(theme.surface))
+        .bg(bg.unwrap_or(theme.surface()))
         .font_family(font_family.clone())
         .text_size(rems(0.875))
         .child(text)

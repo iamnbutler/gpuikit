@@ -4,7 +4,7 @@ use gpui::{
     div, prelude::*, App, CursorStyle, ElementId, InteractiveElement, ParentElement, SharedString,
     StatefulInteractiveElement, Styled,
 };
-use gpuikit_theme::ActiveTheme;
+use gpuikit_theme::{ActiveTheme, Themeable};
 
 /// Render a link element.
 ///
@@ -17,7 +17,7 @@ pub fn link(
     cx: &App,
 ) -> impl IntoElement {
     let theme = cx.theme();
-    let link_color = color.unwrap_or(theme.accent);
+    let link_color = color.unwrap_or(theme.accent());
 
     div()
         .id(id)

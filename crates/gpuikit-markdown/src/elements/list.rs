@@ -1,7 +1,7 @@
 //! List elements for markdown.
 
 use gpui::{div, prelude::*, rems, App, ParentElement, SharedString, Styled, StyledText};
-use gpuikit_theme::ActiveTheme;
+use gpuikit_theme::{ActiveTheme, Themeable};
 
 use crate::inline_style::RichText;
 use crate::style::TextStyle;
@@ -17,7 +17,7 @@ pub fn list_item(
     let text: String = text.into();
     let indent = rems(indent_level as f32 * 1.5);
     let theme = cx.theme();
-    let text_color = style.color.unwrap_or(theme.fg);
+    let text_color = style.color.unwrap_or(theme.fg());
 
     div()
         .flex()
@@ -41,7 +41,7 @@ pub fn rich_list_item(
 ) -> impl IntoElement {
     let indent = rems(indent_level as f32 * 1.5);
     let theme = cx.theme();
-    let text_color = style.color.unwrap_or(theme.fg);
+    let text_color = style.color.unwrap_or(theme.fg());
     let (text, highlights) = rich_text.to_highlights();
 
     let styled_text: SharedString = text.into();

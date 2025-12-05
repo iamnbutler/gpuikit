@@ -32,7 +32,7 @@ use gpui::{
     div, prelude::*, rems, App, Context, Entity, IntoElement, ParentElement, SharedString, Styled,
     Window,
 };
-use gpuikit_theme::ActiveTheme;
+use gpuikit_theme::{ActiveTheme, Themeable};
 use pulldown_cmark::{Alignment, Event, Tag, TagEnd};
 
 /// A markdown document that can be rendered as a GPUI element.
@@ -208,6 +208,8 @@ impl MarkdownRenderer {
         }
 
         div()
+            .w_full()
+            .overflow_hidden()
             .flex()
             .flex_col()
             .gap(rems(self.style.block_spacing))
@@ -530,7 +532,7 @@ impl MarkdownRenderer {
         cx: &App,
     ) -> impl IntoElement {
         let theme = cx.theme();
-        let border_color = theme.border;
+        let border_color = theme.border();
 
         div()
             .flex()
@@ -542,11 +544,11 @@ impl MarkdownRenderer {
             .children(rows.into_iter().enumerate().map(|(row_idx, row)| {
                 let is_header = row_idx == 0;
                 let bg = if is_header {
-                    theme.surface
+                    theme.surface()
                 } else if row_idx % 2 == 0 {
-                    theme.bg
+                    theme.bg()
                 } else {
-                    theme.surface.opacity(0.5)
+                    theme.surface().opacity(0.5)
                 };
 
                 div()

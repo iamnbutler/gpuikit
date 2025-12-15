@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! gpuikit
 //!
 //! A comprehensive UI component library for GPUI applications.

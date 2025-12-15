@@ -1,4 +1,5 @@
 use crate::theme::{ActiveTheme, Themeable};
+use crate::traits::{clickable::Clickable, disableable::Disableable, selectable::Selectable};
 use gpui::{
     prelude::FluentBuilder, px, App, ClickEvent, Context, ElementId, Entity, InteractiveElement,
     IntoElement, MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Svg,
@@ -154,5 +155,34 @@ impl RenderOnce for IconButton {
                     })
             })
             .child(self.icon.size(px(16.)).text_color(icon_color))
+    }
+}
+
+impl Clickable for IconButton {
+    fn on_click(mut self, handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> Self {
+        self.handler = Some(Box::new(handler));
+        self
+    }
+}
+
+impl Disableable for IconButton {
+    fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+}
+
+impl Selectable for IconButton {
+    fn is_selected(&self) -> bool {
+        self.selected.unwrap_or(false)
+    }
+
+    fn selected(mut self, selected: bool) -> Self {
+        self.selected = Some(selected);
+        self
     }
 }

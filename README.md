@@ -23,3 +23,16 @@ Licensed under either of:
 - MIT License ([LICENSE-MIT](LICENSE-MIT))
 
 at your option.
+
+### Next...
+
+- checkbox
+- context menu
+- image
+- link
+- list item
+- modal
+- spinner
+- split button
+- toast
+- tooltip

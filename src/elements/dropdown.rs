@@ -3,6 +3,8 @@
 //! # Example
 //!
 //! ```ignore
+//! use gpuikit::traits::disableable::Disableable;
+//!
 //! // Create a dropdown with enum options
 //! #[derive(Clone, PartialEq)]
 //! enum Size { Small, Medium, Large }
@@ -21,11 +23,13 @@
 //!         .on_change(|value, _window, _cx| {
 //!             println!("Selected: {:?}", value);
 //!         })
+//!         .disabled(false) // Set to true to disable the dropdown
 //!     )
 //! });
 //! ```
 
 use crate::theme::{ActiveTheme, Themeable};
+use crate::traits::disableable::Disableable;
 use gpui::{
     anchored, deferred, div, prelude::*, px, App, Context, DismissEvent, ElementId, Entity,
     EventEmitter, FocusHandle, Focusable, IntoElement, ParentElement, Render, SharedString, Styled,
@@ -161,6 +165,7 @@ pub struct Dropdown<T: Clone + PartialEq + 'static> {
     selected: T,
     on_change: Option<Rc<dyn Fn(T, &mut Window, &mut App)>>,
     full_width: bool,
+    disabled: bool,
 }
 
 /// Creates a new dropdown builder.
@@ -203,6 +208,7 @@ impl<T: Clone + PartialEq + 'static> Dropdown<T> {
             selected,
             on_change: None,
             full_width: false,
+            disabled: false,
         }
     }
 
@@ -215,6 +221,17 @@ impl<T: Clone + PartialEq + 'static> Dropdown<T> {
     /// Make the dropdown expand to fill available width.
     pub fn full_width(mut self, full_width: bool) -> Self {
         self.full_width = full_width;
+        self
+    }
+}
+
+impl<T: Clone + PartialEq + 'static> Disableable for Dropdown<T> {
+    fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
         self
     }
 }
@@ -234,6 +251,7 @@ pub struct DropdownState<T: Clone + PartialEq + 'static> {
     menu: Option<Entity<DropdownMenu>>,
     on_change: Option<Rc<dyn Fn(T, &mut Window, &mut App)>>,
     full_width: bool,
+    disabled: bool,
 }
 
 impl<T: Clone + PartialEq + 'static> EventEmitter<DropdownChanged> for DropdownState<T> {}
@@ -247,6 +265,7 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
             menu: None,
             on_change: dropdown.on_change,
             full_width: dropdown.full_width,
+            disabled: dropdown.disabled,
         }
     }
 
@@ -279,7 +298,25 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
         self.menu.is_some()
     }
 
+    /// Check if the dropdown is disabled.
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    /// Set the disabled state programmatically.
+    pub fn set_disabled(&mut self, disabled: bool, cx: &mut Context<Self>) {
+        self.disabled = disabled;
+        if disabled && self.menu.is_some() {
+            self.menu = None;
+        }
+        cx.notify();
+    }
+
     fn toggle_menu(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.disabled {
+            return;
+        }
+
         if self.menu.is_some() {
             self.menu = None;
             cx.notify();
@@ -336,9 +373,12 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
         let is_open = self.menu.is_some();
         let label = self.selected_label();
         let full_width = self.full_width;
+        let disabled = self.disabled;
         let theme = cx.theme();
 
-        let border_color = if is_open {
+        let border_color = if disabled {
+            theme.border_subtle()
+        } else if is_open {
             theme.input_border_focused()
         } else {
             theme.input_border()
@@ -363,12 +403,19 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
                     .border_color(border_color)
                     .rounded_sm()
                     .text_xs()
-                    .text_color(theme.fg())
-                    .cursor_pointer()
-                    .hover(|style| style.border_color(theme.input_border_hover()))
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.toggle_menu(window, cx);
-                    }))
+                    .text_color(if disabled {
+                        theme.fg_disabled()
+                    } else {
+                        theme.fg()
+                    })
+                    .when(disabled, |this| this.cursor_not_allowed().opacity(0.65))
+                    .when(!disabled, |this| {
+                        this.cursor_pointer()
+                            .hover(|style| style.border_color(theme.input_border_hover()))
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.toggle_menu(window, cx);
+                            }))
+                    })
                     .child(label)
                     .child(
                         div().flex().items_center().justify_center().child(

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 use gpui::{
     div, px, size, App, AppContext, Application, Bounds, Context, Entity, FocusHandle, FontWeight,
     InteractiveElement, IntoElement, Menu, ParentElement, Render, StatefulInteractiveElement,

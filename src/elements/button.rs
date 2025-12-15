@@ -1,5 +1,5 @@
 use crate::theme::{ActiveTheme, Themeable};
-use crate::{layout::h_stack, traits};
+use crate::{layout::h_stack, traits, traits::disableable::Disableable};
 use gpui::{
     prelude::FluentBuilder, rems, App, ClickEvent, ElementId, FontWeight, InteractiveElement,
     IntoElement, MouseButton, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
@@ -100,10 +100,6 @@ impl RenderOnce for Button {
 }
 
 impl traits::clickable::Clickable for Button {
-    fn disabled(&self) -> bool {
-        self.disabled
-    }
-
     fn on_click(mut self, handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> Self {
         self.handler = Some(Box::new(handler));
         self
@@ -115,5 +111,16 @@ impl traits::button::Button for Button {
 
     fn variant(&self) -> Self::Variant {
         ButtonVariant::default()
+    }
+}
+
+impl Disableable for Button {
+    fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
     }
 }

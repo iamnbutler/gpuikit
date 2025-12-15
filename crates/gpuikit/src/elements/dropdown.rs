@@ -1,6 +1,4 @@
-//! Dropdown component for gpuikit.
-//!
-//! Provides a type-safe dropdown selector with customizable options.
+//! Dropdown
 //!
 //! # Example
 //!
@@ -30,7 +28,7 @@
 use gpui::{
     anchored, deferred, div, prelude::*, px, App, Context, DismissEvent, ElementId, Entity,
     EventEmitter, FocusHandle, Focusable, IntoElement, ParentElement, Render, SharedString, Styled,
-    Transformation, Window,
+    Window,
 };
 use gpuikit_theme::{ActiveTheme, Themeable};
 
@@ -376,7 +374,7 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
                         div().flex().items_center().justify_center().child(
                             Icons::chevron_down()
                                 .size(px(12.))
-                                .text_color(theme.fg_muted())
+                                .text_color(theme.fg_muted()),
                         ),
                     ),
             )

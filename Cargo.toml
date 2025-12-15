@@ -1,51 +1,71 @@
-[workspace]
-resolver = "2"
-members = [
-    "crates/gpuikit",
-    "crates/showcase"
-]
-
-default-members = ["crates/gpuikit"]
-
-[workspace.package]
+[package]
+name = "gpuikit"
 version = "0.1.1"
 edition = "2021"
 authors = ["Nate Butler <iamnbutler@gmail.com>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/iamnbutler/gpuikit"
 homepage = "https://github.com/iamnbutler/gpuikit"
+description = "A comprehensive UI component library for GPUI applications"
+readme = "README.md"
+keywords = ["gpui", "ui", "components", "toolkit", "gui"]
+categories = ["gui", "graphics"]
 rust-version = "1.75"
 
-[workspace.dependencies]
-# workspace crates
-gpuikit = { path = "crates/gpuikit", version = "0.1.0" }
+[lib]
+name = "gpuikit"
+path = "src/lib.rs"
 
-# gpui
+[[example]]
+name = "showcase"
+path = "examples/showcase.rs"
+
+[dependencies]
+# GPUI framework
 gpui = "0.2.2"
-gpui_util = { version = "0.2.2" }
-
-# common deps
+rust-embed = "8.2.0"
 anyhow = "1.0.79"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 log = "0.4"
+
+# Markdown parsing
 pulldown-cmark = { version = "0.12", default-features = false, features = ["simd"] }
 
-# todo: move to assets
-rust-embed = "8.2.0"
+# Editor dependencies (optional)
+syntect = { version = "5.3.0", optional = true }
+gpui_util = { version = "0.2.2", optional = true }
 
-# lints
-[workspace.lints.rust]
+# Schema generation (optional)
+schemars = { version = "0.8", optional = true }
+
+[dev-dependencies]
+gpui = { version = "0.2.2", features = ["test-support"] }
+tempfile = "3.8"
+pretty_assertions = "1.4"
+
+[features]
+default = []
+editor = ["dep:syntect", "dep:gpui_util"]
+schema = ["dep:schemars"]
+
+# Lints
+[lints.rust]
 missing_docs = "warn"
 rust_2018_idioms = "warn"
 
-# optimize release builds
+# Optimize release builds
 [profile.release]
 lto = true
 codegen-units = 1
 opt-level = 3
 
-# speed up debug builds
+# Speed up debug builds
 [profile.dev]
 opt-level = 0
 debug = 2
+
+# Package metadata for crates.io
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

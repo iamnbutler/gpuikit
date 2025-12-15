@@ -1,12 +1,12 @@
 [package]
 name = "gpuikit"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 authors = ["Nate Butler <iamnbutler@gmail.com>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/iamnbutler/gpuikit"
 homepage = "https://github.com/iamnbutler/gpuikit"
-description = "A comprehensive UI component library for GPUI applications"
+description = "A UI toolkit for GPUI applications"
 readme = "README.md"
 keywords = ["gpui", "ui", "components", "toolkit", "gui"]
 categories = ["gui", "graphics"]

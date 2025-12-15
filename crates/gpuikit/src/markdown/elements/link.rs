@@ -1,10 +1,10 @@
 //! Link element for markdown.
 
+use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
     div, prelude::*, App, CursorStyle, ElementId, InteractiveElement, ParentElement, SharedString,
     StatefulInteractiveElement, Styled,
 };
-use gpuikit_theme::{ActiveTheme, Themeable};
 
 /// Render a link element.
 ///

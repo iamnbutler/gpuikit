@@ -2,10 +2,6 @@
 resolver = "2"
 members = [
     "crates/gpuikit",
-    "crates/gpuikit-editor",
-    "crates/gpuikit-keymap",
-    "crates/gpuikit-markdown",
-    "crates/gpuikit-theme",
     "crates/showcase"
 ]
 
@@ -23,10 +19,6 @@ rust-version = "1.75"
 [workspace.dependencies]
 # workspace crates
 gpuikit = { path = "crates/gpuikit", version = "0.1.0" }
-gpuikit-editor = { path = "crates/gpuikit-editor", version = "0.1.0" }
-gpuikit-keymap = { path = "crates/gpuikit-keymap", version = "0.1.0" }
-gpuikit-markdown = { path = "crates/gpuikit-markdown", version = "0.1.0" }
-gpuikit-theme = { path = "crates/gpuikit-theme", version = "0.1.0" }
 
 # gpui
 gpui = "0.2.2"

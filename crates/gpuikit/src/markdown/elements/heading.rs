@@ -1,10 +1,10 @@
 //! Heading element for markdown.
 
+use crate::theme::{ActiveTheme, Themeable};
 use gpui::{div, prelude::*, rems, App, ParentElement, SharedString, Styled, StyledText};
-use gpuikit_theme::{ActiveTheme, Themeable};
 
-use crate::inline_style::RichText;
-use crate::style::TextStyle;
+use super::super::inline_style::RichText;
+use super::super::style::TextStyle;
 
 /// Heading level (h1-h6).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

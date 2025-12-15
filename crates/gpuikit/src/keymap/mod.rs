@@ -83,7 +83,7 @@ impl KeymapCollection {
 
     /// Load default keymaps
     pub fn load_defaults(&mut self) -> Result<()> {
-        let default_keymap = include_str!("../default-keymap.json");
+        let default_keymap = include_str!("../../assets/default-keymap.json");
         self.load_json(default_keymap)?;
         Ok(())
     }

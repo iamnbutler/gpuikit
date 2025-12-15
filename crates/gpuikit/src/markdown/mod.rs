@@ -28,11 +28,11 @@ pub use inline_style::*;
 pub use parser::*;
 pub use style::*;
 
+use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
     div, prelude::*, rems, App, Context, Entity, IntoElement, ParentElement, SharedString, Styled,
     Window,
 };
-use gpuikit_theme::{ActiveTheme, Themeable};
 use pulldown_cmark::{Alignment, Event, Tag, TagEnd};
 
 /// A markdown document that can be rendered as a GPUI element.

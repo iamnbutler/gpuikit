@@ -24,9 +24,9 @@ mod meta_line;
 pub use buffer::{GapBuffer, TextBuffer};
 pub use editor::{CursorPosition, Editor, EditorConfig};
 pub use element::EditorElement;
-// Re-export keymap types from gpuikit-keymap
-pub use gpuikit_keymap::extensions::{bind, create_bindings, BindingBuilder};
-pub use gpuikit_keymap::{BindingSpec, Keymap, KeymapCollection};
+// Re-export keymap types from keymap module
+pub use crate::keymap::extensions::{bind, create_bindings, BindingBuilder};
+pub use crate::keymap::{BindingSpec, Keymap, KeymapCollection};
 pub use meta_line::{Language, MetaLine, Selection};
 pub use syntax_highlighter::SyntaxHighlighter;
 

@@ -1,7 +1,7 @@
 //! GPUI Element implementation for rendering an Editor
 
-use crate::buffer::TextBuffer;
-use crate::editor::Editor;
+use super::buffer::TextBuffer;
+use super::editor::Editor;
 use gpui::{canvas, Stateful, *};
 use std::cell::RefCell;
 use std::rc::Rc;

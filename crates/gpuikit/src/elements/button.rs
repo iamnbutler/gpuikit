@@ -1,10 +1,10 @@
+use crate::theme::{ActiveTheme, Themeable};
 use crate::{layout::h_stack, traits};
 use gpui::{
     prelude::FluentBuilder, rems, App, ClickEvent, ElementId, FontWeight, InteractiveElement,
     IntoElement, MouseButton, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
     Styled, Window,
 };
-use gpuikit_theme::{ActiveTheme, Themeable};
 
 pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Button {
     let label = label.into();

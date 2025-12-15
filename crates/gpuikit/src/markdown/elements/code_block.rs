@@ -1,9 +1,9 @@
 //! Code block element for markdown.
 
+use crate::theme::{ActiveTheme, Themeable};
 use gpui::{div, prelude::*, rems, App, ParentElement, SharedString, Styled};
-use gpuikit_theme::{ActiveTheme, Themeable};
 
-use crate::style::TextStyle;
+use super::super::style::TextStyle;
 
 /// Render a code block element.
 ///

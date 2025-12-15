@@ -25,12 +25,12 @@
 //! });
 //! ```
 
+use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
     anchored, deferred, div, prelude::*, px, App, Context, DismissEvent, ElementId, Entity,
     EventEmitter, FocusHandle, Focusable, IntoElement, ParentElement, Render, SharedString, Styled,
     Window,
 };
-use gpuikit_theme::{ActiveTheme, Themeable};
 
 use crate::icons::Icons;
 use std::rc::Rc;

@@ -1,9 +1,9 @@
+use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
     prelude::FluentBuilder, px, App, ClickEvent, Context, ElementId, Entity, InteractiveElement,
     IntoElement, MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Svg,
     Window,
 };
-use gpuikit_theme::{ActiveTheme, Themeable};
 
 pub fn icon_button(id: impl Into<ElementId>, icon: Svg) -> IconButton {
     IconButton::new(id, icon)

@@ -17,20 +17,30 @@
 //!         });
 //! }
 //! ```
+//!
+//! # Feature Flags
+//!
+//! - `editor` - Enables the editor component with syntax highlighting support
 
 use gpui::App;
 use rust_embed::RustEmbed;
 
-pub use gpuikit_theme as theme;
-
+// Core modules
 pub mod elements;
 pub mod error;
 pub mod fs;
 pub mod icons;
+pub mod keymap;
 pub mod layout;
+pub mod markdown;
 pub mod resource;
+pub mod theme;
 pub mod traits;
 pub mod utils;
+
+// Feature-gated editor module
+#[cfg(feature = "editor")]
+pub mod editor;
 
 pub use icons::Icons as DefaultIcons;
 

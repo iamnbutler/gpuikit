@@ -1,5 +1,5 @@
 #[allow(unused)]
-use crate::*;
+use super::super::*;
 
 #[test]
 fn test_insert_basic_emoji() {

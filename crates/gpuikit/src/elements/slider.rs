@@ -1,13 +1,13 @@
 //! Slider component for gpuikit
 
 use crate::layout::{h_stack, v_stack};
+use crate::theme::{ActiveTheme, Themeable};
 use crate::utils::element_manager::ElementManagerExt;
 use gpui::{
     canvas, div, prelude::*, px, rems, App, Bounds, Context, ElementId, EventEmitter, IntoElement,
     MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels, Point,
     Render, SharedString, Styled, Window,
 };
-use gpuikit_theme::{ActiveTheme, Themeable};
 use std::ops::RangeInclusive;
 
 /// Event emitted when the slider value changes

@@ -1,12 +1,12 @@
 //! Toggle button component for gpuikit
 
 use crate::layout::h_stack;
+use crate::theme::{ActiveTheme, Themeable};
 use crate::utils::element_manager::ElementManagerExt;
 use gpui::{
     div, prelude::*, rems, App, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
     MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
 };
-use gpuikit_theme::{ActiveTheme, Themeable};
 
 /// Event emitted when the toggle state changes
 pub struct ToggleChanged {

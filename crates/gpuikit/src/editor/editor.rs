@@ -1,7 +1,7 @@
 use gpui::{px, rgb, ElementId, Pixels, Rgba, SharedString, TextRun};
 
-use crate::buffer::{GapBuffer, TextBuffer};
-use crate::syntax_highlighter::SyntaxHighlighter;
+use super::buffer::{GapBuffer, TextBuffer};
+use super::syntax_highlighter::SyntaxHighlighter;
 
 #[derive(Clone)]
 pub struct EditorConfig {

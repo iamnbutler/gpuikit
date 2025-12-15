@@ -1,10 +1,10 @@
 //! Paragraph element for markdown.
 
+use crate::theme::{ActiveTheme, Themeable};
 use gpui::{div, prelude::*, rems, App, ParentElement, SharedString, Styled, StyledText};
-use gpuikit_theme::{ActiveTheme, Themeable};
 
-use crate::inline_style::RichText;
-use crate::style::TextStyle;
+use super::super::inline_style::RichText;
+use super::super::style::TextStyle;
 
 /// Render a paragraph element with plain text.
 pub fn paragraph(text: impl Into<String>, style: &TextStyle, cx: &App) -> impl IntoElement {

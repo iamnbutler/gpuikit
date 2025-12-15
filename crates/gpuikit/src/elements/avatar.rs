@@ -1,8 +1,8 @@
+use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
     div, img, rems, AbsoluteLength, App, ImageSource, Img, IntoElement, ParentElement, RenderOnce,
     Styled, Window,
 };
-use gpuikit_theme::{ActiveTheme, Themeable};
 
 pub fn avatar(src: impl Into<ImageSource>) -> Avatar {
     Avatar::new(src)

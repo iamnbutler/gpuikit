@@ -16,10 +16,6 @@ name = "gpuikit"
 path = "src/lib.rs"
 
 [dependencies]
-# Internal workspace dependencies
-gpuikit-theme = { workspace = true }
-gpuikit-keymap = { workspace = true }
-
 # GPUI framework
 gpui = { workspace = true }
 rust-embed = { workspace = true }
@@ -28,11 +24,26 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }
 
+# Markdown parsing
+pulldown-cmark = { workspace = true }
+
+# Editor dependencies (optional)
+syntect = { version = "5.3.0", optional = true }
+gpui_util = { version = "0.2.2", optional = true }
+
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
+tempfile = "3.8"
+pretty_assertions = "1.4"
 
 [features]
 default = []
+editor = ["dep:syntect", "dep:gpui_util"]
+schema = ["schemars"]
+
+[dependencies.schemars]
+version = "0.8"
+optional = true
 
 # Package metadata for crates.io
 [package.metadata.docs.rs]

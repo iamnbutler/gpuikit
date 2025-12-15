@@ -2,8 +2,8 @@
 //!
 //! A visual divider that can be horizontal or vertical.
 
+use crate::theme::{ActiveTheme, Themeable};
 use gpui::{div, px, IntoElement, Pixels, Styled};
-use gpuikit_theme::{ActiveTheme, Themeable};
 
 /// Orientation of the separator
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

@@ -1,5 +1,5 @@
 #[allow(unused)]
-use crate::*;
+use super::super::*;
 
 #[test]
 fn test_empty_buffer_has_one_line() {

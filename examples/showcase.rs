@@ -13,6 +13,7 @@ use gpuikit::{
         dropdown::{dropdown, DropdownState},
         icon_button::icon_button,
         separator::{separator, vertical_separator},
+        tooltip::tooltip,
     },
     layout::{h_stack, v_stack},
     DefaultIcons,
@@ -382,6 +383,33 @@ impl Render for Showcase {
                                     avatar("https://avatars.githubusercontent.com/u/1714999?v=4")
                                         .size(px(32.)),
                                 ),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Tooltip"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_2()
+                                    .child(
+                                        button("tooltip-btn-1", "Hover me")
+                                            .tooltip(tooltip("This is a tooltip")),
+                                    )
+                                    .child(
+                                        icon_button("tooltip-icon", DefaultIcons::info_circled())
+                                            .tooltip(tooltip("More information")),
+                                    )
+                                    .child(button("tooltip-btn-2", "Another one").tooltip(
+                                        tooltip("Tooltips work on any element with an id"),
+                                    )),
                             ),
                     ),
             )

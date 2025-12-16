@@ -1,9 +1,9 @@
 use crate::theme::{ActiveTheme, Themeable};
 use crate::traits::{clickable::Clickable, disableable::Disableable, selectable::Selectable};
 use gpui::{
-    prelude::FluentBuilder, px, App, ClickEvent, Context, ElementId, Entity, InteractiveElement,
-    IntoElement, MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Svg,
-    Window,
+    prelude::FluentBuilder, px, AnyView, App, ClickEvent, Context, ElementId, Entity,
+    InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce,
+    StatefulInteractiveElement, Styled, Svg, Window,
 };
 
 pub fn icon_button(id: impl Into<ElementId>, icon: Svg) -> IconButton {
@@ -27,6 +27,7 @@ pub struct IconButton {
     handler: Option<Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>>,
     /// Called when toggle state changes (only used with internal state)
     on_toggle: Option<Box<dyn Fn(&bool, &mut Window, &mut App) + 'static>>,
+    tooltip: Option<Box<dyn Fn(&mut Window, &mut App) -> AnyView + 'static>>,
 }
 
 impl IconButton {
@@ -39,6 +40,7 @@ impl IconButton {
             use_internal_state: false,
             handler: None,
             on_toggle: None,
+            tooltip: None,
         }
     }
 
@@ -78,6 +80,11 @@ impl IconButton {
     /// Accepts `&bool` to enable use with `cx.listener()`.
     pub fn on_toggle(mut self, handler: impl Fn(&bool, &mut Window, &mut App) + 'static) -> Self {
         self.on_toggle = Some(Box::new(handler));
+        self
+    }
+
+    pub fn tooltip(mut self, tooltip: impl Fn(&mut Window, &mut App) -> AnyView + 'static) -> Self {
+        self.tooltip = Some(Box::new(tooltip));
         self
     }
 }
@@ -154,6 +161,7 @@ impl RenderOnce for IconButton {
                         }
                     })
             })
+            .when_some(self.tooltip, |el, tooltip| el.tooltip(tooltip))
             .child(self.icon.size(px(16.)).text_color(icon_color))
     }
 }

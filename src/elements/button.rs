@@ -1,9 +1,9 @@
 use crate::theme::{ActiveTheme, Themeable};
 use crate::{layout::h_stack, traits, traits::disableable::Disableable};
 use gpui::{
-    prelude::FluentBuilder, rems, App, ClickEvent, ElementId, FontWeight, InteractiveElement,
-    IntoElement, MouseButton, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
-    Styled, Window,
+    prelude::FluentBuilder, rems, AnyView, App, ClickEvent, ElementId, FontWeight,
+    InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce, SharedString,
+    StatefulInteractiveElement, Styled, Window,
 };
 
 pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Button {
@@ -25,6 +25,7 @@ pub struct Button {
     label: SharedString,
     disabled: bool,
     handler: Option<Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>>,
+    tooltip: Option<Box<dyn Fn(&mut Window, &mut App) -> AnyView + 'static>>,
 }
 
 impl Button {
@@ -37,6 +38,7 @@ impl Button {
             label,
             disabled: false,
             handler: None,
+            tooltip: None,
         }
     }
 
@@ -50,6 +52,11 @@ impl Button {
 
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+
+    pub fn tooltip(mut self, tooltip: impl Fn(&mut Window, &mut App) -> AnyView + 'static) -> Self {
+        self.tooltip = Some(Box::new(tooltip));
         self
     }
 }
@@ -95,6 +102,7 @@ impl RenderOnce for Button {
                         })
                 },
             )
+            .when_some(self.tooltip, |button, tooltip| button.tooltip(tooltip))
             .child(self.label)
     }
 }

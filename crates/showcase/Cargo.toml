@@ -13,12 +13,26 @@ description = "A showcase of the gpuikit components & patterns"
 name = "showcase"
 path = "src/showcase.rs"
 
+[[bin]]
+name = "video_player"
+path = "src/video_player.rs"
+
 [dependencies]
 # Internal workspace dependencies
 gpuikit = { workspace = true }
 gpuikit-markdown = { workspace = true }
+gpuikit-media = { workspace = true }
 gpuikit-theme = { workspace = true }
 gpuikit-keymap = { workspace = true }
 
 # GPUI framework
 gpui = { workspace = true }
+
+# Video decoding (for auto-download)
+ffmpeg-sidecar = "2.4.0"
+
+# Async/utilities
+anyhow = { workspace = true }
+log = { workspace = true }
+serde_json = { workspace = true }
+env_logger = "0.11"

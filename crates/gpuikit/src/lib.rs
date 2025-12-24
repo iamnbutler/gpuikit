@@ -23,6 +23,9 @@ use rust_embed::RustEmbed;
 
 pub use gpuikit_theme as theme;
 
+#[cfg(feature = "media")]
+pub use gpuikit_media as media;
+
 pub mod elements;
 pub mod error;
 pub mod fs;

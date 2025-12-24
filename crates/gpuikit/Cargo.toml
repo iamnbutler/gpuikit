@@ -19,6 +19,7 @@ path = "src/lib.rs"
 # Internal workspace dependencies
 gpuikit-theme = { workspace = true }
 gpuikit-keymap = { workspace = true }
+gpuikit-media = { workspace = true, optional = true }
 
 # GPUI framework
 gpui = { workspace = true }
@@ -28,11 +29,15 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+core-video = "0.4"
+
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
 
 [features]
 default = []
+media = ["dep:gpuikit-media"]
 
 # Package metadata for crates.io
 [package.metadata.docs.rs]

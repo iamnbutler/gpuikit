@@ -5,3 +5,4 @@ pub mod icon_button;
 pub mod separator;
 pub mod slider;
 pub mod toggle;
+pub mod video;

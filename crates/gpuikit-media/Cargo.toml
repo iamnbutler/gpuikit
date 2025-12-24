@@ -1,0 +1,58 @@
+[package]
+name = "gpuikit-media"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Video and audio playback support for gpuikit"
+keywords = ["gpui", "video", "audio", "media", "playback"]
+categories = ["multimedia", "multimedia::video", "multimedia::audio"]
+
+[lib]
+name = "gpuikit_media"
+path = "src/media.rs"
+
+[dependencies]
+# Internal workspace dependencies
+gpuikit-theme = { workspace = true }
+
+# GPUI framework
+gpui = { workspace = true }
+
+# Common dependencies
+anyhow = { workspace = true }
+log = { workspace = true }
+
+# Async support
+futures = "0.3"
+parking_lot = "0.12"
+crossbeam-channel = "0.5"
+
+# Audio playback
+rodio = { version = "0.19", default-features = false, features = ["symphonia-all"] }
+cpal = "0.15"
+
+# Image handling for frame conversion
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+smallvec = "1.13"
+
+# Video decoding (FFmpeg)
+ffmpeg-sidecar = "2.4.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-video = "0.4"
+core-foundation = "0.10"
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
+
+[features]
+default = []
+# Enable FFmpeg-based decoding (requires ffmpeg installed)
+ffmpeg = []
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

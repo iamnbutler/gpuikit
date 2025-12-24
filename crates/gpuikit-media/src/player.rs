@@ -449,13 +449,21 @@ impl VideoPlayer {
 
     /// Stop playback and reset to the beginning.
     pub fn stop(&mut self, cx: &mut Context<Self>) {
-        self.stop_internal();
+        if !self.state.has_media() {
+            return;
+        }
 
-        self.state = if self.media_info.is_some() {
-            PlaybackState::Stopped
-        } else {
-            PlaybackState::Empty
-        };
+        self.stop_playback_task();
+        self.shared_state.is_playing.store(false, Ordering::SeqCst);
+        self.playback_start_time = None;
+        self.frame_buffer.clear();
+
+        self.position = Timestamp::ZERO;
+        self.playback_start_position = Timestamp::ZERO;
+        *self.shared_state.pending_seek.lock() = Some(Timestamp::ZERO);
+        self.shared_state.decoded_frames.lock().clear();
+
+        self.state = PlaybackState::Stopped;
 
         cx.emit(VideoPlayerEvent::Stopped);
         cx.emit(VideoPlayerEvent::StateChanged(self.state));
@@ -463,7 +471,7 @@ impl VideoPlayer {
         cx.notify();
     }
 
-    /// Internal stop without emitting events.
+    /// Internal stop - fully stops decode task (used when loading new media).
     fn stop_internal(&mut self) {
         self.shared_state.stop();
         self.stop_playback_task();

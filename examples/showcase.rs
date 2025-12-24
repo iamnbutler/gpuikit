@@ -9,9 +9,13 @@ use gpuikit::theme::{ActiveTheme, Themeable};
 use gpuikit::{
     elements::{
         avatar::avatar,
+        badge::{badge, BadgeVariant},
         button::button,
+        card::card,
         dropdown::{dropdown, DropdownState},
         icon_button::icon_button,
+        loading_indicator::loading_indicator,
+        progress::{progress, ProgressVariant},
         separator::{separator, vertical_separator},
         tooltip::tooltip,
     },
@@ -133,9 +137,11 @@ impl Render for Showcase {
             .overflow_hidden()
             .child(
                 v_stack()
+                    .id("left-panel")
                     .gap_4()
                     .p_8()
-                    .h_full()
+                    .overflow_y_scroll()
+                    .min_h_full()
                     .flex_1()
                     .child(
                         v_stack()
@@ -383,6 +389,91 @@ impl Render for Showcase {
                                     avatar("https://avatars.githubusercontent.com/u/1714999?v=4")
                                         .size(px(32.)),
                                 ),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Badge"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_2()
+                                    .items_center()
+                                    .child(badge("Default"))
+                                    .child(badge("Secondary").secondary())
+                                    .child(badge("Outline").outline())
+                                    .child(badge("Destructive").destructive()),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Spinner"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_4()
+                                    .items_center()
+                                    .child(loading_indicator().dots())
+                                    .child(loading_indicator().ellipsis())
+                                    .child(loading_indicator().dash())
+                                    .child(loading_indicator().star()),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Progress"),
+                            )
+                            .child(
+                                v_stack()
+                                    .gap_2()
+                                    .child(progress(0.25))
+                                    .child(progress(0.5))
+                                    .child(progress(0.75))
+                                    .child(progress(1.0).variant(ProgressVariant::Danger)),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Card"),
+                            )
+                            .child(
+                                card()
+                                    .title("Card Title")
+                                    .description("A short description of the card content.")
+                                    .footer(
+                                        h_stack()
+                                            .gap_2()
+                                            .child(button("card-save", "Save"))
+                                            .child(button("card-cancel", "Cancel").disabled(true)),
+                                    ),
                             ),
                     )
                     .child(separator())

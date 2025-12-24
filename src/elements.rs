@@ -1,7 +1,11 @@
 pub mod avatar;
+pub mod badge;
 pub mod button;
+pub mod card;
 pub mod dropdown;
 pub mod icon_button;
+pub mod loading_indicator;
+pub mod progress;
 pub mod separator;
 pub mod slider;
 pub mod toggle;

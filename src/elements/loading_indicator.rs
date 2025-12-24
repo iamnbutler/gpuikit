@@ -26,7 +26,7 @@ impl LoadingIndicatorVariant {
             LoadingIndicatorVariant::Dots => &[".  ", ".. ", "..."],
             LoadingIndicatorVariant::Ellipsis => &["   ", ".  ", ".. ", "...", ".. ", ".  "],
             LoadingIndicatorVariant::Dash => &["-", "\\", "|", "/"],
-            LoadingIndicatorVariant::Star => &["∙", "✦", "★", "✤", "❊", "❊", "✳︎", "※"],
+            LoadingIndicatorVariant::Star => &["❊", "❊", "✳︎", "※"],
         }
     }
 
@@ -35,7 +35,7 @@ impl LoadingIndicatorVariant {
             LoadingIndicatorVariant::Dots => Duration::from_millis(1500),
             LoadingIndicatorVariant::Ellipsis => Duration::from_millis(1800),
             LoadingIndicatorVariant::Dash => Duration::from_millis(400),
-            LoadingIndicatorVariant::Star => Duration::from_millis(1600),
+            LoadingIndicatorVariant::Star => Duration::from_millis(1000),
         }
     }
 

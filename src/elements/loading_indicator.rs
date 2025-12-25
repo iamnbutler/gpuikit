@@ -18,6 +18,9 @@ pub enum LoadingIndicatorVariant {
     Ellipsis,
     Dash,
     Star,
+    Triangle,
+    Braille,
+    BrailleExtended,
 }
 
 impl LoadingIndicatorVariant {
@@ -27,6 +30,22 @@ impl LoadingIndicatorVariant {
             LoadingIndicatorVariant::Ellipsis => &["   ", ".  ", ".. ", "...", ".. ", ".  "],
             LoadingIndicatorVariant::Dash => &["-", "\\", "|", "/"],
             LoadingIndicatorVariant::Star => &["❊", "❊", "✳︎", "※"],
+            LoadingIndicatorVariant::Triangle => &["◢", "◣", "◤", "◥"],
+            LoadingIndicatorVariant::Braille => &["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"],
+            LoadingIndicatorVariant::BrailleExtended => &[
+                "⡀", "⡁", "⡂", "⡃", "⡄", "⡅", "⡆", "⡇", "⡈", "⡉", "⡊", "⡋", "⡌", "⡍", "⡎", "⡏",
+                "⡐", "⡑", "⡒", "⡓", "⡔", "⡕", "⡖", "⡗", "⡘", "⡙", "⡚", "⡛", "⡜", "⡝", "⡞", "⡟",
+                "⡠", "⡡", "⡢", "⡣", "⡤", "⡥", "⡦", "⡧", "⡨", "⡩", "⡪", "⡫", "⡬", "⡭", "⡮", "⡯",
+                "⡰", "⡱", "⡲", "⡳", "⡴", "⡵", "⡶", "⡷", "⡸", "⡹", "⡺", "⡻", "⡼", "⡽", "⡾", "⡿",
+                "⢀", "⢁", "⢂", "⢃", "⢄", "⢅", "⢆", "⢇", "⢈", "⢉", "⢊", "⢋", "⢌", "⢍", "⢎", "⢏",
+                "⢐", "⢑", "⢒", "⢓", "⢔", "⢕", "⢖", "⢗", "⢘", "⢙", "⢚", "⢛", "⢜", "⢝", "⢞", "⢟",
+                "⢠", "⢡", "⢢", "⢣", "⢤", "⢥", "⢦", "⢧", "⢨", "⢩", "⢪", "⢫", "⢬", "⢭", "⢮", "⢯",
+                "⢰", "⢱", "⢲", "⢳", "⢴", "⢵", "⢶", "⢷", "⢸", "⢹", "⢺", "⢻", "⢼", "⢽", "⢾", "⢿",
+                "⣀", "⣁", "⣂", "⣃", "⣄", "⣅", "⣆", "⣇", "⣈", "⣉", "⣊", "⣋", "⣌", "⣍", "⣎", "⣏",
+                "⣐", "⣑", "⣒", "⣓", "⣔", "⣕", "⣖", "⣗", "⣘", "⣙", "⣚", "⣛", "⣜", "⣝", "⣞", "⣟",
+                "⣠", "⣡", "⣢", "⣣", "⣤", "⣥", "⣦", "⣧", "⣨", "⣩", "⣪", "⣫", "⣬", "⣭", "⣮", "⣯",
+                "⣰", "⣱", "⣲", "⣳", "⣴", "⣵", "⣶", "⣷", "⣸", "⣹", "⣺", "⣻", "⣼", "⣽", "⣾", "⣿",
+            ],
         }
     }
 
@@ -36,6 +55,9 @@ impl LoadingIndicatorVariant {
             LoadingIndicatorVariant::Ellipsis => Duration::from_millis(1800),
             LoadingIndicatorVariant::Dash => Duration::from_millis(400),
             LoadingIndicatorVariant::Star => Duration::from_millis(1000),
+            LoadingIndicatorVariant::Triangle => Duration::from_millis(1200),
+            LoadingIndicatorVariant::Braille => Duration::from_millis(1000),
+            LoadingIndicatorVariant::BrailleExtended => Duration::from_millis(30000),
         }
     }
 
@@ -45,6 +67,9 @@ impl LoadingIndicatorVariant {
             LoadingIndicatorVariant::Ellipsis => "loading-ellipsis",
             LoadingIndicatorVariant::Dash => "loading-dash",
             LoadingIndicatorVariant::Star => "loading-star",
+            LoadingIndicatorVariant::Triangle => "loading-triangle",
+            LoadingIndicatorVariant::Braille => "loading-braille",
+            LoadingIndicatorVariant::BrailleExtended => "loading-braille-extended",
         }
     }
 
@@ -104,6 +129,21 @@ impl LoadingIndicator {
 
     pub fn star(mut self) -> Self {
         self.variant = LoadingIndicatorVariant::Star;
+        self
+    }
+
+    pub fn triangle(mut self) -> Self {
+        self.variant = LoadingIndicatorVariant::Triangle;
+        self
+    }
+
+    pub fn braille(mut self) -> Self {
+        self.variant = LoadingIndicatorVariant::Braille;
+        self
+    }
+
+    pub fn braille_extended(mut self) -> Self {
+        self.variant = LoadingIndicatorVariant::BrailleExtended;
         self
     }
 

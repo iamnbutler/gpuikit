@@ -421,7 +421,7 @@ impl Render for Showcase {
                                     .text_lg()
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .text_color(theme.fg_muted())
-                                    .child("Spinner"),
+                                    .child("LoadingIndicator"),
                             )
                             .child(
                                 h_stack()
@@ -430,7 +430,10 @@ impl Render for Showcase {
                                     .child(loading_indicator().dots())
                                     .child(loading_indicator().ellipsis())
                                     .child(loading_indicator().dash())
-                                    .child(loading_indicator().star()),
+                                    .child(loading_indicator().star())
+                                    .child(loading_indicator().triangle())
+                                    .child(loading_indicator().braille())
+                                    .child(loading_indicator().braille_extended()),
                             ),
                     )
                     .child(separator())

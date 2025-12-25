@@ -53,6 +53,7 @@ schema = ["dep:schemars"]
 [lints.rust]
 missing_docs = "warn"
 rust_2018_idioms = "warn"
+elided_lifetimes_in_paths = "allow"
 
 # Optimize release builds
 [profile.release]

@@ -9,7 +9,7 @@ use gpuikit::theme::{ActiveTheme, Themeable};
 use gpuikit::{
     elements::{
         avatar::avatar,
-        badge::{badge, BadgeVariant},
+        badge::badge,
         breadcrumb::{breadcrumb, breadcrumb_item, BreadcrumbSeparator},
         button::button,
         card::card,

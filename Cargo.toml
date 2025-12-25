@@ -26,7 +26,7 @@ path = "examples/tasks.rs"
 
 [[example]]
 name = "input_sandbox"
-path = "examples/input_sandbox.rs"
+path = "examples/input/sandbox.rs"
 
 [dependencies]
 # GPUI framework

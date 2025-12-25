@@ -30,16 +30,16 @@ const MARKED_TEXT_UNDERLINE_THICKNESS: f32 = 2.0;
 ///
 /// The `InputState` should be created with `InputState::new_singleline(cx)`.
 #[track_caller]
-pub fn input(input_state: &Entity<InputState>) -> Input {
-    Input::new(input_state, false)
+pub fn input(input_state: &Entity<InputState>, cx: &App) -> Input {
+    Input::new(input_state, false, cx)
 }
 
 /// Creates a new multi-line `Input` element (text area) powered by the given `InputState`.
 ///
 /// The `InputState` should be created with `InputState::new_multiline(cx)`.
 #[track_caller]
-pub fn text_area(input_state: &Entity<InputState>) -> Input {
-    Input::new(input_state, true)
+pub fn text_area(input_state: &Entity<InputState>, cx: &App) -> Input {
+    Input::new(input_state, true, cx)
 }
 
 /// A text editing element that supports both single-line and multi-line modes.
@@ -54,7 +54,8 @@ pub struct Input {
 
 impl Input {
     #[track_caller]
-    fn new(input_state: &Entity<InputState>, multiline: bool) -> Self {
+    fn new(input_state: &Entity<InputState>, multiline: bool, cx: &App) -> Self {
+        let focus_handle = input_state.focus_handle(cx);
         let mut input = Input {
             input: input_state.clone(),
             interactivity: Interactivity::new(),
@@ -64,7 +65,7 @@ impl Input {
             multiline,
         };
         input.register_actions();
-        input.key_context(INPUT_CONTEXT)
+        input.key_context(INPUT_CONTEXT).track_focus(&focus_handle)
     }
 
     /// Sets the placeholder text shown when the input is empty.
@@ -89,8 +90,10 @@ impl Input {
         let theme = cx.theme();
 
         PaintColors {
-            selection: self.selection_color.unwrap_or_else(|| theme.selection()),
-            cursor: self.cursor_color.unwrap_or_else(|| theme.accent()),
+            selection: self
+                .selection_color
+                .unwrap_or_else(|| theme.input_selection()),
+            cursor: self.cursor_color.unwrap_or_else(|| theme.input_cursor()),
         }
     }
 
@@ -798,7 +801,8 @@ fn paint_multiline_placeholder(
     window: &mut Window,
     cx: &mut App,
 ) {
-    let placeholder_color = text_style.color.opacity(0.5);
+    use crate::theme::ActiveTheme;
+    let placeholder_color = cx.theme().input_placeholder();
     let run = TextRun {
         len: placeholder.len(),
         font: text_style.font(),
@@ -1188,7 +1192,8 @@ fn paint_singleline_placeholder(
     window: &mut Window,
     cx: &mut App,
 ) {
-    let placeholder_color = text_style.color.opacity(0.5);
+    use crate::theme::ActiveTheme;
+    let placeholder_color = cx.theme().input_placeholder();
     let run = TextRun {
         len: placeholder.len(),
         font: text_style.font(),

@@ -137,7 +137,7 @@ impl Render for InputSandbox {
                             .overflow_hidden()
                             .when(self.use_multiline, |this| {
                                 this.child(
-                                    text_area(&self.multiline_input)
+                                    text_area(&self.multiline_input, cx)
                                         .size_full()
                                         .bg(rgb(0x1e1e1e))
                                         .text_color(rgb(0xd4d4d4))
@@ -149,7 +149,7 @@ impl Render for InputSandbox {
                             .when(!self.use_multiline, |this| {
                                 this.child(
                                     div().flex().items_center().h(px(40.)).child(
-                                        input(&self.singleline_input)
+                                        input(&self.singleline_input, cx)
                                             .size_full()
                                             .bg(rgb(0x1e1e1e))
                                             .text_color(rgb(0xd4d4d4))

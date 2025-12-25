@@ -425,7 +425,7 @@ impl InputBindings {
 
     /// Collects all `Some` bindings into a `Vec<KeyBinding>`.
     pub fn into_bindings(self) -> Vec<KeyBinding> {
-        [
+        let mut bindings: Vec<Option<KeyBinding>> = vec![
             self.backspace,
             self.delete,
             self.delete_word_left,
@@ -459,10 +459,18 @@ impl InputBindings {
             self.undo,
             self.redo,
             self.escape,
-        ]
-        .into_iter()
-        .flatten()
-        .collect()
+        ];
+
+        // Add additional macOS-specific bindings for Home/End
+        // Mac keyboards don't have Home/End keys, so cmd-left/right are standard
+        #[cfg(target_os = "macos")]
+        {
+            let context = Some(INPUT_CONTEXT);
+            bindings.push(Some(KeyBinding::new("cmd-left", Home, context)));
+            bindings.push(Some(KeyBinding::new("cmd-right", End, context)));
+        }
+
+        bindings.into_iter().flatten().collect()
     }
 }
 

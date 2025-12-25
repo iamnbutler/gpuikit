@@ -10,12 +10,15 @@ use gpuikit::{
     elements::{
         avatar::avatar,
         badge::{badge, BadgeVariant},
+        breadcrumb::{breadcrumb, breadcrumb_item, BreadcrumbSeparator},
         button::button,
         card::card,
+        checkbox::{checkbox, Checkbox},
         dropdown::{dropdown, DropdownState},
         icon_button::icon_button,
         loading_indicator::loading_indicator,
         progress::{progress, ProgressVariant},
+        radio_group::{radio_group, radio_option, RadioGroup},
         separator::{separator, vertical_separator},
         tooltip::tooltip,
     },
@@ -77,6 +80,13 @@ enum Priority {
     Critical,
 }
 
+#[derive(Clone, PartialEq, Debug)]
+enum NotificationPreference {
+    All,
+    Important,
+    None,
+}
+
 struct Showcase {
     focus_handle: FocusHandle,
     click_count: usize,
@@ -84,6 +94,9 @@ struct Showcase {
     size_dropdown: Entity<DropdownState<Size>>,
     priority_dropdown: Entity<DropdownState<Priority>>,
     markdown: Entity<Markdown>,
+    checkbox_agree: Entity<Checkbox>,
+    checkbox_newsletter: Entity<Checkbox>,
+    radio_notifications: Entity<RadioGroup<NotificationPreference>>,
 }
 
 impl Showcase {
@@ -115,6 +128,23 @@ impl Showcase {
 
         let markdown = cx.new(|cx| Markdown::new(SAMPLE_MARKDOWN, cx));
 
+        let checkbox_agree =
+            cx.new(|_cx| checkbox("agree-terms", false).label("I agree to the terms"));
+        let checkbox_newsletter =
+            cx.new(|_cx| checkbox("newsletter", true).label("Subscribe to newsletter"));
+
+        let radio_notifications = cx.new(|_cx| {
+            radio_group(
+                "notifications",
+                vec![
+                    radio_option(NotificationPreference::All, "All notifications"),
+                    radio_option(NotificationPreference::Important, "Important only"),
+                    radio_option(NotificationPreference::None, "None"),
+                ],
+            )
+            .selected(NotificationPreference::Important)
+        });
+
         Self {
             focus_handle: cx.focus_handle(),
             click_count: 0,
@@ -122,6 +152,9 @@ impl Showcase {
             size_dropdown,
             priority_dropdown,
             markdown,
+            checkbox_agree,
+            checkbox_newsletter,
+            radio_notifications,
         }
     }
 }
@@ -504,6 +537,73 @@ impl Render for Showcase {
                                     .child(button("tooltip-btn-2", "Another one").tooltip(
                                         tooltip("Tooltips work on any element with an id"),
                                     )),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Checkbox"),
+                            )
+                            .child(
+                                v_stack()
+                                    .gap_2()
+                                    .child(self.checkbox_agree.clone())
+                                    .child(self.checkbox_newsletter.clone()),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("RadioGroup"),
+                            )
+                            .child(self.radio_notifications.clone()),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Breadcrumb"),
+                            )
+                            .child(
+                                v_stack()
+                                    .gap_3()
+                                    .child(
+                                        breadcrumb("breadcrumb-1")
+                                            .item(breadcrumb_item("Home"))
+                                            .item(breadcrumb_item("Documents"))
+                                            .item(breadcrumb_item("Projects")),
+                                    )
+                                    .child(
+                                        breadcrumb("breadcrumb-2")
+                                            .separator(BreadcrumbSeparator::Chevron)
+                                            .item(breadcrumb_item("Settings"))
+                                            .item(breadcrumb_item("Account"))
+                                            .item(breadcrumb_item("Profile")),
+                                    )
+                                    .child(
+                                        breadcrumb("breadcrumb-3")
+                                            .separator(BreadcrumbSeparator::Arrow)
+                                            .item(breadcrumb_item("Level 1"))
+                                            .item(breadcrumb_item("Level 2"))
+                                            .item(breadcrumb_item("Current")),
+                                    ),
                             ),
                     ),
             )

@@ -20,6 +20,10 @@ path = "src/lib.rs"
 name = "showcase"
 path = "examples/showcase.rs"
 
+[[example]]
+name = "tasks"
+path = "examples/tasks.rs"
+
 [dependencies]
 # GPUI framework
 gpui = "0.2.2"

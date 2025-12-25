@@ -31,6 +31,7 @@ pub mod elements;
 pub mod error;
 pub mod fs;
 pub mod icons;
+pub mod input;
 pub mod keymap;
 pub mod layout;
 pub mod markdown;

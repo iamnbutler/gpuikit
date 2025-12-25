@@ -146,8 +146,10 @@ impl Render for DropdownMenu {
                     .when(is_selected, |this| {
                         this.bg(theme.accent()).text_color(theme.bg())
                     })
-                    .when(!is_selected, |this| this.text_color(theme.fg()))
-                    .hover(|style| style.bg(theme.surface_secondary()))
+                    .when(!is_selected, |this| {
+                        this.text_color(theme.fg())
+                            .hover(|style| style.bg(theme.surface_secondary()))
+                    })
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.select(index, window, cx);
                     }))

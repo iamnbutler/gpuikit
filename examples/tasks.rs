@@ -15,10 +15,6 @@ use gpuikit::{
     theme::{ActiveTheme, Themeable},
 };
 
-// ============================================================================
-// Data Types
-// ============================================================================
-
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum TaskStatus {
     Todo,
@@ -92,10 +88,6 @@ struct Task {
     status: TaskStatus,
     priority: TaskPriority,
 }
-
-// ============================================================================
-// Generate Mock Data
-// ============================================================================
 
 fn generate_tasks() -> Vec<Task> {
     let tasks_data = [
@@ -253,10 +245,6 @@ fn generate_tasks() -> Vec<Task> {
         .collect()
 }
 
-// ============================================================================
-// Row Selection State
-// ============================================================================
-
 struct RowCheckbox {
     checked: bool,
     task_index: usize,
@@ -326,10 +314,6 @@ impl Render for RowCheckbox {
             })
     }
 }
-
-// ============================================================================
-// Main App
-// ============================================================================
 
 struct TasksApp {
     focus_handle: FocusHandle,

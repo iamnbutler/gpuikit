@@ -24,6 +24,10 @@ path = "examples/showcase.rs"
 name = "tasks"
 path = "examples/tasks.rs"
 
+[[example]]
+name = "input_sandbox"
+path = "examples/input/sandbox.rs"
+
 [dependencies]
 # GPUI framework
 gpui = "0.2.2"
@@ -32,6 +36,11 @@ anyhow = "1.0.79"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 log = "0.4"
+
+# Input module dependencies
+unicode-bidi = "0.3"
+unicode-segmentation = "1.10"
+smol = "2.0"
 
 # Markdown parsing
 pulldown-cmark = { version = "0.12", default-features = false, features = ["simd"] }

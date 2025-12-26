@@ -6,6 +6,7 @@ pub mod card;
 pub mod checkbox;
 pub mod dropdown;
 pub mod icon_button;
+pub mod input;
 pub mod loading_indicator;
 pub mod progress;
 pub mod radio_group;

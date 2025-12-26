@@ -86,6 +86,11 @@ pub trait Themeable {
         self.accent().opacity(0.3)
     }
 
+    /// Placeholder text color
+    fn placeholder(&self) -> Hsla {
+        self.fg().opacity(0.5)
+    }
+
     // === Component-specific defaults ===
 
     fn button_bg(&self) -> Hsla {
@@ -117,6 +122,26 @@ pub trait Themeable {
     }
 
     fn input_border_focused(&self) -> Hsla {
+        self.accent()
+    }
+
+    /// Input text color
+    fn input_text(&self) -> Hsla {
+        self.fg()
+    }
+
+    /// Input placeholder text color
+    fn input_placeholder(&self) -> Hsla {
+        self.placeholder()
+    }
+
+    /// Input selection/highlight color
+    fn input_selection(&self) -> Hsla {
+        self.selection()
+    }
+
+    /// Input cursor/caret color
+    fn input_cursor(&self) -> Hsla {
         self.accent()
     }
 }
@@ -165,6 +190,10 @@ pub struct Theme {
     input_border_color: Option<Hsla>,
     input_border_hover_color: Option<Hsla>,
     input_border_focused_color: Option<Hsla>,
+    input_text_color: Option<Hsla>,
+    input_placeholder_color: Option<Hsla>,
+    input_selection_color: Option<Hsla>,
+    input_cursor_color: Option<Hsla>,
 }
 
 impl Themeable for Theme {
@@ -226,6 +255,9 @@ impl Themeable for Theme {
         self.selection_color
             .unwrap_or_else(|| self.accent().opacity(0.3))
     }
+    fn placeholder(&self) -> Hsla {
+        self.fg().opacity(0.5)
+    }
     fn button_bg(&self) -> Hsla {
         self.button_bg_color.unwrap_or_else(|| self.surface())
     }
@@ -253,6 +285,20 @@ impl Themeable for Theme {
     fn input_border_focused(&self) -> Hsla {
         self.input_border_focused_color
             .unwrap_or_else(|| self.accent())
+    }
+    fn input_text(&self) -> Hsla {
+        self.input_text_color.unwrap_or_else(|| self.fg())
+    }
+    fn input_placeholder(&self) -> Hsla {
+        self.input_placeholder_color
+            .unwrap_or_else(|| self.placeholder())
+    }
+    fn input_selection(&self) -> Hsla {
+        self.input_selection_color
+            .unwrap_or_else(|| self.selection())
+    }
+    fn input_cursor(&self) -> Hsla {
+        self.input_cursor_color.unwrap_or_else(|| self.accent())
     }
 }
 
@@ -295,6 +341,10 @@ impl Theme {
             input_border_color: None,
             input_border_hover_color: None,
             input_border_focused_color: None,
+            input_text_color: None,
+            input_placeholder_color: None,
+            input_selection_color: None,
+            input_cursor_color: None,
         }
     }
 

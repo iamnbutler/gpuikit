@@ -26,10 +26,6 @@ const SCROLL_GRADIENT_HEIGHT: f32 = 128.0;
 
 actions!(input_sandbox, [ToggleMode]);
 
-// =============================================================================
-// Theme
-// =============================================================================
-
 enum Theme {
     Background,
     Foreground,
@@ -81,10 +77,6 @@ impl ThemeGradient {
         }
     }
 }
-
-// =============================================================================
-// Font Weight Option
-// =============================================================================
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum FontWeightOption {
@@ -140,10 +132,6 @@ impl FontWeightOption {
         }
     }
 }
-
-// =============================================================================
-// UI Components
-// =============================================================================
 
 fn sidebar_section(title: impl Into<Option<&'static str>>) -> Div {
     let title = title.into();
@@ -219,10 +207,6 @@ fn key_row(key: &'static str, description: &'static str) -> Div {
                 .child(description),
         )
 }
-
-// =============================================================================
-// Input Sandbox
-// =============================================================================
 
 struct InputSandbox {
     multiline_input: Entity<InputState>,
@@ -594,10 +578,6 @@ impl Render for InputSandbox {
             )
     }
 }
-
-// =============================================================================
-// Main
-// =============================================================================
 
 fn main() {
     Application::new().run(|cx: &mut App| {

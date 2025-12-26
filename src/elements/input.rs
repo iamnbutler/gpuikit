@@ -548,10 +548,6 @@ fn screen_to_text_position(
     }
 }
 
-// =============================================================================
-// Multi-line painting
-// =============================================================================
-
 fn paint_multiline(
     input: &Entity<InputState>,
     focus_handle: &FocusHandle,
@@ -1028,10 +1024,6 @@ fn paint_multiline_cursor(
         break;
     }
 }
-
-// =============================================================================
-// Single-line painting
-// =============================================================================
 
 /// State for single-line painting that pre-computes character positions.
 struct SingleLinePaintState {

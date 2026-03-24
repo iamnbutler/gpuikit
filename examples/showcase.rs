@@ -12,6 +12,7 @@ use gpuikit::{
     elements::{
         accordion::{accordion, accordion_item, AccordionState},
         alert::alert,
+        aspect_ratio::{aspect_ratio_square, aspect_ratio_video, aspect_ratio},
         avatar::avatar,
         badge::badge,
         breadcrumb::{breadcrumb, breadcrumb_item, BreadcrumbSeparator},
@@ -846,6 +847,98 @@ impl Render for Showcase {
                                             .gap_2()
                                             .child(button("card-save", "Save"))
                                             .child(button("card-cancel", "Cancel").disabled(true)),
+                                    ),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("AspectRatio"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_4()
+                                    .items_start()
+                                    .child(
+                                        v_stack()
+                                            .gap_1()
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("1:1 Square"),
+                                            )
+                                            .child(
+                                                aspect_ratio_square()
+                                                    .width(px(80.0))
+                                                    .child(
+                                                        div()
+                                                            .size_full()
+                                                            .bg(theme.accent())
+                                                            .flex()
+                                                            .items_center()
+                                                            .justify_center()
+                                                            .text_xs()
+                                                            .text_color(theme.bg())
+                                                            .child("1:1"),
+                                                    ),
+                                            ),
+                                    )
+                                    .child(
+                                        v_stack()
+                                            .gap_1()
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("16:9 Video"),
+                                            )
+                                            .child(
+                                                aspect_ratio_video()
+                                                    .width(px(160.0))
+                                                    .child(
+                                                        div()
+                                                            .size_full()
+                                                            .bg(theme.surface_secondary())
+                                                            .flex()
+                                                            .items_center()
+                                                            .justify_center()
+                                                            .text_xs()
+                                                            .text_color(theme.fg())
+                                                            .child("16:9"),
+                                                    ),
+                                            ),
+                                    )
+                                    .child(
+                                        v_stack()
+                                            .gap_1()
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("4:3 Photo"),
+                                            )
+                                            .child(
+                                                aspect_ratio(4.0 / 3.0)
+                                                    .width(px(120.0))
+                                                    .child(
+                                                        div()
+                                                            .size_full()
+                                                            .bg(theme.accent_bg())
+                                                            .flex()
+                                                            .items_center()
+                                                            .justify_center()
+                                                            .text_xs()
+                                                            .text_color(theme.accent())
+                                                            .child("4:3"),
+                                                    ),
+                                            ),
                                     ),
                             ),
                     )

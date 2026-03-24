@@ -9,6 +9,7 @@ use gpuikit::markdown::{Markdown, MarkdownElement};
 use gpuikit::theme::{ActiveTheme, Themeable};
 use gpuikit::{
     elements::{
+        aspect_ratio::{aspect_ratio, aspect_ratio_photo, aspect_ratio_square, aspect_ratio_video},
         avatar::avatar,
         badge::badge,
         breadcrumb::{breadcrumb, breadcrumb_item, BreadcrumbSeparator},
@@ -641,6 +642,131 @@ impl Render for Showcase {
                                             .item(breadcrumb_item("Level 1"))
                                             .item(breadcrumb_item("Level 2"))
                                             .item(breadcrumb_item("Current")),
+                                    ),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("AspectRatio"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_4()
+                                    .items_start()
+                                    .child(
+                                        v_stack()
+                                            .gap_1()
+                                            .w(px(100.0))
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("Square (1:1)"),
+                                            )
+                                            .child(
+                                                aspect_ratio_square().child(
+                                                    div()
+                                                        .size_full()
+                                                        .bg(theme.accent().opacity(0.2))
+                                                        .border_1()
+                                                        .border_color(theme.accent())
+                                                        .rounded(px(4.0))
+                                                        .flex()
+                                                        .items_center()
+                                                        .justify_center()
+                                                        .text_xs()
+                                                        .text_color(theme.accent())
+                                                        .child("1:1"),
+                                                ),
+                                            ),
+                                    )
+                                    .child(
+                                        v_stack()
+                                            .gap_1()
+                                            .w(px(160.0))
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("Video (16:9)"),
+                                            )
+                                            .child(
+                                                aspect_ratio_video().child(
+                                                    div()
+                                                        .size_full()
+                                                        .bg(theme.accent().opacity(0.2))
+                                                        .border_1()
+                                                        .border_color(theme.accent())
+                                                        .rounded(px(4.0))
+                                                        .flex()
+                                                        .items_center()
+                                                        .justify_center()
+                                                        .text_xs()
+                                                        .text_color(theme.accent())
+                                                        .child("16:9"),
+                                                ),
+                                            ),
+                                    )
+                                    .child(
+                                        v_stack()
+                                            .gap_1()
+                                            .w(px(120.0))
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("Photo (4:3)"),
+                                            )
+                                            .child(
+                                                aspect_ratio_photo().child(
+                                                    div()
+                                                        .size_full()
+                                                        .bg(theme.accent().opacity(0.2))
+                                                        .border_1()
+                                                        .border_color(theme.accent())
+                                                        .rounded(px(4.0))
+                                                        .flex()
+                                                        .items_center()
+                                                        .justify_center()
+                                                        .text_xs()
+                                                        .text_color(theme.accent())
+                                                        .child("4:3"),
+                                                ),
+                                            ),
+                                    )
+                                    .child(
+                                        v_stack()
+                                            .gap_1()
+                                            .w(px(100.0))
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("Custom (2:1)"),
+                                            )
+                                            .child(
+                                                aspect_ratio(2.0).child(
+                                                    div()
+                                                        .size_full()
+                                                        .bg(theme.accent().opacity(0.2))
+                                                        .border_1()
+                                                        .border_color(theme.accent())
+                                                        .rounded(px(4.0))
+                                                        .flex()
+                                                        .items_center()
+                                                        .justify_center()
+                                                        .text_xs()
+                                                        .text_color(theme.accent())
+                                                        .child("2:1"),
+                                                ),
+                                            ),
                                     ),
                             ),
                     ),

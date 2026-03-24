@@ -425,7 +425,7 @@ impl InputBindings {
 
     /// Collects all `Some` bindings into a `Vec<KeyBinding>`.
     pub fn into_bindings(self) -> Vec<KeyBinding> {
-        let bindings: Vec<Option<KeyBinding>> = vec![
+        let mut bindings: Vec<Option<KeyBinding>> = vec![
             self.backspace,
             self.delete,
             self.delete_word_left,

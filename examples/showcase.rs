@@ -17,6 +17,7 @@ use gpuikit::{
         button_group::button_group,
         card::card,
         checkbox::{checkbox, Checkbox},
+        collapsible::{collapsible, Collapsible},
         dropdown::{dropdown, DropdownState},
         icon_button::icon_button,
         kbd::{kbd, kbd_combo, KbdSize},
@@ -106,6 +107,8 @@ struct Showcase {
     switch_wifi: Entity<Switch>,
     switch_bluetooth: Entity<Switch>,
     switch_airplane: Entity<Switch>,
+    collapsible_basic: Entity<Collapsible>,
+    collapsible_nested: Entity<Collapsible>,
 }
 
 impl Showcase {
@@ -158,6 +161,41 @@ impl Showcase {
         let switch_bluetooth = cx.new(|_cx| switch("bluetooth-switch", false).label("Bluetooth"));
         let switch_airplane = cx.new(|_cx| switch("airplane-switch", false).label("Airplane Mode").disabled(true));
 
+        let collapsible_basic = cx.new(|_cx| {
+            collapsible("collapsible-basic")
+                .trigger_label("Click to expand")
+                .content(|_window, _cx| {
+                    div()
+                        .text_sm()
+                        .child("This is the collapsible content. It can contain any elements you want.")
+                        .into_any_element()
+                })
+                .default_open(false)
+        });
+
+        let collapsible_nested = cx.new(|_cx| {
+            collapsible("collapsible-nested")
+                .trigger_label("Settings")
+                .content(|_window, _cx| {
+                    v_stack()
+                        .gap_2()
+                        .child(
+                            div()
+                                .text_sm()
+                                .child("Configure your preferences below:"),
+                        )
+                        .child(
+                            h_stack()
+                                .gap_2()
+                                .child(badge("Option 1"))
+                                .child(badge("Option 2"))
+                                .child(badge("Option 3")),
+                        )
+                        .into_any_element()
+                })
+                .default_open(true)
+        });
+
         Self {
             focus_handle: cx.focus_handle(),
             click_count: 0,
@@ -171,6 +209,8 @@ impl Showcase {
             switch_wifi,
             switch_bluetooth,
             switch_airplane,
+            collapsible_basic,
+            collapsible_nested,
         }
     }
 }
@@ -744,6 +784,24 @@ impl Render for Showcase {
                                             .item(breadcrumb_item("Level 2"))
                                             .item(breadcrumb_item("Current")),
                                     ),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Collapsible"),
+                            )
+                            .child(
+                                v_stack()
+                                    .gap_2()
+                                    .child(self.collapsible_basic.clone())
+                                    .child(self.collapsible_nested.clone()),
                             ),
                     ),
             )

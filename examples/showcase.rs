@@ -27,6 +27,7 @@ use gpuikit::{
         radio_group::{radio_group, radio_option, RadioGroup},
         separator::{separator, vertical_separator},
         switch::{switch, Switch},
+        tabs::{tab, tabs, Tabs},
         toggle_group::{toggle_group, toggle_option, ToggleGroup, ToggleGroupMode},
         tooltip::tooltip,
     },
@@ -128,6 +129,7 @@ struct Showcase {
     accordion: Entity<AccordionState>,
     toggle_group_alignment: Entity<ToggleGroup<Alignment>>,
     toggle_group_text_style: Entity<ToggleGroup<TextStyle>>,
+    tabs_example: Entity<Tabs>,
 }
 
 impl Showcase {
@@ -176,7 +178,6 @@ impl Showcase {
             .selected(NotificationPreference::Important)
         });
 
-<<<<<<< HEAD
         let switch_wifi = cx.new(|_cx| switch("wifi-switch", true).label("Wi-Fi"));
         let switch_bluetooth = cx.new(|_cx| switch("bluetooth-switch", false).label("Bluetooth"));
         let switch_airplane = cx.new(|_cx| switch("airplane-switch", false).label("Airplane Mode").disabled(true));
@@ -265,6 +266,14 @@ impl Showcase {
             .selected(vec![TextStyle::Bold])
         });
 
+        let tabs_example = cx.new(|_cx| {
+            tabs("example-tabs")
+                .tab(tab("home", "Home"))
+                .tab(tab("profile", "Profile"))
+                .tab(tab("settings", "Settings"))
+                .tab(tab("disabled", "Disabled").disabled(true))
+        });
+
         Self {
             focus_handle: cx.focus_handle(),
             click_count: 0,
@@ -283,6 +292,7 @@ impl Showcase {
             accordion,
             toggle_group_alignment,
             toggle_group_text_style,
+            tabs_example,
         }
     }
 }
@@ -863,6 +873,18 @@ impl Render for Showcase {
                                             .child(self.toggle_group_text_style.clone()),
                                     ),
                             ),
+                    )
+                    .child(
+                        v_stack()
+                            .gap_4()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Tabs"),
+                            )
+                            .child(self.tabs_example.clone()),
                     )
                     .child(separator())
                     .child(

@@ -1,6 +1,8 @@
 //! Radio group component for gpuikit
 
 use crate::theme::{ActiveTheme, Themeable};
+use crate::traits::disableable::Disableable;
+use crate::traits::orientable::{Orientable, Orientation};
 use gpui::{
     div, prelude::*, rems, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
     MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
@@ -43,13 +45,6 @@ pub struct RadioGroup<T: Clone + PartialEq + 'static> {
     orientation: Orientation,
 }
 
-#[derive(Clone, Copy, Default, PartialEq)]
-pub enum Orientation {
-    #[default]
-    Vertical,
-    Horizontal,
-}
-
 impl<T: Clone + PartialEq + 'static> EventEmitter<RadioGroupChanged<T>> for RadioGroup<T> {}
 
 impl<T: Clone + PartialEq + 'static> RadioGroup<T> {
@@ -75,21 +70,6 @@ impl<T: Clone + PartialEq + 'static> RadioGroup<T> {
 
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
-        self
-    }
-
-    pub fn orientation(mut self, orientation: Orientation) -> Self {
-        self.orientation = orientation;
-        self
-    }
-
-    pub fn horizontal(mut self) -> Self {
-        self.orientation = Orientation::Horizontal;
-        self
-    }
-
-    pub fn vertical(mut self) -> Self {
-        self.orientation = Orientation::Vertical;
         self
     }
 
@@ -223,4 +203,33 @@ pub fn radio_group<T: Clone + PartialEq + 'static>(
 /// Convenience function to create a radio option
 pub fn radio_option<T: Clone>(value: T, label: impl Into<SharedString>) -> RadioOption<T> {
     RadioOption::new(value, label)
+}
+
+impl<T: Clone + PartialEq + 'static> Disableable for RadioGroup<T> {
+    fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+}
+
+impl<T: Clone> Disableable for RadioOption<T> {
+    fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+}
+
+impl<T: Clone + PartialEq + 'static> Orientable for RadioGroup<T> {
+    fn orientation(mut self, orientation: Orientation) -> Self {
+        self.orientation = orientation;
+        self
+    }
 }

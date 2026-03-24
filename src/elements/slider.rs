@@ -2,6 +2,8 @@
 
 use crate::layout::{h_stack, v_stack};
 use crate::theme::{ActiveTheme, Themeable};
+use crate::traits::disableable::Disableable;
+use crate::traits::labelable::Labelable;
 use crate::utils::element_manager::ElementManagerExt;
 use gpui::{
     canvas, div, prelude::*, px, rems, App, Bounds, Context, ElementId, EventEmitter, IntoElement,
@@ -273,4 +275,22 @@ pub fn slider(id: impl Into<ElementId>, value: f32, range: RangeInclusive<f32>) 
 /// Convenience function to create a slider with auto-generated ID
 pub fn slider_auto(cx: &App, value: f32, range: RangeInclusive<f32>) -> Slider {
     Slider::new(cx.next_id_named("slider"), value, range)
+}
+
+impl Disableable for Slider {
+    fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+}
+
+impl Labelable for Slider {
+    fn label(mut self, label: impl Into<SharedString>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
 }

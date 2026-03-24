@@ -1,0 +1,174 @@
+# Release Workflow
+# Triggered manually via workflow_dispatch to create a new release
+# Bumps versions, creates tags, and triggers the deploy workflow
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+      custom_version:
+        description: 'Custom version (overrides version_type if set, e.g., 1.2.3)'
+        required: false
+        type: string
+      dry_run:
+        description: 'Dry run (skip actual release)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      tag: ${{ steps.bump.outputs.tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-edit
+        run: cargo install cargo-edit --features vendored-openssl
+
+      - name: Get current version
+        id: current
+        run: |
+          CURRENT_VERSION=$(cargo pkgid | sed 's/.*@//')
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+
+      - name: Calculate new version
+        id: bump
+        run: |
+          CURRENT="${{ steps.current.outputs.version }}"
+
+          if [ -n "${{ inputs.custom_version }}" ]; then
+            # Use custom version if provided
+            NEW_VERSION="${{ inputs.custom_version }}"
+            # Validate semver format
+            if ! echo "$NEW_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+              echo "Error: Invalid version format. Expected semver (e.g., 1.2.3 or 1.2.3-beta.1)"
+              exit 1
+            fi
+          else
+            # Calculate version based on bump type
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+            # Strip any pre-release suffix from PATCH
+            PATCH=$(echo "$PATCH" | sed 's/-.*//')
+
+            case "${{ inputs.version_type }}" in
+              major)
+                NEW_VERSION="$((MAJOR + 1)).0.0"
+                ;;
+              minor)
+                NEW_VERSION="${MAJOR}.$((MINOR + 1)).0"
+                ;;
+              patch)
+                NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+                ;;
+            esac
+          fi
+
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      - name: Update Cargo.toml version
+        if: ${{ !inputs.dry_run }}
+        run: |
+          cargo set-version ${{ steps.bump.outputs.version }}
+          echo "Updated Cargo.toml to version ${{ steps.bump.outputs.version }}"
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          TAG="${{ steps.bump.outputs.tag }}"
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          echo "Generating release notes..."
+
+          if [ -z "$PREV_TAG" ]; then
+            # First release - get all commits
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            # Get commits since last tag
+            COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          # Create release notes file
+          cat > RELEASE_NOTES.md << EOF
+          ## What's Changed
+
+          ${COMMITS:-No changes recorded}
+
+          **Full Changelog**: ${PREV_TAG:+https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG}}${PREV_TAG:-First release}
+          EOF
+
+          echo "Release notes generated"
+          cat RELEASE_NOTES.md
+
+      - name: Commit version bump
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git add Cargo.toml
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.version }}"
+
+      - name: Create and push tag
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git tag -a "${{ steps.bump.outputs.tag }}" -m "Release ${{ steps.bump.outputs.version }}"
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin "${{ steps.bump.outputs.tag }}"
+
+      - name: Upload release notes artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: RELEASE_NOTES.md
+          retention-days: 1
+
+      - name: Summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous Version**: ${{ steps.current.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **New Version**: ${{ steps.bump.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${{ steps.bump.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dry Run**: ${{ inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+
+  deploy:
+    name: Deploy Release
+    needs: release
+    if: ${{ !inputs.dry_run }}
+    uses: ./.github/workflows/release-deploy.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+      tag: ${{ needs.release.outputs.tag }}
+    secrets: inherit

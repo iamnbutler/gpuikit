@@ -20,6 +20,7 @@ use gpuikit::{
         checkbox::{checkbox, Checkbox},
         collapsible::{collapsible, Collapsible},
         dropdown::{dropdown, DropdownState},
+        field::{field, LabelPosition},
         icon_button::icon_button,
         kbd::{kbd, kbd_combo, KbdSize},
         loading_indicator::loading_indicator,
@@ -32,6 +33,7 @@ use gpuikit::{
         tooltip::tooltip,
     },
     layout::{h_stack, v_stack},
+    traits::labelable::Labelable,
     traits::orientable::Orientable,
     DefaultIcons,
 };
@@ -841,6 +843,7 @@ impl Render for Showcase {
                                     .text_lg()
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .text_color(theme.fg_muted())
+<<<<<<< HEAD
                                     .child("ToggleGroup"),
                             )
                             .child(
@@ -885,6 +888,71 @@ impl Render for Showcase {
                                     .child("Tabs"),
                             )
                             .child(self.tabs_example.clone()),
+                    )
+                    .child(
+                        v_stack()
+                            .gap_4()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Field"),
+                            )
+                            .child(
+                                v_stack()
+                                    .gap_4()
+                                    .child(
+                                        field()
+                                            .label("Username")
+                                            .description("Enter your preferred username")
+                                            .required(true)
+                                            .child(
+                                                div()
+                                                    .px_2()
+                                                    .py_1()
+                                                    .border_1()
+                                                    .border_color(theme.border())
+                                                    .rounded(gpui::px(4.0))
+                                                    .text_sm()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("(input placeholder)"),
+                                            ),
+                                    )
+                                    .child(
+                                        field()
+                                            .label("Email")
+                                            .error("Please enter a valid email address")
+                                            .child(
+                                                div()
+                                                    .px_2()
+                                                    .py_1()
+                                                    .border_1()
+                                                    .border_color(theme.danger())
+                                                    .rounded(gpui::px(4.0))
+                                                    .text_sm()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("invalid@"),
+                                            ),
+                                    )
+                                    .child(
+                                        field()
+                                            .label("Department")
+                                            .label_position(LabelPosition::Beside)
+                                            .description("Select your department")
+                                            .child(
+                                                div()
+                                                    .px_2()
+                                                    .py_1()
+                                                    .border_1()
+                                                    .border_color(theme.border())
+                                                    .rounded(gpui::px(4.0))
+                                                    .text_sm()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("(horizontal layout)"),
+                                            ),
+                                    ),
+                            ),
                     )
                     .child(separator())
                     .child(

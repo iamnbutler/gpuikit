@@ -81,7 +81,7 @@ impl DropdownMenu {
     ) -> Entity<Self> {
         cx.new(|cx| {
             let focus_handle = cx.focus_handle();
-            window.focus(&focus_handle);
+            window.focus(&focus_handle, cx);
             Self {
                 options,
                 selected_index,

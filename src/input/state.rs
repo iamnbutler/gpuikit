@@ -1,4 +1,5 @@
 use std::ops::Range;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use gpui::{
@@ -145,7 +146,7 @@ pub struct InputLineLayout {
     /// The byte range in the content string that this line covers.
     pub text_range: Range<usize>,
     /// The shaped and wrapped text for this line, if available.
-    pub wrapped_line: Option<WrappedLine>,
+    pub wrapped_line: Option<Arc<WrappedLine>>,
     /// The vertical offset from the top of the text area in pixels.
     pub y_offset: Pixels,
     /// The number of visual lines this logical line spans (due to wrapping).
@@ -866,7 +867,7 @@ impl InputState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        window.focus(&self.focus_handle);
+        window.focus(&self.focus_handle, cx);
         self.is_selecting = true;
 
         let is_same_position = self
@@ -1266,7 +1267,7 @@ impl InputState {
 
                     self.line_layouts.push(InputLineLayout {
                         text_range: current_pos..line_end,
-                        wrapped_line: Some(wrapped),
+                        wrapped_line: Some(Arc::new(wrapped)),
                         y_offset,
                         visual_line_count,
                         direction,

@@ -4,6 +4,7 @@ use gpui::{
     InteractiveElement, IntoElement, Menu, ParentElement, Render, StatefulInteractiveElement,
     Styled, TitlebarOptions, Window, WindowBounds, WindowOptions,
 };
+use gpui_platform;
 use gpuikit::markdown::{Markdown, MarkdownElement};
 use gpuikit::theme::{ActiveTheme, Themeable};
 use gpuikit::{
@@ -622,7 +623,7 @@ impl Render for Showcase {
 }
 
 fn main() {
-    Application::new()
+    Application::with_platform(gpui_platform::current_platform(false))
         .with_assets(gpuikit::assets())
         .run(|cx: &mut App| {
             gpuikit::init(cx);
@@ -630,6 +631,7 @@ fn main() {
             cx.set_menus(vec![Menu {
                 name: "GPUIKit Showcase".into(),
                 items: vec![],
+                disabled: false,
             }]);
 
             let window = cx
@@ -651,7 +653,7 @@ fn main() {
 
             window
                 .update(cx, |showcase, window, cx| {
-                    window.focus(&showcase.focus_handle);
+                    window.focus(&showcase.focus_handle, cx);
                     cx.activate(true);
                 })
                 .unwrap();

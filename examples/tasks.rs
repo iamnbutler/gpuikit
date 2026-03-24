@@ -6,6 +6,7 @@ use gpui::{
     IntoElement, MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement,
     Styled, TitlebarOptions, Window, WindowBounds, WindowOptions,
 };
+use gpui_platform;
 use gpuikit::{
     elements::{
         badge::{badge, BadgeVariant},
@@ -677,7 +678,7 @@ fn pagination_button(
 }
 
 fn main() {
-    Application::new().run(|cx: &mut App| {
+    Application::with_platform(gpui_platform::current_platform(false)).run(|cx: &mut App| {
         gpuikit::init(cx);
         let bounds = Bounds::centered(None, size(px(900.), px(600.)), cx);
         cx.open_window(

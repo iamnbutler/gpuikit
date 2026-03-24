@@ -16,7 +16,7 @@ pub fn alert(message: impl Into<SharedString>) -> Alert {
 }
 
 /// Alert variant determining severity/styling
-#[derive(Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum AlertVariant {
     /// Neutral informational (default styling)
     #[default]

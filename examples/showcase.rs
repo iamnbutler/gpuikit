@@ -31,6 +31,7 @@ use gpuikit::{
         separator::{separator, vertical_separator},
         switch::{switch, Switch},
         tabs::{tab, tabs, Tabs},
+        toast::{toast_container, ToastExt},
         toggle_group::{toggle_group, toggle_option, ToggleGroup, ToggleGroupMode},
         tooltip::tooltip,
     },
@@ -315,12 +316,16 @@ impl Render for Showcase {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
 
-        h_stack()
-            .bg(theme.bg())
-            .text_color(theme.fg())
+        div()
             .size_full()
-            .overflow_hidden()
+            .relative()
             .child(
+                h_stack()
+                    .bg(theme.bg())
+                    .text_color(theme.fg())
+                    .size_full()
+                    .overflow_hidden()
+                    .child(
                 v_stack()
                     .id("left-panel")
                     .gap_4()
@@ -778,6 +783,97 @@ impl Render for Showcase {
                                     .text_lg()
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .text_color(theme.fg_muted())
+                                    .child("Toast"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_2()
+                                    .child(
+                                        button("toast-default", "Default").on_click(
+                                            cx.listener(|_showcase, _event, _window, cx| {
+                                                cx.toast("This is a default toast notification").show();
+                                            }),
+                                        ),
+                                    )
+                                    .child(
+                                        button("toast-info", "Info").on_click(
+                                            cx.listener(|_showcase, _event, _window, cx| {
+                                                cx.toast("Your session will expire in 5 minutes")
+                                                    .info()
+                                                    .title("Session Notice")
+                                                    .show();
+                                            }),
+                                        ),
+                                    )
+                                    .child(
+                                        button("toast-success", "Success").on_click(
+                                            cx.listener(|_showcase, _event, _window, cx| {
+                                                cx.toast("Your changes have been saved successfully")
+                                                    .success()
+                                                    .title("Saved!")
+                                                    .show();
+                                            }),
+                                        ),
+                                    )
+                                    .child(
+                                        button("toast-warning", "Warning").on_click(
+                                            cx.listener(|_showcase, _event, _window, cx| {
+                                                cx.toast("This action cannot be undone")
+                                                    .warning()
+                                                    .title("Warning")
+                                                    .show();
+                                            }),
+                                        ),
+                                    )
+                                    .child(
+                                        button("toast-error", "Error").on_click(
+                                            cx.listener(|_showcase, _event, _window, cx| {
+                                                cx.toast("Failed to connect to server")
+                                                    .error()
+                                                    .title("Connection Error")
+                                                    .show();
+                                            }),
+                                        ),
+                                    ),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_2()
+                                    .mt_2()
+                                    .child(
+                                        button("toast-action", "With Action").on_click(
+                                            cx.listener(|_showcase, _event, _window, cx| {
+                                                cx.toast("File deleted")
+                                                    .title("Deleted")
+                                                    .action("Undo", |_window, _cx| {
+                                                        // Undo action would go here
+                                                    })
+                                                    .show();
+                                            }),
+                                        ),
+                                    )
+                                    .child(
+                                        button("toast-persistent", "Persistent").on_click(
+                                            cx.listener(|_showcase, _event, _window, cx| {
+                                                cx.toast("This toast will not auto-dismiss")
+                                                    .info()
+                                                    .title("Persistent Toast")
+                                                    .persistent()
+                                                    .show();
+                                            }),
+                                        ),
+                                    ),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
                                     .child("Tooltip"),
                             )
                             .child(
@@ -1106,7 +1202,9 @@ impl Render for Showcase {
                     .min_h_full()
                     .flex_1()
                     .child(MarkdownElement::new(self.markdown.clone())),
+            ),
             )
+            .child(toast_container(cx))
     }
 }
 

@@ -9,6 +9,7 @@ use gpuikit::markdown::{Markdown, MarkdownElement};
 use gpuikit::theme::{ActiveTheme, Themeable};
 use gpuikit::{
     elements::{
+        alert::alert,
         avatar::avatar,
         badge::badge,
         breadcrumb::{breadcrumb, breadcrumb_item, BreadcrumbSeparator},
@@ -547,6 +548,34 @@ impl Render for Showcase {
                                             .gap_2()
                                             .child(button("card-save", "Save"))
                                             .child(button("card-cancel", "Cancel").disabled(true)),
+                                    ),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Alert"),
+                            )
+                            .child(
+                                v_stack()
+                                    .gap_2()
+                                    .child(alert("This is a default alert message."))
+                                    .child(alert("Informational: Your session will expire in 5 minutes.").info())
+                                    .child(alert("Success! Your changes have been saved.").success())
+                                    .child(alert("Warning: This action cannot be undone.").warning())
+                                    .child(alert("Error: Failed to connect to server.").destructive())
+                                    .child(
+                                        alert("New feature available!")
+                                            .info()
+                                            .title("Heads up!")
+                                            .id("dismissible-alert")
+                                            .dismissible(true),
                                     ),
                             ),
                     )

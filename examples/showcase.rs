@@ -19,6 +19,7 @@ use gpuikit::{
         icon_button::icon_button,
         kbd::{kbd, kbd_combo, KbdSize},
         loading_indicator::loading_indicator,
+        skeleton::skeleton,
         progress::{progress, ProgressVariant},
         radio_group::{radio_group, radio_option, RadioGroup},
         separator::{separator, vertical_separator},
@@ -505,6 +506,61 @@ impl Render for Showcase {
                                     .child(loading_indicator().triangle())
                                     .child(loading_indicator().braille())
                                     .child(loading_indicator().braille_extended()),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Skeleton"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_4()
+                                    .items_start()
+                                    .child(
+                                        v_stack()
+                                            .gap_2()
+                                            .child(
+                                                div()
+                                                    .text_sm()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("Rectangle"),
+                                            )
+                                            .child(skeleton().width(px(200.0)).height(px(20.0))),
+                                    )
+                                    .child(
+                                        v_stack()
+                                            .gap_2()
+                                            .child(
+                                                div()
+                                                    .text_sm()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("Circle"),
+                                            )
+                                            .child(skeleton().circle().size(px(48.0))),
+                                    )
+                                    .child(
+                                        v_stack()
+                                            .gap_2()
+                                            .child(
+                                                div()
+                                                    .text_sm()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("Text lines"),
+                                            )
+                                            .child(
+                                                skeleton()
+                                                    .text()
+                                                    .width(px(200.0))
+                                                    .lines(3),
+                                            ),
+                                    ),
                             ),
                     )
                     .child(separator())

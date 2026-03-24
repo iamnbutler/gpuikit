@@ -2,6 +2,9 @@
 
 use crate::layout::h_stack;
 use crate::theme::{ActiveTheme, Themeable};
+use crate::traits::disableable::Disableable;
+use crate::traits::labelable::Labelable;
+use crate::traits::selectable::Selectable;
 use crate::utils::element_manager::ElementManagerExt;
 use gpui::{
     div, prelude::*, rems, App, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
@@ -167,4 +170,33 @@ pub fn toggle(id: impl Into<ElementId>, enabled: bool) -> Toggle {
 /// Convenience function to create a toggle with auto-generated ID
 pub fn toggle_auto(cx: &App, enabled: bool) -> Toggle {
     Toggle::new(cx.next_id_named("toggle"), enabled)
+}
+
+impl Disableable for Toggle {
+    fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+}
+
+impl Selectable for Toggle {
+    fn is_selected(&self) -> bool {
+        self.enabled
+    }
+
+    fn selected(mut self, selected: bool) -> Self {
+        self.enabled = selected;
+        self
+    }
+}
+
+impl Labelable for Toggle {
+    fn label(mut self, label: impl Into<SharedString>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
 }

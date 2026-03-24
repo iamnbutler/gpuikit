@@ -22,6 +22,7 @@ pub mod loading_indicator;
 pub mod progress;
 pub mod radio_group;
 pub mod select;
+pub mod scroll_area;
 pub mod separator;
 pub mod skeleton;
 pub mod slider;

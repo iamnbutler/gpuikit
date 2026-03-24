@@ -32,6 +32,7 @@ use gpuikit::{
         loading_indicator::loading_indicator,
         progress::{progress, ProgressVariant},
         radio_group::{radio_group, radio_option, RadioGroup},
+        scroll_area::scroll_area,
         skeleton::{skeleton, skeleton_avatar, skeleton_card, skeleton_text},
         separator::{separator, vertical_separator},
         switch::{switch, Switch},
@@ -1326,6 +1327,86 @@ impl Render for Showcase {
                                                     .right_addon(InputAddon::button(
                                                         button("go-btn", "Go"),
                                                     )),
+                                            ),
+                                    ),
+                            ),
+                    )
+                    // ScrollArea
+                    .child(
+                        v_stack()
+                            .gap_4()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("ScrollArea"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_4()
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_col()
+                                            .gap_1()
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("Vertical scroll:"),
+                                            )
+                                            .child(
+                                                scroll_area("vertical-scroll-demo")
+                                                    .max_h(px(120.))
+                                                    .vertical()
+                                                    .child(
+                                                        v_stack()
+                                                            .gap_2()
+                                                            .p_2()
+                                                            .bg(theme.surface())
+                                                            .border_1()
+                                                            .border_color(theme.border())
+                                                            .rounded_sm()
+                                                            .children((1..=15).map(|i| {
+                                                                div().text_xs().child(format!("Item {}", i))
+                                                            })),
+                                                    ),
+                                            ),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_col()
+                                            .gap_1()
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("Horizontal scroll:"),
+                                            )
+                                            .child(
+                                                scroll_area("horizontal-scroll-demo")
+                                                    .max_w(px(150.))
+                                                    .horizontal()
+                                                    .child(
+                                                        h_stack()
+                                                            .gap_2()
+                                                            .p_2()
+                                                            .bg(theme.surface())
+                                                            .border_1()
+                                                            .border_color(theme.border())
+                                                            .rounded_sm()
+                                                            .children((1..=10).map(|i| {
+                                                                div()
+                                                                    .px_3()
+                                                                    .py_1()
+                                                                    .bg(theme.accent_bg())
+                                                                    .rounded_sm()
+                                                                    .text_xs()
+                                                                    .child(format!("Tag {}", i))
+                                                            })),
+                                                    ),
                                             ),
                                     ),
                             ),

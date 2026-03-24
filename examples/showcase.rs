@@ -5,6 +5,7 @@ use gpui::{
     Styled, TitlebarOptions, Window, WindowBounds, WindowOptions,
 };
 use gpui_platform;
+use gpuikit::input::InputState;
 use gpuikit::markdown::{Markdown, MarkdownElement};
 use gpuikit::theme::{ActiveTheme, Themeable};
 use gpuikit::{
@@ -22,7 +23,6 @@ use gpuikit::{
         dropdown::{dropdown, DropdownState},
         field::{field, LabelPosition},
         icon_button::icon_button,
-        input::InputState,
         input_group::{input_group, InputAddon},
         kbd::{kbd, kbd_combo, KbdSize},
         loading_indicator::loading_indicator,
@@ -855,7 +855,6 @@ impl Render for Showcase {
                                     .text_lg()
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .text_color(theme.fg_muted())
-<<<<<<< HEAD
                                     .child("ToggleGroup"),
                             )
                             .child(

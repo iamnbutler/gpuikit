@@ -276,7 +276,13 @@ impl RenderOnce for Alert {
             )
             // Dismiss button
             .when(self.dismissible && id.is_some(), |alert| {
+                // Capture the dismiss state entity during render so the click handler can use it
                 let dismiss_id = id.clone().unwrap();
+                let dismiss_state: Entity<DismissState> = window.use_keyed_state(
+                    dismiss_id,
+                    cx,
+                    |_window, _cx: &mut Context<DismissState>| DismissState { dismissed: false },
+                );
                 alert.child(
                     div()
                         .id("alert-dismiss")
@@ -291,15 +297,7 @@ impl RenderOnce for Alert {
                         .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
                         .on_click(move |event, window, cx| {
                             cx.stop_propagation();
-                            // Update dismiss state
-                            let state: Entity<DismissState> = window.use_keyed_state(
-                                dismiss_id.clone(),
-                                cx,
-                                |_window, _cx: &mut Context<DismissState>| DismissState {
-                                    dismissed: false,
-                                },
-                            );
-                            state.update(cx, |s, _| {
+                            dismiss_state.update(cx, |s, _| {
                                 s.dismissed = true;
                             });
                             // Call dismiss handler

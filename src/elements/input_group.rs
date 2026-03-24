@@ -118,6 +118,7 @@ impl RenderOnce for InputGroup {
 
         h_stack()
             .items_center()
+            .h(px(36.))
             .rounded(rems(0.25))
             .border_1()
             .border_color(theme.input_border())
@@ -134,6 +135,7 @@ impl RenderOnce for InputGroup {
                     .border_0()
                     .bg(gpui::transparent_black())
                     .flex_1()
+                    .size_full()
                     .min_w(px(100.))
                     .when(has_left, |el| el.rounded_l_none())
                     .when(has_right, |el| el.rounded_r_none()),

@@ -76,4 +76,5 @@ pub fn assets() -> resource::ResourceSource<Assets> {
 pub fn init(cx: &mut App) {
     theme::init(cx);
     utils::element_manager::init(cx);
+    input::bind_input_keys(cx, None);
 }

@@ -32,6 +32,7 @@ use gpuikit::{
         loading_indicator::loading_indicator,
         progress::{progress, ProgressVariant},
         radio_group::{radio_group, radio_option, RadioGroup},
+        skeleton::{skeleton, skeleton_avatar, skeleton_card, skeleton_text},
         separator::{separator, vertical_separator},
         switch::{switch, Switch},
         tabs::{tab, tabs, Tabs},
@@ -826,6 +827,39 @@ impl Render for Showcase {
                                     .child(progress(0.75))
                                     .child(progress(1.0).variant(ProgressVariant::Danger)),
                             ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Skeleton"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_4()
+                                    .items_center()
+                                    .child(skeleton_avatar())
+                                    .child(
+                                        v_stack()
+                                            .gap_2()
+                                            .child(skeleton_text().w(px(150.0)))
+                                            .child(skeleton_text().w(px(100.0))),
+                                    ),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_4()
+                                    .mt_2()
+                                    .child(skeleton().w(px(80.0)).h(px(32.0)))
+                                    .child(skeleton().w(px(120.0)).h(px(32.0)))
+                                    .child(skeleton().w(px(60.0)).h(px(32.0)).circle()),
+                            )
+                            .child(div().mt_2().child(skeleton_card())),
                     )
                     .child(separator())
                     .child(

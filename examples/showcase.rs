@@ -22,6 +22,8 @@ use gpuikit::{
         dropdown::{dropdown, DropdownState},
         field::{field, LabelPosition},
         icon_button::icon_button,
+        input::InputState,
+        input_group::{input_group, InputAddon},
         kbd::{kbd, kbd_combo, KbdSize},
         loading_indicator::loading_indicator,
         progress::{progress, ProgressVariant},
@@ -132,6 +134,9 @@ struct Showcase {
     toggle_group_alignment: Entity<ToggleGroup<Alignment>>,
     toggle_group_text_style: Entity<ToggleGroup<TextStyle>>,
     tabs_example: Entity<Tabs>,
+    input_with_icon: Entity<InputState>,
+    input_with_text: Entity<InputState>,
+    input_with_button: Entity<InputState>,
 }
 
 impl Showcase {
@@ -276,6 +281,10 @@ impl Showcase {
                 .tab(tab("disabled", "Disabled").disabled(true))
         });
 
+        let input_with_icon = cx.new(|cx| InputState::new_singleline(cx));
+        let input_with_text = cx.new(|cx| InputState::new_singleline(cx));
+        let input_with_button = cx.new(|cx| InputState::new_singleline(cx));
+
         Self {
             focus_handle: cx.focus_handle(),
             click_count: 0,
@@ -295,6 +304,9 @@ impl Showcase {
             toggle_group_alignment,
             toggle_group_text_style,
             tabs_example,
+            input_with_icon,
+            input_with_text,
+            input_with_button,
         }
     }
 }
@@ -1019,6 +1031,70 @@ impl Render for Showcase {
                                     .child("Accordion"),
                             )
                             .child(self.accordion.clone()),
+                    )
+                    .child(
+                        v_stack()
+                            .gap_4()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("InputGroup"),
+                            )
+                            .child(
+                                v_stack()
+                                    .gap_3()
+                                    .child(
+                                        h_stack()
+                                            .gap_2()
+                                            .items_center()
+                                            .child(
+                                                div()
+                                                    .text_sm()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("With icon:"),
+                                            )
+                                            .child(
+                                                input_group(&self.input_with_icon, cx)
+                                                    .left_addon(InputAddon::icon(
+                                                        DefaultIcons::magnifying_glass(),
+                                                    )),
+                                            ),
+                                    )
+                                    .child(
+                                        h_stack()
+                                            .gap_2()
+                                            .items_center()
+                                            .child(
+                                                div()
+                                                    .text_sm()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("With text:"),
+                                            )
+                                            .child(
+                                                input_group(&self.input_with_text, cx)
+                                                    .left_addon(InputAddon::text("https://")),
+                                            ),
+                                    )
+                                    .child(
+                                        h_stack()
+                                            .gap_2()
+                                            .items_center()
+                                            .child(
+                                                div()
+                                                    .text_sm()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("With button:"),
+                                            )
+                                            .child(
+                                                input_group(&self.input_with_button, cx)
+                                                    .right_addon(InputAddon::button(
+                                                        button("go-btn", "Go"),
+                                                    )),
+                                            ),
+                                    ),
+                            ),
                     ),
             )
             .child(vertical_separator())

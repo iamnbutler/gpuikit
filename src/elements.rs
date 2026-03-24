@@ -14,3 +14,4 @@ pub mod separator;
 pub mod slider;
 pub mod toggle;
 pub mod tooltip;
+pub mod typography;

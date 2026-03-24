@@ -35,6 +35,7 @@ use gpuikit::{
         tooltip::tooltip,
     },
     layout::{h_stack, v_stack},
+    traits::disableable::Disableable,
     traits::labelable::Labelable,
     traits::orientable::Orientable,
     DefaultIcons,

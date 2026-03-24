@@ -36,12 +36,6 @@ impl Tab {
             disabled: false,
         }
     }
-
-    /// Set whether this tab is disabled
-    pub fn disabled(mut self, disabled: bool) -> Self {
-        self.disabled = disabled;
-        self
-    }
 }
 
 impl Disableable for Tab {

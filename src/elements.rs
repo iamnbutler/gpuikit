@@ -9,6 +9,7 @@ pub mod button_group;
 pub mod card;
 pub mod checkbox;
 pub mod collapsible;
+pub mod dialog;
 pub mod dropdown;
 pub mod empty;
 pub mod field;

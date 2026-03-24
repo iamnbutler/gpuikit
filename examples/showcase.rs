@@ -26,6 +26,7 @@ use gpuikit::{
         icon_button::icon_button,
         input_group::{input_group, InputAddon},
         kbd::{kbd, kbd_combo, KbdSize},
+        textarea::textarea,
         loading_indicator::loading_indicator,
         progress::{progress, ProgressVariant},
         radio_group::{radio_group, radio_option, RadioGroup},
@@ -36,6 +37,7 @@ use gpuikit::{
         tooltip::tooltip,
     },
     layout::{h_stack, v_stack},
+    traits::disableable::Disableable,
     traits::labelable::Labelable,
     traits::orientable::Orientable,
     DefaultIcons,
@@ -148,6 +150,7 @@ struct Showcase {
     input_with_icon: Entity<InputState>,
     input_with_text: Entity<InputState>,
     input_with_button: Entity<InputState>,
+    textarea_example: Entity<InputState>,
 }
 
 impl Showcase {
@@ -311,6 +314,7 @@ impl Showcase {
         let input_with_icon = cx.new(|cx| InputState::new_singleline(cx));
         let input_with_text = cx.new(|cx| InputState::new_singleline(cx));
         let input_with_button = cx.new(|cx| InputState::new_singleline(cx));
+        let textarea_example = cx.new(|cx| InputState::new_multiline(cx));
 
         Self {
             focus_handle: cx.focus_handle(),
@@ -335,6 +339,7 @@ impl Showcase {
             input_with_icon,
             input_with_text,
             input_with_button,
+            textarea_example,
         }
     }
 }
@@ -1173,6 +1178,36 @@ impl Render for Showcase {
                                                     .right_addon(InputAddon::button(
                                                         button("go-btn", "Go"),
                                                     )),
+                                            ),
+                                    ),
+                            ),
+                    )
+                    // Textarea
+                    .child(
+                        card()
+                            .title("Textarea")
+                            .description("Multi-line text input for longer content")
+                            .body(
+                                v_stack()
+                                    .gap_4()
+                                    .child(
+                                        field()
+                                            .label("Message")
+                                            .description("Tell us what's on your mind")
+                                            .child(
+                                                textarea(&self.textarea_example, cx)
+                                                    .placeholder("Type your message here...")
+                                                    .rows(4),
+                                            ),
+                                    )
+                                    .child(
+                                        field()
+                                            .label("Disabled")
+                                            .child(
+                                                textarea(&self.textarea_example, cx)
+                                                    .placeholder("This is disabled...")
+                                                    .rows(2)
+                                                    .disabled(true),
                                             ),
                                     ),
                             ),

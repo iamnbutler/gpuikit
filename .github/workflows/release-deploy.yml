@@ -1,0 +1,191 @@
+# Release Deploy Workflow
+# Triggered by the release workflow or tag pushes
+# Publishes crates to crates.io and creates GitHub releases
+
+name: Deploy Release
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to deploy'
+        required: true
+        type: string
+      tag:
+        description: 'Git tag for the release'
+        required: true
+        type: string
+
+  # Allow manual trigger for recovery scenarios
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., 0.3.0)'
+        required: true
+        type: string
+      tag:
+        description: 'Git tag for the release (e.g., v0.3.0)'
+        required: true
+        type: string
+      skip_publish:
+        description: 'Skip crates.io publish (for GitHub release only)'
+        required: false
+        type: boolean
+        default: false
+
+  # Trigger on tag push for automated deployments
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+jobs:
+  prepare:
+    name: Prepare Release Info
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.info.outputs.version }}
+      tag: ${{ steps.info.outputs.tag }}
+    steps:
+      - name: Determine version and tag
+        id: info
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # Extract from pushed tag
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#v}"
+          else
+            # Use workflow inputs
+            TAG="${{ inputs.tag }}"
+            VERSION="${{ inputs.version }}"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION, Tag: $TAG"
+
+  publish:
+    name: Publish to crates.io
+    needs: prepare
+    runs-on: ubuntu-latest
+    # Skip if manually triggered with skip_publish
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.skip_publish }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Verify package version
+        run: |
+          EXPECTED="${{ needs.prepare.outputs.version }}"
+          ACTUAL=$(cargo pkgid | sed 's/.*@//')
+
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "Error: Version mismatch!"
+            echo "Expected: $EXPECTED"
+            echo "Actual: $ACTUAL"
+            exit 1
+          fi
+
+          echo "Version verified: $ACTUAL"
+
+      - name: Run cargo check
+        run: cargo check --all-features
+
+      - name: Dry run publish
+        run: cargo publish --dry-run
+
+      - name: Publish to crates.io
+        run: |
+          echo "Publishing gpuikit v${{ needs.prepare.outputs.version }} to crates.io..."
+          cargo publish
+          echo "Successfully published to crates.io!"
+
+      - name: Wait for crates.io propagation
+        run: |
+          echo "Waiting for crates.io to propagate the package..."
+          sleep 30
+
+  github-release:
+    name: Create GitHub Release
+    needs: [prepare, publish]
+    # Run even if publish was skipped (for workflow_dispatch with skip_publish)
+    if: ${{ always() && needs.prepare.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: .
+        continue-on-error: true
+
+      - name: Generate release notes if not available
+        run: |
+          if [ ! -f RELEASE_NOTES.md ]; then
+            echo "Generating release notes from git log..."
+            TAG="${{ needs.prepare.outputs.tag }}"
+            PREV_TAG=$(git describe --tags --abbrev=0 ${TAG}^ 2>/dev/null || echo "")
+
+            if [ -z "$PREV_TAG" ]; then
+              COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges ${TAG})
+            else
+              COMMITS=$(git log ${PREV_TAG}..${TAG} --pretty=format:"- %s (%h)" --no-merges)
+            fi
+
+            cat > RELEASE_NOTES.md << EOF
+          ## What's Changed
+
+          ${COMMITS:-No changes recorded}
+
+          **Full Changelog**: ${PREV_TAG:+https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG}}${PREV_TAG:-First release}
+          EOF
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: gpuikit ${{ needs.prepare.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ contains(needs.prepare.outputs.version, '-') }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ needs.prepare.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${{ needs.prepare.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **crates.io**: [gpuikit](https://crates.io/crates/gpuikit)" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Release**: [${{ needs.prepare.outputs.tag }}](https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare.outputs.tag }})" >> $GITHUB_STEP_SUMMARY

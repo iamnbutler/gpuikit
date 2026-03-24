@@ -1,6 +1,7 @@
 //! Field component for wrapping form inputs with labels, descriptions, and error states.
 
 use crate::theme::{ActiveTheme, Themeable};
+use crate::traits::disableable::Disableable;
 use crate::traits::labelable::Labelable;
 use gpui::{
     div, prelude::FluentBuilder, rems, AnyElement, App, IntoElement, ParentElement, RenderOnce,
@@ -41,6 +42,7 @@ pub struct Field {
     required: bool,
     label_position: LabelPosition,
     child: Option<AnyElement>,
+    disabled: bool,
 }
 
 impl Field {
@@ -53,6 +55,7 @@ impl Field {
             required: false,
             label_position: LabelPosition::default(),
             child: None,
+            disabled: false,
         }
     }
 
@@ -102,10 +105,30 @@ impl Labelable for Field {
     }
 }
 
+impl Disableable for Field {
+    fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+}
+
 impl RenderOnce for Field {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
         let has_error = self.error.is_some();
+        let disabled = self.disabled;
+
+        let label_color = if disabled {
+            theme.fg_disabled()
+        } else if has_error {
+            theme.danger()
+        } else {
+            theme.fg()
+        };
 
         let label_element = self.label.map(|label_text| {
             div()
@@ -115,14 +138,10 @@ impl RenderOnce for Field {
                     div()
                         .text_sm()
                         .font_weight(gpui::FontWeight::MEDIUM)
-                        .text_color(if has_error {
-                            theme.danger()
-                        } else {
-                            theme.fg()
-                        })
+                        .text_color(label_color)
                         .child(label_text),
                 )
-                .when(self.required, |this| {
+                .when(self.required && !disabled, |this| {
                     this.child(
                         div()
                             .text_sm()
@@ -135,7 +154,11 @@ impl RenderOnce for Field {
         let description_element = self.description.map(|desc| {
             div()
                 .text_xs()
-                .text_color(theme.fg_muted())
+                .text_color(if disabled {
+                    theme.fg_disabled()
+                } else {
+                    theme.fg_muted()
+                })
                 .child(desc)
         });
 
@@ -153,6 +176,7 @@ impl RenderOnce for Field {
                     .flex()
                     .flex_col()
                     .gap(rems(0.375))
+                    .when(disabled, |el| el.cursor_not_allowed())
                     .when_some(label_element, |container, label| {
                         container.child(label)
                     })
@@ -172,6 +196,7 @@ impl RenderOnce for Field {
                     .flex()
                     .flex_col()
                     .gap(rems(0.375))
+                    .when(disabled, |el| el.cursor_not_allowed())
                     .child(
                         div()
                             .flex()

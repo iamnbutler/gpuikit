@@ -1,3 +1,4 @@
+pub mod accordion;
 pub mod alert;
 pub mod aspect_ratio;
 pub mod avatar;

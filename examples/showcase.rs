@@ -9,6 +9,7 @@ use gpuikit::markdown::{Markdown, MarkdownElement};
 use gpuikit::theme::{ActiveTheme, Themeable};
 use gpuikit::{
     elements::{
+        accordion::{accordion, accordion_item, AccordionState},
         alert::alert,
         avatar::avatar,
         badge::badge,
@@ -109,6 +110,7 @@ struct Showcase {
     switch_airplane: Entity<Switch>,
     collapsible_basic: Entity<Collapsible>,
     collapsible_nested: Entity<Collapsible>,
+    accordion: Entity<AccordionState>,
 }
 
 impl Showcase {
@@ -196,6 +198,30 @@ impl Showcase {
                 .default_open(true)
         });
 
+        let accordion = cx.new(|_cx| {
+            AccordionState::new(
+                accordion("showcase-accordion")
+                    .item(
+                        accordion_item("getting-started", "Getting Started")
+                            .content("Welcome to GPUIKit! This library provides a comprehensive set of UI components for building GPUI applications."),
+                    )
+                    .item(
+                        accordion_item("installation", "Installation")
+                            .content("Add gpuikit to your Cargo.toml and call gpuikit::init(cx) in your application."),
+                    )
+                    .item(
+                        accordion_item("theming", "Theming")
+                            .content("GPUIKit supports theming through the theme module. You can customize colors, fonts, and spacing."),
+                    )
+                    .item(
+                        accordion_item("disabled-section", "Disabled Section")
+                            .content("This section is disabled.")
+                            .disabled(true),
+                    )
+                    .default_expanded("getting-started"),
+            )
+        });
+
         Self {
             focus_handle: cx.focus_handle(),
             click_count: 0,
@@ -211,6 +237,7 @@ impl Showcase {
             switch_airplane,
             collapsible_basic,
             collapsible_nested,
+            accordion,
         }
     }
 }
@@ -803,6 +830,18 @@ impl Render for Showcase {
                                     .child(self.collapsible_basic.clone())
                                     .child(self.collapsible_nested.clone()),
                             ),
+                    )
+                    .child(
+                        v_stack()
+                            .gap_4()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Accordion"),
+                            )
+                            .child(self.accordion.clone()),
                     ),
             )
             .child(vertical_separator())

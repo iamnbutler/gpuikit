@@ -9,66 +9,44 @@
 - Card
 - Checkbox
 - Dropdown Menu
+- Empty
+- Icon Button
+- Input
+- Kbd
+- LoadingIndicator
 - Progress
 - Radio Group
 - Separator
 - Slider
-- LoadingIndicator
 - Toggle
 - Tooltip
+- Typography
 
 ## Not Implemented (ranked by ease)
 
 ### Easy
 
-- Label
-- Kbd
-- Typography
-- Skeleton
-- Empty
+- Label (#47)
+- Skeleton (#48)
 
 ### Medium
 
-- Alert
-- Aspect Ratio
-- Button Group
-- Switch
-- Collapsible
-- Accordion
-- Toggle Group
-- Tabs
-- Field
-- Input Group
+- Alert (#49)
+- Aspect Ratio (#50)
+- Button Group (#51)
+- Switch (#52)
+- Collapsible (#53)
+- Accordion (#54)
+- Toggle Group (#55)
+- Tabs (#56)
+- Field (#57)
+- Input Group (#58)
 
-### Hard
+### Out of Scope (Hard)
 
-- Input (needs text editing primitives)
-- Textarea
-- Popover (overlay positioning)
-- Hover Card
-- Dialog
-- Alert Dialog
-- Sheet
-- Drawer
-- Context Menu
-- Menubar
-- Navigation Menu
-- Command
-- Combobox
-- Select
-- Native Select
-- Scroll Area
-- Resizable
-- Sidebar
-- Table
-- Data Table
-- Pagination
-- Toast
-- Sonner
-- Calendar
-- Date Picker
-- Carousel
-- Chart
-- Form
-- Input OTP
-- Item
+See issue #59 for the full list of complex components that require additional infrastructure.
+
+Components include: Textarea, Popover, Hover Card, Dialog, Alert Dialog, Sheet, Drawer,
+Context Menu, Menubar, Navigation Menu, Command, Combobox, Select, Native Select,
+Scroll Area, Resizable, Sidebar, Table, Data Table, Pagination, Toast, Sonner,
+Calendar, Date Picker, Carousel, Chart, Form, Input OTP, Item

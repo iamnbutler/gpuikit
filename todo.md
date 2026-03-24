@@ -2,51 +2,64 @@
 
 ## Implemented
 
+- Accordion
+- Alert
+- Aspect Ratio
 - Avatar
 - Badge
 - Breadcrumb
 - Button
+- Button Group
 - Card
 - Checkbox
+- Collapsible
 - Dropdown Menu
 - Empty
+- Field
 - Icon Button
 - Input
+- Input Group
 - Kbd
-- LoadingIndicator
+- Label
+- Loading Indicator
 - Progress
 - Radio Group
 - Separator
+- Skeleton
 - Slider
+- Switch
+- Tabs
 - Toggle
+- Toggle Group
 - Tooltip
 - Typography
 
-## Not Implemented (ranked by ease)
+## Not Yet Implemented
 
-### Easy
+### Next Up — Overlay Foundation
 
-- Label (#47)
-- Skeleton (#48)
+These share the `anchored()`/`deferred()` pattern already used by Dropdown.
 
-### Medium
+- Popover — general-purpose positioned overlay, building block for many others
+- Dialog — modal overlay with backdrop
+- Select — form selection dropdown (close to existing Dropdown)
+- Context Menu — right-click positioned menu
 
-- Alert (#49)
-- Aspect Ratio (#50)
-- Button Group (#51)
-- Switch (#52)
-- Collapsible (#53)
-- Accordion (#54)
-- Toggle Group (#55)
-- Tabs (#56)
-- Field (#57)
-- Input Group (#58)
+### Next Up — No New Infra Needed
 
-### Out of Scope (Hard)
+- Textarea — styled wrapper around existing `text_area()` element
+- Scroll Area — styled wrapper around gpui overflow scrolling
+- Toast — notification queue system
 
-See issue #59 for the full list of complex components that require additional infrastructure.
+### Future — Data & Complex
 
-Components include: Textarea, Popover, Hover Card, Dialog, Alert Dialog, Sheet, Drawer,
-Context Menu, Menubar, Navigation Menu, Command, Combobox, Select, Native Select,
-Scroll Area, Resizable, Sidebar, Table, Data Table, Pagination, Toast, Sonner,
-Calendar, Date Picker, Carousel, Chart, Form, Input OTP, Item
+- Table — needs grid layout primitives
+- Data Table — Table + sorting/filtering
+- Pagination — pairs with Table
+- Form — state management wrapper around Field
+
+### Deferred
+
+Hover Card, Alert Dialog, Sheet, Drawer, Menubar, Navigation Menu,
+Command, Combobox, Native Select, Resizable, Sidebar, Sonner,
+Calendar, Date Picker, Carousel, Chart, Input OTP

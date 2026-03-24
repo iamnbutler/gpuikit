@@ -18,6 +18,7 @@ use gpuikit::{
         dropdown::{dropdown, DropdownState},
         icon_button::icon_button,
         kbd::{kbd, kbd_combo, KbdSize},
+        label::{label, LabelSize},
         loading_indicator::loading_indicator,
         progress::{progress, ProgressVariant},
         radio_group::{radio_group, radio_option, RadioGroup},
@@ -476,6 +477,41 @@ impl Render for Showcase {
                                     .child(kbd("S").size(KbdSize::Small))
                                     .child(kbd("M"))
                                     .child(kbd("L").size(KbdSize::Large))
+                                    .child(
+                                        div()
+                                            .text_color(theme.fg_muted())
+                                            .child("(small / default / large)"),
+                                    ),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Label"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_4()
+                                    .items_center()
+                                    .child(label("Default"))
+                                    .child(label("Muted").muted())
+                                    .child(label("Accent").accent())
+                                    .child(label("Required").required(true)),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_4()
+                                    .items_center()
+                                    .mt_2()
+                                    .child(label("Small").size(LabelSize::Small))
+                                    .child(label("Default"))
+                                    .child(label("Large").size(LabelSize::Large))
                                     .child(
                                         div()
                                             .text_color(theme.fg_muted())

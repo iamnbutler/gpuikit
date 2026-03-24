@@ -28,6 +28,10 @@ path = "examples/tasks.rs"
 name = "input_sandbox"
 path = "examples/input/sandbox.rs"
 
+[[example]]
+name = "components_sandbox"
+path = "examples/components/sandbox.rs"
+
 [dependencies]
 # GPUI framework (using latest from zed repo)
 gpui = { git = "https://github.com/zed-industries/zed", package = "gpui" }

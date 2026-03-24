@@ -24,6 +24,7 @@ use gpuikit::{
         progress::{progress, ProgressVariant},
         radio_group::{radio_group, radio_option, RadioGroup},
         separator::{separator, vertical_separator},
+        switch::{switch, Switch},
         tooltip::tooltip,
     },
     layout::{h_stack, v_stack},
@@ -102,6 +103,9 @@ struct Showcase {
     checkbox_agree: Entity<Checkbox>,
     checkbox_newsletter: Entity<Checkbox>,
     radio_notifications: Entity<RadioGroup<NotificationPreference>>,
+    switch_wifi: Entity<Switch>,
+    switch_bluetooth: Entity<Switch>,
+    switch_airplane: Entity<Switch>,
 }
 
 impl Showcase {
@@ -150,6 +154,10 @@ impl Showcase {
             .selected(NotificationPreference::Important)
         });
 
+        let switch_wifi = cx.new(|_cx| switch("wifi-switch", true).label("Wi-Fi"));
+        let switch_bluetooth = cx.new(|_cx| switch("bluetooth-switch", false).label("Bluetooth"));
+        let switch_airplane = cx.new(|_cx| switch("airplane-switch", false).label("Airplane Mode").disabled(true));
+
         Self {
             focus_handle: cx.focus_handle(),
             click_count: 0,
@@ -160,6 +168,9 @@ impl Showcase {
             checkbox_agree,
             checkbox_newsletter,
             radio_notifications,
+            switch_wifi,
+            switch_bluetooth,
+            switch_airplane,
         }
     }
 }
@@ -665,6 +676,25 @@ impl Render for Showcase {
                                     .gap_2()
                                     .child(self.checkbox_agree.clone())
                                     .child(self.checkbox_newsletter.clone()),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Switch"),
+                            )
+                            .child(
+                                v_stack()
+                                    .gap_2()
+                                    .child(self.switch_wifi.clone())
+                                    .child(self.switch_bluetooth.clone())
+                                    .child(self.switch_airplane.clone()),
                             ),
                     )
                     .child(separator())

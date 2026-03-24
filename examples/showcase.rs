@@ -17,6 +17,7 @@ use gpuikit::{
         checkbox::{checkbox, Checkbox},
         dropdown::{dropdown, DropdownState},
         icon_button::icon_button,
+        kbd::{kbd, kbd_combo, KbdSize},
         loading_indicator::loading_indicator,
         progress::{progress, ProgressVariant},
         radio_group::{radio_group, radio_option, RadioGroup},
@@ -444,6 +445,42 @@ impl Render for Showcase {
                                     .child(badge("Secondary").secondary())
                                     .child(badge("Outline").outline())
                                     .child(badge("Destructive").destructive()),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Kbd"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_2()
+                                    .items_center()
+                                    .child(kbd("Esc"))
+                                    .child(kbd("Enter"))
+                                    .child(kbd("Tab"))
+                                    .child(kbd_combo(&["Ctrl", "C"]))
+                                    .child(kbd_combo(&["Cmd", "Shift", "P"])),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_2()
+                                    .items_center()
+                                    .mt_2()
+                                    .child(kbd("S").size(KbdSize::Small))
+                                    .child(kbd("M"))
+                                    .child(kbd("L").size(KbdSize::Large))
+                                    .child(
+                                        div()
+                                            .text_color(theme.fg_muted())
+                                            .child("(small / default / large)"),
+                                    ),
                             ),
                     )
                     .child(separator())

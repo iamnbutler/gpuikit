@@ -9,6 +9,7 @@ pub mod empty;
 pub mod icon_button;
 pub mod input;
 pub mod kbd;
+pub mod label;
 pub mod loading_indicator;
 pub mod progress;
 pub mod radio_group;

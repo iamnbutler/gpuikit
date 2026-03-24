@@ -22,6 +22,7 @@ use gpuikit::{
         progress::{progress, ProgressVariant},
         radio_group::{radio_group, radio_option, RadioGroup},
         separator::{separator, vertical_separator},
+        tabs::{tab, Tabs},
         tooltip::tooltip,
     },
     layout::{h_stack, v_stack},
@@ -99,6 +100,7 @@ struct Showcase {
     checkbox_agree: Entity<Checkbox>,
     checkbox_newsletter: Entity<Checkbox>,
     radio_notifications: Entity<RadioGroup<NotificationPreference>>,
+    tabs: Entity<Tabs>,
 }
 
 impl Showcase {
@@ -147,6 +149,45 @@ impl Showcase {
             .selected(NotificationPreference::Important)
         });
 
+        let tabs = cx.new(|_cx| {
+            Tabs::new("showcase-tabs")
+                .tab(tab("overview", "Overview", |_window, cx| {
+                    let theme = cx.theme();
+                    div()
+                        .p_2()
+                        .child("This is the Overview tab content.")
+                        .text_color(theme.fg())
+                        .into_any_element()
+                }))
+                .tab(tab("details", "Details", |_window, cx| {
+                    let theme = cx.theme();
+                    div()
+                        .p_2()
+                        .child("Here are some details about the component.")
+                        .text_color(theme.fg())
+                        .into_any_element()
+                }))
+                .tab(
+                    tab("disabled", "Disabled", |_window, cx| {
+                        let theme = cx.theme();
+                        div()
+                            .p_2()
+                            .child("This tab is disabled.")
+                            .text_color(theme.fg())
+                            .into_any_element()
+                    })
+                    .disabled(true),
+                )
+                .tab(tab("settings", "Settings", |_window, cx| {
+                    let theme = cx.theme();
+                    div()
+                        .p_2()
+                        .child("Settings panel content goes here.")
+                        .text_color(theme.fg())
+                        .into_any_element()
+                }))
+        });
+
         Self {
             focus_handle: cx.focus_handle(),
             click_count: 0,
@@ -157,6 +198,7 @@ impl Showcase {
             checkbox_agree,
             checkbox_newsletter,
             radio_notifications,
+            tabs,
         }
     }
 }
@@ -643,6 +685,19 @@ impl Render for Showcase {
                                             .item(breadcrumb_item("Current")),
                                     ),
                             ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Tabs"),
+                            )
+                            .child(self.tabs.clone()),
                     ),
             )
             .child(vertical_separator())

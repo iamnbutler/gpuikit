@@ -14,6 +14,7 @@ pub mod progress;
 pub mod radio_group;
 pub mod separator;
 pub mod slider;
+pub mod tabs;
 pub mod toggle;
 pub mod tooltip;
 pub mod typography;

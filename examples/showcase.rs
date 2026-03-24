@@ -26,6 +26,7 @@ use gpuikit::{
         icon_button::icon_button,
         input_group::{input_group, InputAddon},
         kbd::{kbd, kbd_combo, KbdSize},
+        label::label,
         textarea::textarea,
         loading_indicator::loading_indicator,
         progress::{progress, ProgressVariant},
@@ -759,6 +760,26 @@ impl Render for Showcase {
                                             .text_color(theme.fg_muted())
                                             .child("(small / default / large)"),
                                     ),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Label"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_4()
+                                    .items_center()
+                                    .child(label("Basic Label"))
+                                    .child(label("Required Field").required(true))
+                                    .child(label("Disabled Label").disabled(true)),
                             ),
                     )
                     .child(separator())

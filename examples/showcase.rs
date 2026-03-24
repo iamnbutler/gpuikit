@@ -9,6 +9,7 @@ use gpuikit::markdown::{Markdown, MarkdownElement};
 use gpuikit::theme::{ActiveTheme, Themeable};
 use gpuikit::{
     elements::{
+        alert::alert,
         avatar::avatar,
         badge::badge,
         breadcrumb::{breadcrumb, breadcrumb_item, BreadcrumbSeparator},
@@ -445,6 +446,50 @@ impl Render for Showcase {
                                     .child(badge("Secondary").secondary())
                                     .child(badge("Outline").outline())
                                     .child(badge("Destructive").destructive()),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Alert"),
+                            )
+                            .child(
+                                v_stack()
+                                    .gap_2()
+                                    .child(
+                                        alert()
+                                            .info()
+                                            .icon(DefaultIcons::info_circled())
+                                            .title("Info")
+                                            .description("This is an informational alert."),
+                                    )
+                                    .child(
+                                        alert()
+                                            .success()
+                                            .icon(DefaultIcons::check_circled())
+                                            .title("Success")
+                                            .description("Your changes have been saved."),
+                                    )
+                                    .child(
+                                        alert()
+                                            .warning()
+                                            .icon(DefaultIcons::exclamation_triangle())
+                                            .title("Warning")
+                                            .description("Please review before proceeding."),
+                                    )
+                                    .child(
+                                        alert()
+                                            .destructive()
+                                            .icon(DefaultIcons::cross_circled())
+                                            .title("Error")
+                                            .description("Something went wrong."),
+                                    ),
                             ),
                     )
                     .child(separator())

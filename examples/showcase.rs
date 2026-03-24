@@ -21,6 +21,7 @@ use gpuikit::{
         card::card,
         checkbox::{checkbox, Checkbox},
         collapsible::{collapsible, Collapsible},
+        context_menu::{context_menu, menu_item, menu_separator, ContextMenuState},
         dropdown::{dropdown, DropdownState},
         select::{select, SelectState},
         field::{field, LabelPosition},
@@ -155,6 +156,7 @@ struct Showcase {
     input_with_text: Entity<InputState>,
     input_with_button: Entity<InputState>,
     textarea_example: Entity<InputState>,
+    context_menu_example: Entity<ContextMenuState>,
 }
 
 impl Showcase {
@@ -320,6 +322,46 @@ impl Showcase {
         let input_with_button = cx.new(|cx| InputState::new_singleline(cx));
         let textarea_example = cx.new(|cx| InputState::new_multiline(cx));
 
+        let context_menu_example = cx.new(|_cx| {
+            ContextMenuState::new(
+                context_menu("example-context-menu")
+                    .trigger(|_window, cx| {
+                        let theme = cx.theme();
+                        div()
+                            .p_8()
+                            .bg(theme.surface_secondary())
+                            .border_1()
+                            .border_color(theme.border())
+                            .rounded_md()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child("Right-click here")
+                            .into_any_element()
+                    })
+                    .menu(|_window, _cx| {
+                        vec![
+                            menu_item("cut", "Cut")
+                                .icon(|| DefaultIcons::scissors())
+                                .kbd("Cmd+X"),
+                            menu_item("copy", "Copy")
+                                .icon(|| DefaultIcons::copy())
+                                .kbd("Cmd+C"),
+                            menu_item("paste", "Paste")
+                                .icon(|| DefaultIcons::clipboard())
+                                .kbd("Cmd+V"),
+                            menu_separator(),
+                            menu_item("select-all", "Select All").kbd("Cmd+A"),
+                            menu_separator(),
+                            menu_item("disabled", "Disabled Item").disabled(true),
+                            menu_item("delete", "Delete")
+                                .icon(|| DefaultIcons::trash())
+                                .destructive(),
+                        ]
+                    }),
+            )
+        });
+
         Self {
             focus_handle: cx.focus_handle(),
             click_count: 0,
@@ -344,6 +386,7 @@ impl Showcase {
             input_with_text,
             input_with_button,
             textarea_example,
+            context_menu_example,
         }
     }
 }
@@ -687,6 +730,36 @@ impl Render for Showcase {
                                                             .unwrap_or_else(|| "None".to_string()),
                                                     ),
                                             ),
+                                    ),
+                            ),
+                    )
+                    .child(separator())
+                    // Context Menu
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Context Menu"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_4()
+                                    .items_start()
+                                    .child(self.context_menu_example.clone()),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_2()
+                                    .items_center()
+                                    .mt_2()
+                                    .child(
+                                        div()
+                                            .text_color(theme.fg_muted())
+                                            .child("(right-click on the area above)"),
                                     ),
                             ),
                     )

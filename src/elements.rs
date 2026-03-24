@@ -19,6 +19,7 @@ pub mod input_group;
 pub mod kbd;
 pub mod label;
 pub mod loading_indicator;
+pub mod popover;
 pub mod progress;
 pub mod radio_group;
 pub mod select;

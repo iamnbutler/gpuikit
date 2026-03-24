@@ -78,5 +78,6 @@ pub fn init(cx: &mut App) {
     utils::element_manager::init(cx);
     input::bind_input_keys(cx, None);
     elements::dialog::bind_dialog_keys(cx);
+    elements::popover::bind_popover_keys(cx);
     elements::toast::init(cx);
 }

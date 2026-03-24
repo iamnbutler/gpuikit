@@ -14,6 +14,7 @@ pub mod empty;
 pub mod field;
 pub mod icon_button;
 pub mod input;
+pub mod input_group;
 pub mod kbd;
 pub mod label;
 pub mod loading_indicator;

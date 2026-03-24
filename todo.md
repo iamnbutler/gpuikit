@@ -33,6 +33,7 @@
 - Toggle Group
 - Tooltip
 - Typography
+- Scroll Area
 
 ## Not Yet Implemented
 
@@ -48,7 +49,6 @@ These share the `anchored()`/`deferred()` pattern already used by Dropdown.
 ### Next Up — No New Infra Needed
 
 - Textarea — styled wrapper around existing `text_area()` element
-- Scroll Area — styled wrapper around gpui overflow scrolling
 - Toast — notification queue system
 
 ### Future — Data & Complex

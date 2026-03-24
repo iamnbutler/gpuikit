@@ -23,5 +23,6 @@ pub mod skeleton;
 pub mod slider;
 pub mod switch;
 pub mod toggle;
+pub mod toggle_group;
 pub mod tooltip;
 pub mod typography;

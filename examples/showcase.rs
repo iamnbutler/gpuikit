@@ -27,6 +27,7 @@ use gpuikit::{
         radio_group::{radio_group, radio_option, RadioGroup},
         separator::{separator, vertical_separator},
         switch::{switch, Switch},
+        toggle_group::{toggle_group, toggle_option, ToggleGroup, ToggleGroupMode},
         tooltip::tooltip,
     },
     layout::{h_stack, v_stack},
@@ -95,6 +96,20 @@ enum NotificationPreference {
     None,
 }
 
+#[derive(Clone, PartialEq, Debug)]
+enum Alignment {
+    Left,
+    Center,
+    Right,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+enum TextStyle {
+    Bold,
+    Italic,
+    Underline,
+}
+
 struct Showcase {
     focus_handle: FocusHandle,
     click_count: usize,
@@ -111,6 +126,8 @@ struct Showcase {
     collapsible_basic: Entity<Collapsible>,
     collapsible_nested: Entity<Collapsible>,
     accordion: Entity<AccordionState>,
+    toggle_group_alignment: Entity<ToggleGroup<Alignment>>,
+    toggle_group_text_style: Entity<ToggleGroup<TextStyle>>,
 }
 
 impl Showcase {
@@ -159,6 +176,7 @@ impl Showcase {
             .selected(NotificationPreference::Important)
         });
 
+<<<<<<< HEAD
         let switch_wifi = cx.new(|_cx| switch("wifi-switch", true).label("Wi-Fi"));
         let switch_bluetooth = cx.new(|_cx| switch("bluetooth-switch", false).label("Bluetooth"));
         let switch_airplane = cx.new(|_cx| switch("airplane-switch", false).label("Airplane Mode").disabled(true));
@@ -222,6 +240,31 @@ impl Showcase {
             )
         });
 
+        let toggle_group_alignment = cx.new(|_cx| {
+            toggle_group(
+                "alignment",
+                vec![
+                    toggle_option(Alignment::Left, "Left"),
+                    toggle_option(Alignment::Center, "Center"),
+                    toggle_option(Alignment::Right, "Right"),
+                ],
+            )
+            .selected_value(Alignment::Center)
+        });
+
+        let toggle_group_text_style = cx.new(|_cx| {
+            toggle_group(
+                "text-style",
+                vec![
+                    toggle_option(TextStyle::Bold, "B"),
+                    toggle_option(TextStyle::Italic, "I"),
+                    toggle_option(TextStyle::Underline, "U"),
+                ],
+            )
+            .mode(ToggleGroupMode::Multiple)
+            .selected(vec![TextStyle::Bold])
+        });
+
         Self {
             focus_handle: cx.focus_handle(),
             click_count: 0,
@@ -238,6 +281,8 @@ impl Showcase {
             collapsible_basic,
             collapsible_nested,
             accordion,
+            toggle_group_alignment,
+            toggle_group_text_style,
         }
     }
 }
@@ -776,6 +821,48 @@ impl Render for Showcase {
                                     .child("RadioGroup"),
                             )
                             .child(self.radio_notifications.clone()),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("ToggleGroup"),
+                            )
+                            .child(
+                                v_stack()
+                                    .gap_3()
+                                    .child(
+                                        h_stack()
+                                            .gap_2()
+                                            .items_center()
+                                            .child(
+                                                div()
+                                                    .text_sm()
+                                                    .text_color(theme.fg_muted())
+                                                    .w_20()
+                                                    .child("Single:"),
+                                            )
+                                            .child(self.toggle_group_alignment.clone()),
+                                    )
+                                    .child(
+                                        h_stack()
+                                            .gap_2()
+                                            .items_center()
+                                            .child(
+                                                div()
+                                                    .text_sm()
+                                                    .text_color(theme.fg_muted())
+                                                    .w_20()
+                                                    .child("Multiple:"),
+                                            )
+                                            .child(self.toggle_group_text_style.clone()),
+                                    ),
+                            ),
                     )
                     .child(separator())
                     .child(

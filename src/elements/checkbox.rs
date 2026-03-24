@@ -2,6 +2,9 @@
 
 use crate::layout::h_stack;
 use crate::theme::{ActiveTheme, Themeable};
+use crate::traits::disableable::Disableable;
+use crate::traits::labelable::Labelable;
+use crate::traits::selectable::Selectable;
 use gpui::{
     div, prelude::*, px, rems, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
     MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
@@ -168,4 +171,33 @@ impl Render for Checkbox {
 /// Convenience function to create a checkbox
 pub fn checkbox(id: impl Into<ElementId>, checked: bool) -> Checkbox {
     Checkbox::new(id, checked)
+}
+
+impl Disableable for Checkbox {
+    fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+}
+
+impl Selectable for Checkbox {
+    fn is_selected(&self) -> bool {
+        self.checked
+    }
+
+    fn selected(mut self, selected: bool) -> Self {
+        self.checked = selected;
+        self
+    }
+}
+
+impl Labelable for Checkbox {
+    fn label(mut self, label: impl Into<SharedString>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
 }

@@ -3,15 +3,8 @@
 //! A visual divider that can be horizontal or vertical.
 
 use crate::theme::{ActiveTheme, Themeable};
+use crate::traits::orientable::{Orientable, Orientation};
 use gpui::{div, px, IntoElement, Pixels, Styled};
-
-/// Orientation of the separator
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum Orientation {
-    #[default]
-    Horizontal,
-    Vertical,
-}
 
 /// A separator component for visually dividing content.
 #[derive(IntoElement)]
@@ -34,22 +27,6 @@ impl Separator {
             size: None,
             inset: None,
         }
-    }
-
-    /// Create a horizontal separator
-    pub fn horizontal() -> Self {
-        Self::new().orientation(Orientation::Horizontal)
-    }
-
-    /// Create a vertical separator
-    pub fn vertical() -> Self {
-        Self::new().orientation(Orientation::Vertical)
-    }
-
-    /// Set the orientation of the separator
-    pub fn orientation(mut self, orientation: Orientation) -> Self {
-        self.orientation = orientation;
-        self
     }
 
     /// Set the size (length) of the separator.
@@ -108,10 +85,25 @@ impl gpui::RenderOnce for Separator {
 
 /// Convenience function to create a horizontal separator
 pub fn separator() -> Separator {
-    Separator::horizontal()
+    Separator::new().horizontal()
 }
 
 /// Convenience function to create a vertical separator
 pub fn vertical_separator() -> Separator {
-    Separator::vertical()
+    Separator::new().vertical()
+}
+
+impl Orientable for Separator {
+    fn orientation(mut self, orientation: Orientation) -> Self {
+        self.orientation = orientation;
+        self
+    }
+
+    fn horizontal(self) -> Self {
+        self.orientation(Orientation::Horizontal)
+    }
+
+    fn vertical(self) -> Self {
+        self.orientation(Orientation::Vertical)
+    }
 }

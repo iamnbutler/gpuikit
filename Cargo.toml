@@ -29,8 +29,9 @@ name = "input_sandbox"
 path = "examples/input/sandbox.rs"
 
 [dependencies]
-# GPUI framework
-gpui = "0.2.2"
+# GPUI framework (using latest from zed repo)
+gpui = { git = "https://github.com/zed-industries/zed", package = "gpui" }
+gpui_platform = { git = "https://github.com/zed-industries/zed", package = "gpui_platform" }
 rust-embed = "8.2.0"
 anyhow = "1.0.79"
 serde = { version = "1.0", features = ["derive"] }
@@ -47,13 +48,13 @@ pulldown-cmark = { version = "0.12", default-features = false, features = ["simd
 
 # Editor dependencies (optional)
 syntect = { version = "5.3.0", optional = true }
-gpui_util = { version = "0.2.2", optional = true }
+gpui_util = { git = "https://github.com/zed-industries/zed", package = "gpui_util", optional = true }
 
 # Schema generation (optional)
 schemars = { version = "0.8", optional = true }
 
 [dev-dependencies]
-gpui = { version = "0.2.2", features = ["test-support"] }
+gpui = { git = "https://github.com/zed-industries/zed", package = "gpui", features = ["test-support"] }
 tempfile = "3.8"
 pretty_assertions = "1.4"
 

@@ -15,6 +15,7 @@ use gpui::{
     Background, Bounds, Context, DefiniteLength, Div, Entity, FocusHandle, Focusable, FontWeight,
     Hsla, KeyBinding, SharedString, Stateful, Window, WindowBounds, WindowOptions,
 };
+use gpui_platform;
 use gpuikit::elements::dropdown::{dropdown, DropdownChanged, DropdownState};
 use gpuikit::elements::input::{input, text_area};
 use gpuikit::elements::slider::{Slider, SliderChanged};
@@ -580,7 +581,7 @@ impl Render for InputSandbox {
 }
 
 fn main() {
-    Application::new().run(|cx: &mut App| {
+    Application::with_platform(gpui_platform::current_platform(false)).run(|cx: &mut App| {
         gpuikit::init(cx);
         bind_input_keys(cx, None);
 
@@ -595,7 +596,7 @@ fn main() {
             |window, cx| {
                 let view = cx.new(|cx| InputSandbox::new(window, cx));
                 let focus_handle = view.read(cx).active_input().focus_handle(cx);
-                window.focus(&focus_handle);
+                window.focus(&focus_handle, cx);
                 view
             },
         )

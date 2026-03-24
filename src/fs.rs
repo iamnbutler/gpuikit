@@ -427,7 +427,7 @@ pub mod dialog {
                     multiple: options.multiple,
                     prompt: None,
                 })
-            })?
+            })
             .await??;
 
         Ok(paths)
@@ -446,7 +446,7 @@ pub mod dialog {
         });
 
         let path = cx
-            .update(|cx| cx.prompt_for_new_path(&default_path, None))?
+            .update(|cx| cx.prompt_for_new_path(&default_path, None))
             .await??;
 
         Ok(path)

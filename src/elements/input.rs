@@ -7,6 +7,8 @@
 //!
 //! Use `input()` for single-line text fields and `text_area()` for multi-line text editing.
 
+use std::sync::Arc;
+
 use gpui::{
     fill, point, px, relative, size, Action, App, Bounds, ContentMask, Context, CursorStyle,
     DispatchPhase, Element, ElementId, Entity, FocusHandle, Focusable, GlobalElementId, Hitbox,
@@ -813,7 +815,7 @@ fn paint_multiline_placeholder(
         .text_system()
         .shape_line(placeholder.clone(), font_size, &[run], None);
     let line_height = text_style.line_height_in_pixels(window.rem_size());
-    let _ = shaped_line.paint(bounds.origin, line_height, window, cx);
+    let _ = shaped_line.paint(bounds.origin, line_height, TextAlign::Left, None, window, cx);
 }
 
 fn paint_multiline_text(
@@ -1036,7 +1038,7 @@ struct SingleLinePaintState {
     text_width: Pixels,
     is_focused: bool,
     char_positions: Vec<Pixels>,
-    wrapped_line: Option<WrappedLine>,
+    wrapped_line: Option<Arc<WrappedLine>>,
     direction: TextDirection,
 }
 
@@ -1204,7 +1206,7 @@ fn paint_singleline_placeholder(
     let y_offset = (bounds.size.height - line_height).max(px(0.)) / 2.0;
     let paint_origin = point(bounds.origin.x, bounds.origin.y + y_offset);
 
-    let _ = shaped_line.paint(paint_origin, line_height, window, cx);
+    let _ = shaped_line.paint(paint_origin, line_height, TextAlign::Left, None, window, cx);
 }
 
 fn paint_singleline_text(

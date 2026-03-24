@@ -21,6 +21,7 @@ use gpuikit::{
         checkbox::{checkbox, Checkbox},
         collapsible::{collapsible, Collapsible},
         dropdown::{dropdown, DropdownState},
+        select::{select, SelectState},
         field::{field, LabelPosition},
         icon_button::icon_button,
         input_group::{input_group, InputAddon},
@@ -115,12 +116,22 @@ enum TextStyle {
     Underline,
 }
 
+#[derive(Clone, PartialEq, Debug)]
+enum Country {
+    US,
+    UK,
+    CA,
+    DE,
+    FR,
+}
+
 struct Showcase {
     focus_handle: FocusHandle,
     click_count: usize,
     toggled_count: usize,
     size_dropdown: Entity<DropdownState<Size>>,
     priority_dropdown: Entity<DropdownState<Priority>>,
+    country_select: Entity<SelectState<Country>>,
     markdown: Entity<Markdown>,
     checkbox_agree: Entity<Checkbox>,
     checkbox_newsletter: Entity<Checkbox>,
@@ -164,6 +175,22 @@ impl Showcase {
                 ],
                 Priority::Normal,
             ))
+        });
+
+        let country_select = cx.new(|_cx| {
+            SelectState::new(
+                select(
+                    "country-select",
+                    vec![
+                        (Country::US, "United States"),
+                        (Country::UK, "United Kingdom"),
+                        (Country::CA, "Canada"),
+                        (Country::DE, "Germany"),
+                        (Country::FR, "France"),
+                    ],
+                )
+                .placeholder("Choose a country..."),
+            )
         });
 
         let markdown = cx.new(|cx| Markdown::new(SAMPLE_MARKDOWN, cx));
@@ -291,6 +318,7 @@ impl Showcase {
             toggled_count: 0,
             size_dropdown,
             priority_dropdown,
+            country_select,
             markdown,
             checkbox_agree,
             checkbox_newsletter,
@@ -595,6 +623,60 @@ impl Render for Showcase {
                                                         "{:?}",
                                                         self.priority_dropdown.read(cx).selected
                                                     )),
+                                            ),
+                                    ),
+                            ),
+                    )
+                    .child(separator())
+                    // Select
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Select"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_4()
+                                    .items_start()
+                                    .child(
+                                        v_stack()
+                                            .gap_1()
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(theme.fg_muted())
+                                                    .child("Country"),
+                                            )
+                                            .child(self.country_select.clone()),
+                                    ),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_4()
+                                    .items_start()
+                                    .child(
+                                        h_stack()
+                                            .gap_2()
+                                            .items_center()
+                                            .text_color(theme.fg_muted())
+                                            .child("Selected country:")
+                                            .child(
+                                                div()
+                                                    .text_color(theme.accent())
+                                                    .font_weight(FontWeight::BOLD)
+                                                    .child(
+                                                        self.country_select
+                                                            .read(cx)
+                                                            .selected
+                                                            .as_ref()
+                                                            .map(|c| format!("{:?}", c))
+                                                            .unwrap_or_else(|| "None".to_string()),
+                                                    ),
                                             ),
                                     ),
                             ),

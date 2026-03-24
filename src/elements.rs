@@ -5,6 +5,7 @@ pub mod button;
 pub mod card;
 pub mod checkbox;
 pub mod dropdown;
+pub mod empty;
 pub mod icon_button;
 pub mod input;
 pub mod loading_indicator;

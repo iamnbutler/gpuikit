@@ -15,6 +15,7 @@ pub mod loading_indicator;
 pub mod progress;
 pub mod radio_group;
 pub mod separator;
+pub mod skeleton;
 pub mod slider;
 pub mod toggle;
 pub mod tooltip;

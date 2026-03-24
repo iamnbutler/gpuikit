@@ -14,6 +14,7 @@ use gpuikit::{
         badge::badge,
         breadcrumb::{breadcrumb, breadcrumb_item, BreadcrumbSeparator},
         button::button,
+        button_group::button_group,
         card::card,
         checkbox::{checkbox, Checkbox},
         dropdown::{dropdown, DropdownState},
@@ -26,6 +27,7 @@ use gpuikit::{
         tooltip::tooltip,
     },
     layout::{h_stack, v_stack},
+    traits::orientable::Orientable,
     DefaultIcons,
 };
 
@@ -217,6 +219,47 @@ impl Render for Showcase {
                                             .text_color(theme.accent())
                                             .font_weight(FontWeight::BOLD)
                                             .child(format!("{}", self.click_count)),
+                                    ),
+                            ),
+                    )
+                    .child(separator())
+                    .child(
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("ButtonGroup"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_4()
+                                    .items_center()
+                                    .child(
+                                        button_group("btn-group-1")
+                                            .child(button("group-1-a", "Left"))
+                                            .child(button("group-1-b", "Center"))
+                                            .child(button("group-1-c", "Right")),
+                                    )
+                                    .child(
+                                        button_group("btn-group-2")
+                                            .vertical()
+                                            .child(button("group-2-a", "Top"))
+                                            .child(button("group-2-b", "Middle"))
+                                            .child(button("group-2-c", "Bottom")),
+                                    ),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_2()
+                                    .items_center()
+                                    .mt_2()
+                                    .child(
+                                        div()
+                                            .text_color(theme.fg_muted())
+                                            .child("(horizontal / vertical)"),
                                     ),
                             ),
                     )

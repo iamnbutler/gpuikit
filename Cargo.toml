@@ -36,6 +36,10 @@ path = "examples/components/sandbox.rs"
 name = "dialog_example"
 path = "examples/dialog_example.rs"
 
+[[example]]
+name = "popover_demo"
+path = "examples/popover_demo.rs"
+
 [dependencies]
 # GPUI framework (using latest from zed repo)
 gpui = { git = "https://github.com/zed-industries/zed", package = "gpui" }

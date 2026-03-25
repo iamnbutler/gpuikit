@@ -168,7 +168,10 @@ impl RenderOnce for ScrollArea {
         let container = div()
             .id(self.id)
             .flex()
-            .flex_col()
+            .when(
+                self.direction == ScrollDirection::Vertical,
+                |this| this.flex_col(),
+            )
             .when(self.full_width, |this| this.w_full())
             .when(self.full_height, |this| this.h_full())
             .when_some(self.max_height, |this, height| this.max_h(height))
@@ -181,12 +184,27 @@ impl RenderOnce for ScrollArea {
             ScrollDirection::Both => container.overflow_y_scroll().overflow_x_scroll(),
         };
 
+        // For horizontal or both scrolling, wrap children so they don't shrink
+        // to fit the container (flex items shrink by default, preventing overflow).
+        let scrolls_horizontally = matches!(
+            self.direction,
+            ScrollDirection::Horizontal | ScrollDirection::Both
+        );
+
         // Stop scroll wheel propagation to prevent parent scrolling
-        container
-            .on_scroll_wheel(|_, _, cx| {
-                cx.stop_propagation();
-            })
-            .children(self.children)
+        if scrolls_horizontally {
+            container
+                .on_scroll_wheel(|_, _, cx| {
+                    cx.stop_propagation();
+                })
+                .child(div().flex_none().children(self.children))
+        } else {
+            container
+                .on_scroll_wheel(|_, _, cx| {
+                    cx.stop_propagation();
+                })
+                .children(self.children)
+        }
     }
 }
 

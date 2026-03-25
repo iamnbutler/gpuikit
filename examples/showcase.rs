@@ -30,6 +30,7 @@ use gpuikit::{
         input_group::{input_group, InputAddon},
         kbd::{kbd, kbd_combo, KbdSize},
         label::label,
+        list::{List, ListEntry},
         textarea::textarea,
         loading_indicator::loading_indicator,
         popover::{popover, PopoverState},
@@ -433,7 +434,7 @@ impl Showcase {
 }
 
 impl Render for Showcase {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
 
         h_stack()
@@ -1572,6 +1573,61 @@ impl Render for Showcase {
                                             .on_click(cx.listener(|_, _, window, cx| {
                                                 cx.toast("Please check your input").warning().show(window, cx);
                                             })),
+                                    ),
+                            ),
+                    )
+                    // List
+                    .child(
+                        v_stack()
+                            .gap_4()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("List"),
+                            )
+                            .child(
+                                div()
+                                    .h(px(250.))
+                                    .border_1()
+                                    .border_color(theme.border())
+                                    .rounded_md()
+                                    .overflow_hidden()
+                                    .child(
+                                        List::new(
+                                            "showcase-list",
+                                            vec![
+                                                ListEntry::header("Conflicts"),
+                                                ListEntry::item("f-1", |_w, _cx| {
+                                                    div().px_2().child("src/services.rs").into_any_element()
+                                                }),
+                                                ListEntry::header("Changes"),
+                                                ListEntry::item("f-2", |_w, _cx| {
+                                                    div().px_2().child("src/main.rs").into_any_element()
+                                                }),
+                                                ListEntry::item("f-3", |_w, _cx| {
+                                                    div().px_2().child("src/services/auth.rs").into_any_element()
+                                                }),
+                                                ListEntry::item("f-4", |_w, _cx| {
+                                                    div().px_2().child("src/ui/auth.rs").into_any_element()
+                                                }),
+                                                ListEntry::item("f-5", |_w, _cx| {
+                                                    div().px_2().child("src/utils/helpers.rs").into_any_element()
+                                                }),
+                                                ListEntry::header("New"),
+                                                ListEntry::item("f-6", |_w, _cx| {
+                                                    div().px_2().child("build.rs").into_any_element()
+                                                }),
+                                                ListEntry::item("f-7", |_w, _cx| {
+                                                    div().px_2().child("Cargo.toml").into_any_element()
+                                                }),
+                                                ListEntry::item("f-8", |_w, _cx| {
+                                                    div().px_2().child("src/lib.rs").into_any_element()
+                                                }),
+                                            ],
+                                        )
+                                        .render(window, cx),
                                     ),
                             ),
                     )

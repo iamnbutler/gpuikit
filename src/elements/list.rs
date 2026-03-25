@@ -22,8 +22,9 @@
 
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, px, uniform_list, AnyElement, App, ElementId, IntoElement, ParentElement, Pixels,
-    SharedString, Styled, UniformListScrollHandle, Window,
+    div, prelude::FluentBuilder, px, uniform_list, AnyElement, App, ClickEvent, ElementId,
+    InteractiveElement, IntoElement, ParentElement, Pixels, SharedString,
+    StatefulInteractiveElement, Styled, UniformListScrollHandle, Window,
 };
 use std::rc::Rc;
 
@@ -34,6 +35,7 @@ const DEFAULT_ITEM_HEIGHT: f32 = 27.0;
 const DEFAULT_FONT_SIZE: f32 = 13.0;
 
 type ItemRender = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
+type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 
 /// A single entry in the list — either a section header or a content item.
 #[derive(Clone)]
@@ -42,10 +44,12 @@ pub enum ListEntry {
     Header {
         label: SharedString,
     },
-    /// A content item rendered by a callback.
+    /// A content item rendered by a callback, with an optional click handler.
     Item {
         id: ElementId,
         render: ItemRender,
+        on_click: Option<ClickHandler>,
+        selected: bool,
     },
 }
 
@@ -65,7 +69,28 @@ impl ListEntry {
         ListEntry::Item {
             id: id.into(),
             render: Rc::new(render),
+            on_click: None,
+            selected: false,
         }
+    }
+
+    /// Set a click handler on this entry.
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        if let ListEntry::Item { ref mut on_click, .. } = self {
+            *on_click = Some(Rc::new(handler));
+        }
+        self
+    }
+
+    /// Mark this entry as selected.
+    pub fn selected(mut self, is_selected: bool) -> Self {
+        if let ListEntry::Item { ref mut selected, .. } = self {
+            *selected = is_selected;
+        }
+        self
     }
 }
 
@@ -116,6 +141,9 @@ impl List {
 
         let theme = cx.theme();
         let fg_muted = theme.fg_muted();
+        let fg = theme.fg();
+        let accent = theme.accent();
+        let accent_bg = theme.accent_bg();
 
         let list = uniform_list(
             self.id,
@@ -139,16 +167,32 @@ impl List {
                                         .child(label.clone()),
                                 )
                                 .into_any_element(),
-                            ListEntry::Item { render, .. } => {
+                            ListEntry::Item { id, render, on_click, selected } => {
                                 let content = render(window, cx);
-                                div()
+                                let row = div()
+                                    .id(id.clone())
                                     .h(item_height)
                                     .w_full()
                                     .flex()
                                     .items_center()
                                     .text_size(font_size)
-                                    .child(content)
-                                    .into_any_element()
+                                    .rounded_sm()
+                                    .when(*selected, |el| {
+                                        el.bg(accent_bg)
+                                            .text_color(accent)
+                                    })
+                                    .when(!*selected, |el| {
+                                        el.text_color(fg)
+                                            .hover(|s| s.bg(accent_bg.opacity(0.5)))
+                                    })
+                                    .when_some(on_click.clone(), |el, handler| {
+                                        el.cursor_pointer()
+                                            .on_click(move |event, window, cx| {
+                                                handler(event, window, cx);
+                                            })
+                                    })
+                                    .child(content);
+                                row.into_any_element()
                             }
                         }
                     })

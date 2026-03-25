@@ -29,10 +29,6 @@ name = "input_sandbox"
 path = "examples/input/sandbox.rs"
 
 [[example]]
-name = "components_sandbox"
-path = "examples/components/sandbox.rs"
-
-[[example]]
 name = "dialog_example"
 path = "examples/dialog_example.rs"
 

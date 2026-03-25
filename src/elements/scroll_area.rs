@@ -168,7 +168,10 @@ impl RenderOnce for ScrollArea {
         let container = div()
             .id(self.id)
             .flex()
-            .flex_col()
+            .when(
+                self.direction == ScrollDirection::Vertical,
+                |this| this.flex_col(),
+            )
             .when(self.full_width, |this| this.w_full())
             .when(self.full_height, |this| this.h_full())
             .when_some(self.max_height, |this, height| this.max_h(height))

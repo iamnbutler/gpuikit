@@ -12,6 +12,8 @@ use gpuikit::{
     elements::{
         accordion::{accordion, accordion_item, AccordionState},
         alert::alert,
+        context_menu::{context_menu, menu_item, menu_separator, ContextMenuState},
+        dialog::{dialog, DialogState},
         aspect_ratio::{aspect_ratio_square, aspect_ratio_video, aspect_ratio},
         avatar::avatar,
         badge::badge,
@@ -30,6 +32,7 @@ use gpuikit::{
         label::label,
         textarea::textarea,
         loading_indicator::loading_indicator,
+        popover::{popover, PopoverState},
         progress::{progress, ProgressVariant},
         radio_group::{radio_group, radio_option, RadioGroup},
         scroll_area::scroll_area,
@@ -38,6 +41,7 @@ use gpuikit::{
         switch::{switch, Switch},
         tabs::{tab, tabs, Tabs},
         toggle_group::{toggle_group, toggle_option, ToggleGroup, ToggleGroupMode},
+        toast::ToastExt,
         tooltip::tooltip,
     },
     layout::{h_stack, v_stack},
@@ -155,6 +159,9 @@ struct Showcase {
     input_with_text: Entity<InputState>,
     input_with_button: Entity<InputState>,
     textarea_example: Entity<InputState>,
+    popover_example: Entity<PopoverState>,
+    dialog_example: Entity<DialogState>,
+    context_menu_example: Entity<ContextMenuState>,
 }
 
 impl Showcase {
@@ -320,6 +327,80 @@ impl Showcase {
         let input_with_button = cx.new(|cx| InputState::new_singleline(cx));
         let textarea_example = cx.new(|cx| InputState::new_multiline(cx));
 
+        let popover_example = cx.new(|_cx| {
+            PopoverState::new(
+                popover("showcase-popover")
+                    .trigger(|_window, _cx| {
+                        button("popover-trigger", "Open Popover").into_any_element()
+                    })
+                    .content(|_window, cx| {
+                        let theme = cx.theme();
+                        v_stack()
+                            .p_3()
+                            .gap_2()
+                            .w(px(200.))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child("Popover Content"),
+                            )
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(theme.fg_muted())
+                                    .child("Click outside or press Escape to close."),
+                            )
+                            .into_any_element()
+                    }),
+            )
+        });
+
+        let dialog_example = cx.new(|_cx| {
+            DialogState::new(
+                dialog("showcase-dialog")
+                    .title("Confirm Action")
+                    .description("Are you sure you want to proceed? This action cannot be undone.")
+                    .footer(|_window, _cx| {
+                        h_stack()
+                            .gap_2()
+                            .justify_end()
+                            .child(button("dialog-cancel", "Cancel"))
+                            .child(button("dialog-confirm", "Confirm"))
+                            .into_any_element()
+                    }),
+            )
+        });
+
+        let context_menu_example = cx.new(|_cx| {
+            ContextMenuState::new(
+                context_menu("showcase-context-menu")
+                    .trigger(|_window, cx| {
+                        let theme = cx.theme();
+                        div()
+                            .px_4()
+                            .py_3()
+                            .rounded_md()
+                            .border_1()
+                            .border_color(theme.border())
+                            .bg(theme.surface())
+                            .text_sm()
+                            .text_color(theme.fg_muted())
+                            .child("Right-click here")
+                            .into_any_element()
+                    })
+                    .menu(|_window, _cx| {
+                        vec![
+                            menu_item("cut", "Cut").kbd("Cmd+X").into(),
+                            menu_item("copy", "Copy").kbd("Cmd+C").into(),
+                            menu_item("paste", "Paste").kbd("Cmd+V").into(),
+                            menu_separator().into(),
+                            menu_item("delete", "Delete").destructive().into(),
+                        ]
+                    }),
+            )
+        });
+
         Self {
             focus_handle: cx.focus_handle(),
             click_count: 0,
@@ -344,6 +425,9 @@ impl Showcase {
             input_with_text,
             input_with_button,
             textarea_example,
+            popover_example,
+            dialog_example,
+            context_menu_example,
         }
     }
 }
@@ -1411,6 +1495,86 @@ impl Render for Showcase {
                                     ),
                             ),
                     )
+                    // Popover
+                    .child(
+                        v_stack()
+                            .gap_4()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Popover"),
+                            )
+                            .child(self.popover_example.clone()),
+                    )
+                    // Dialog
+                    .child(
+                        v_stack()
+                            .gap_4()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Dialog"),
+                            )
+                            .child(
+                                button("open-dialog", "Open Dialog")
+                                    .on_click(cx.listener(|showcase, _, window, cx| {
+                                        showcase.dialog_example.update(cx, |dialog, cx| {
+                                            dialog.open(window, cx);
+                                        });
+                                    })),
+                            ),
+                    )
+                    // Context Menu
+                    .child(
+                        v_stack()
+                            .gap_4()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Context Menu"),
+                            )
+                            .child(self.context_menu_example.clone()),
+                    )
+                    // Toast
+                    .child(
+                        v_stack()
+                            .gap_4()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.fg_muted())
+                                    .child("Toast"),
+                            )
+                            .child(
+                                h_stack()
+                                    .gap_2()
+                                    .child(
+                                        button("toast-default", "Default")
+                                            .on_click(cx.listener(|_, _, window, cx| {
+                                                cx.toast("This is a default toast").show(window, cx);
+                                            })),
+                                    )
+                                    .child(
+                                        button("toast-success", "Success")
+                                            .on_click(cx.listener(|_, _, window, cx| {
+                                                cx.toast("Changes saved successfully").success().show(window, cx);
+                                            })),
+                                    )
+                                    .child(
+                                        button("toast-warning", "Warning")
+                                            .on_click(cx.listener(|_, _, window, cx| {
+                                                cx.toast("Please check your input").warning().show(window, cx);
+                                            })),
+                                    ),
+                            ),
+                    )
                     // Textarea
                     .child(
                         card()
@@ -1453,6 +1617,8 @@ impl Render for Showcase {
                     .flex_1()
                     .child(MarkdownElement::new(self.markdown.clone())),
             )
+            .child(self.dialog_example.clone())
+            .child(cx.toast_manager().clone())
     }
 }
 

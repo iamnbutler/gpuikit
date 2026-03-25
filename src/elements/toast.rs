@@ -25,7 +25,7 @@
 use crate::icons::Icons;
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    deferred, div, hsla, prelude::*, px, rems, AnyElement, App, ClickEvent, Context, ElementId,
+    deferred, div, prelude::*, px, rems, AnyElement, App, ClickEvent, Context, ElementId,
     Entity, Global, Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement, Render,
     SharedString, StatefulInteractiveElement, Styled, Svg, Window,
 };
@@ -84,26 +84,26 @@ impl ToastVariant {
         }
     }
 
-    /// Returns the icon/accent color for this variant
-    fn color(&self) -> Hsla {
+    /// Returns the icon/accent color for this variant from the theme
+    fn color(&self, theme: &dyn Themeable) -> Hsla {
         match self {
-            ToastVariant::Default => hsla(0.0, 0.0, 0.5, 1.0), // gray
-            ToastVariant::Info => hsla(210.0 / 360.0, 0.7, 0.5, 1.0), // blue
-            ToastVariant::Success => hsla(142.0 / 360.0, 0.7, 0.4, 1.0), // green
-            ToastVariant::Warning => hsla(38.0 / 360.0, 0.9, 0.5, 1.0), // orange/yellow
-            ToastVariant::Destructive => hsla(0.0, 0.7, 0.5, 1.0), // red
+            ToastVariant::Default => theme.fg_muted(),
+            ToastVariant::Info => theme.info(),
+            ToastVariant::Success => theme.success(),
+            ToastVariant::Warning => theme.warning(),
+            ToastVariant::Destructive => theme.danger(),
         }
     }
 
     /// Returns the background color for this variant
     #[allow(dead_code)]
-    fn bg_color(&self) -> Hsla {
-        self.color().opacity(0.1)
+    fn bg_color(&self, theme: &dyn Themeable) -> Hsla {
+        self.color(theme).opacity(0.1)
     }
 
     /// Returns the border color for this variant
-    fn border_color(&self) -> Hsla {
-        self.color().opacity(0.3)
+    fn border_color(&self, theme: &dyn Themeable) -> Hsla {
+        self.color(theme).opacity(0.3)
     }
 }
 
@@ -426,19 +426,20 @@ impl ToastManager {
         let toast = toast_entity.read(cx);
 
         // Extract theme colors
-        let (fg_color, fg_muted_color, surface_color, border_theme_color) = {
+        let (fg_color, fg_muted_color, surface_color, border_theme_color, variant_color, border_color) = {
             let theme = cx.theme();
+            let variant = toast.variant;
             (
                 theme.fg(),
                 theme.fg_muted(),
                 theme.surface(),
                 theme.border(),
+                variant.color(theme.as_ref()),
+                variant.border_color(theme.as_ref()),
             )
         };
 
         let variant = toast.variant;
-        let variant_color = variant.color();
-        let border_color = variant.border_color();
         let icon_mode = toast.icon;
 
         let has_title = toast.title.is_some();
@@ -606,7 +607,8 @@ mod tests {
 
     #[test]
     fn test_toast_variant_colors() {
-        // Test that each variant has non-zero opacity colors
+        // Test that each variant has non-zero opacity colors using default theme
+        let theme = crate::theme::Theme::default();
         for variant in [
             ToastVariant::Default,
             ToastVariant::Info,
@@ -614,13 +616,13 @@ mod tests {
             ToastVariant::Warning,
             ToastVariant::Destructive,
         ] {
-            let color = variant.color();
+            let color = variant.color(&theme);
             assert!(color.a > 0.0, "Variant {:?} should have non-zero alpha", variant);
 
-            let bg = variant.bg_color();
+            let bg = variant.bg_color(&theme);
             assert!(bg.a > 0.0 && bg.a < 1.0, "Variant {:?} bg should be translucent", variant);
 
-            let border = variant.border_color();
+            let border = variant.border_color(&theme);
             assert!(border.a > 0.0 && border.a < 1.0, "Variant {:?} border should be translucent", variant);
         }
     }

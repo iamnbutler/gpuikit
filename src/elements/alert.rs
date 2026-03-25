@@ -5,7 +5,7 @@
 use crate::icons::Icons;
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, hsla, prelude::FluentBuilder, px, rems, App, ClickEvent, Context, ElementId, Entity,
+    div, prelude::FluentBuilder, px, rems, App, ClickEvent, Context, ElementId, Entity,
     Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce, SharedString,
     StatefulInteractiveElement, Styled, Svg, Window,
 };
@@ -43,25 +43,25 @@ impl AlertVariant {
         }
     }
 
-    /// Returns the icon/accent color for this variant
-    fn color(&self) -> Hsla {
+    /// Returns the icon/accent color for this variant from the theme
+    fn color(&self, theme: &dyn Themeable) -> Hsla {
         match self {
-            AlertVariant::Default => hsla(0.0, 0.0, 0.5, 1.0), // gray
-            AlertVariant::Info => hsla(210.0 / 360.0, 0.7, 0.5, 1.0), // blue
-            AlertVariant::Success => hsla(142.0 / 360.0, 0.7, 0.4, 1.0), // green
-            AlertVariant::Warning => hsla(38.0 / 360.0, 0.9, 0.5, 1.0), // orange/yellow
-            AlertVariant::Destructive => hsla(0.0, 0.7, 0.5, 1.0), // red
+            AlertVariant::Default => theme.fg_muted(),
+            AlertVariant::Info => theme.info(),
+            AlertVariant::Success => theme.success(),
+            AlertVariant::Warning => theme.warning(),
+            AlertVariant::Destructive => theme.danger(),
         }
     }
 
     /// Returns the background color for this variant
-    fn bg_color(&self) -> Hsla {
-        self.color().opacity(0.1)
+    fn bg_color(&self, theme: &dyn Themeable) -> Hsla {
+        self.color(theme).opacity(0.1)
     }
 
     /// Returns the border color for this variant
-    fn border_color(&self) -> Hsla {
-        self.color().opacity(0.3)
+    fn border_color(&self, theme: &dyn Themeable) -> Hsla {
+        self.color(theme).opacity(0.3)
     }
 }
 
@@ -184,14 +184,17 @@ impl Alert {
 impl RenderOnce for Alert {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         // Extract theme colors first to avoid borrow conflicts
-        let (fg_color, fg_muted_color, surface_secondary_color) = {
+        let (fg_color, fg_muted_color, surface_secondary_color, variant_color, bg_color, border_color) = {
             let theme = cx.theme();
-            (theme.fg(), theme.fg_muted(), theme.surface_secondary())
+            (
+                theme.fg(),
+                theme.fg_muted(),
+                theme.surface_secondary(),
+                self.variant.color(theme.as_ref()),
+                self.variant.bg_color(theme.as_ref()),
+                self.variant.border_color(theme.as_ref()),
+            )
         };
-
-        let variant_color = self.variant.color();
-        let bg_color = self.variant.bg_color();
-        let border_color = self.variant.border_color();
 
         // Handle dismiss state if dismissible
         let is_dismissed = if self.dismissible {

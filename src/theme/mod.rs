@@ -76,6 +76,21 @@ pub trait Themeable {
         self.accent().opacity(0.25)
     }
 
+    /// Info color (blue)
+    fn info(&self) -> Hsla {
+        hsla(210.0 / 360.0, 0.7, 0.5, 1.0)
+    }
+
+    /// Success color (green)
+    fn success(&self) -> Hsla {
+        hsla(142.0 / 360.0, 0.7, 0.4, 1.0)
+    }
+
+    /// Warning color (yellow/orange)
+    fn warning(&self) -> Hsla {
+        hsla(38.0 / 360.0, 0.9, 0.5, 1.0)
+    }
+
     /// Danger/error color
     fn danger(&self) -> Hsla {
         hsla(0.0, 0.7, 0.5, 1.0)
@@ -180,6 +195,9 @@ pub struct Theme {
     outline_color: Option<Hsla>,
     accent_bg_color: Option<Hsla>,
     accent_bg_hover_color: Option<Hsla>,
+    info_color: Option<Hsla>,
+    success_color: Option<Hsla>,
+    warning_color: Option<Hsla>,
     danger_color: Option<Hsla>,
     selection_color: Option<Hsla>,
     button_bg_color: Option<Hsla>,
@@ -246,6 +264,18 @@ impl Themeable for Theme {
     fn accent_bg_hover(&self) -> Hsla {
         self.accent_bg_hover_color
             .unwrap_or_else(|| self.accent().opacity(0.25))
+    }
+    fn info(&self) -> Hsla {
+        self.info_color
+            .unwrap_or_else(|| hsla(210.0 / 360.0, 0.7, 0.5, 1.0))
+    }
+    fn success(&self) -> Hsla {
+        self.success_color
+            .unwrap_or_else(|| hsla(142.0 / 360.0, 0.7, 0.4, 1.0))
+    }
+    fn warning(&self) -> Hsla {
+        self.warning_color
+            .unwrap_or_else(|| hsla(38.0 / 360.0, 0.9, 0.5, 1.0))
     }
     fn danger(&self) -> Hsla {
         self.danger_color
@@ -331,6 +361,9 @@ impl Theme {
             outline_color: None,
             accent_bg_color: None,
             accent_bg_hover_color: None,
+            info_color: None,
+            success_color: None,
+            warning_color: None,
             danger_color: None,
             selection_color: None,
             button_bg_color: None,
@@ -366,6 +399,9 @@ impl Theme {
         theme.border_secondary_color = Some(parse_hex("#7c6f64"));
         theme.border_subtle_color = Some(parse_hex("#3c3836"));
         theme.outline_color = Some(parse_hex("#458588"));
+        theme.info_color = Some(parse_hex("#458588"));
+        theme.success_color = Some(parse_hex("#b8bb26"));
+        theme.warning_color = Some(parse_hex("#fabd2f"));
         theme.danger_color = Some(parse_hex("#fb4934"));
         theme.selection_color = Some(hsla(55.0 / 360.0, 0.56, 0.64, 0.25));
         theme.button_bg_color = Some(parse_hex("#504945"));
@@ -394,6 +430,9 @@ impl Theme {
         theme.border_secondary_color = Some(parse_hex("#a89984"));
         theme.border_subtle_color = Some(parse_hex("#ebdbb2"));
         theme.outline_color = Some(parse_hex("#076678"));
+        theme.info_color = Some(parse_hex("#076678"));
+        theme.success_color = Some(parse_hex("#79740e"));
+        theme.warning_color = Some(parse_hex("#b57614"));
         theme.danger_color = Some(parse_hex("#cc241d"));
         theme.selection_color = Some(hsla(48.0 / 360.0, 0.87, 0.61, 0.15));
         theme.button_bg_color = Some(parse_hex("#ebdbb2"));

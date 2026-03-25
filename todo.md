@@ -13,6 +13,8 @@
 - Card
 - Checkbox
 - Collapsible
+- Context Menu
+- Dialog
 - Dropdown Menu
 - Empty
 - Field
@@ -21,35 +23,26 @@
 - Input Group
 - Kbd
 - Label
+- List
 - Loading Indicator
+- Popover
 - Progress
 - Radio Group
+- Scroll Area
+- Select
 - Separator
 - Skeleton
 - Slider
 - Switch
 - Tabs
+- Textarea
+- Toast
 - Toggle
 - Toggle Group
 - Tooltip
 - Typography
 
 ## Not Yet Implemented
-
-### Next Up — Overlay Foundation
-
-These share the `anchored()`/`deferred()` pattern already used by Dropdown.
-
-- Popover — general-purpose positioned overlay, building block for many others
-- Dialog — modal overlay with backdrop
-- Select — form selection dropdown (close to existing Dropdown)
-- Context Menu — right-click positioned menu
-
-### Next Up — No New Infra Needed
-
-- Textarea — styled wrapper around existing `text_area()` element
-- Scroll Area — styled wrapper around gpui overflow scrolling
-- Toast — notification queue system
 
 ### Future — Data & Complex
 

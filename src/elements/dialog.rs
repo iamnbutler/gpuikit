@@ -30,6 +30,7 @@
 //! dialog_state.update(cx, |state, cx| state.open(window, cx));
 //! ```
 
+use crate::elements::icon_button::icon_button;
 use crate::icons::Icons;
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
@@ -331,26 +332,10 @@ impl Render for DialogState {
                                     // Close button
                                     .when(show_close_button, |this| {
                                         this.child(
-                                            div()
-                                                .id("dialog-close")
-                                                .flex_none()
-                                                .size(px(24.))
-                                                .flex()
-                                                .items_center()
-                                                .justify_center()
-                                                .rounded(px(4.))
-                                                .cursor_pointer()
-                                                .hover(|style| {
-                                                    style.bg(border_color.opacity(0.5))
-                                                })
+                                            icon_button("dialog-close", Icons::cross_1())
                                                 .on_click(cx.listener(|this, _, _window, cx| {
                                                     this.close(cx);
-                                                }))
-                                                .child(
-                                                    Icons::cross_1()
-                                                        .size(px(14.))
-                                                        .text_color(fg_muted_color),
-                                                ),
+                                                })),
                                         )
                                     }),
                             )

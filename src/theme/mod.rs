@@ -106,6 +106,14 @@ pub trait Themeable {
         self.fg().opacity(0.5)
     }
 
+    /// Overlay/scrim color for modal backdrops.
+    ///
+    /// Used by Dialog and other modal components to dim the background.
+    /// Defaults to a semi-transparent black, which works for both light and dark themes.
+    fn overlay(&self) -> Hsla {
+        hsla(0.0, 0.0, 0.0, 0.6)
+    }
+
     // === Component-specific defaults ===
 
     fn button_bg(&self) -> Hsla {
@@ -212,6 +220,7 @@ pub struct Theme {
     input_placeholder_color: Option<Hsla>,
     input_selection_color: Option<Hsla>,
     input_cursor_color: Option<Hsla>,
+    overlay_color: Option<Hsla>,
 }
 
 impl Themeable for Theme {
@@ -330,6 +339,10 @@ impl Themeable for Theme {
     fn input_cursor(&self) -> Hsla {
         self.input_cursor_color.unwrap_or_else(|| self.accent())
     }
+    fn overlay(&self) -> Hsla {
+        self.overlay_color
+            .unwrap_or_else(|| hsla(0.0, 0.0, 0.0, 0.6))
+    }
 }
 
 impl Theme {
@@ -378,6 +391,7 @@ impl Theme {
             input_placeholder_color: None,
             input_selection_color: None,
             input_cursor_color: None,
+            overlay_color: None,
         }
     }
 

@@ -32,6 +32,7 @@
 - Select
 - Separator
 - Skeleton
+- Grain
 - Slider
 - Switch
 - Tabs

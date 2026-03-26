@@ -14,6 +14,7 @@ pub mod dialog;
 pub mod dropdown;
 pub mod empty;
 pub mod field;
+pub mod grain;
 pub mod icon_button;
 pub mod input;
 pub mod input_group;

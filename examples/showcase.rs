@@ -37,6 +37,7 @@ use gpuikit::{
         scroll_area::scroll_area,
         select::{select, SelectState},
         separator::separator,
+        grain::grain,
         skeleton::{skeleton, skeleton_avatar, skeleton_card, skeleton_text},
         switch::{switch, Switch},
         tabs::{tab, tabs, Tabs},
@@ -1223,6 +1224,97 @@ impl Showcase {
             .child(div().mt_2().child(skeleton_card()))
     }
 
+    fn render_grain_page(&self, cx: &Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+        v_stack()
+            .gap_2()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .child("Grain"),
+            )
+            .child(
+                h_stack().gap_4().child(
+                    // Dark surface with light grain
+                    div()
+                        .relative()
+                        .w(px(200.0))
+                        .h(px(120.0))
+                        .rounded_lg()
+                        .bg(theme.surface())
+                        .border_1()
+                        .border_color(theme.border())
+                        .child(div().p_3().text_color(theme.fg_muted()).child("Default grain"))
+                        .child(grain().size_full().absolute()),
+                )
+                .child(
+                    div()
+                        .relative()
+                        .w(px(200.0))
+                        .h(px(120.0))
+                        .rounded_lg()
+                        .bg(gpui::hsla(0.6, 0.4, 0.15, 1.0))
+                        .border_1()
+                        .border_color(theme.border())
+                        .child(
+                            div()
+                                .p_3()
+                                .text_color(gpui::hsla(0.0, 0.0, 0.9, 1.0))
+                                .child("Light grain"),
+                        )
+                        .child(grain().size_full().absolute().light()),
+                )
+                .child(
+                    div()
+                        .relative()
+                        .w(px(200.0))
+                        .h(px(120.0))
+                        .rounded_lg()
+                        .bg(theme.surface())
+                        .border_1()
+                        .border_color(theme.border())
+                        .child(div().p_3().text_color(theme.fg_muted()).child("High intensity"))
+                        .child(grain().size_full().absolute().intensity(0.15)),
+                ),
+            )
+            .child(
+                h_stack().gap_4().child(
+                    // Dense grain
+                    div()
+                        .relative()
+                        .w(px(200.0))
+                        .h(px(120.0))
+                        .rounded_lg()
+                        .bg(theme.surface())
+                        .border_1()
+                        .border_color(theme.border())
+                        .child(div().p_3().text_color(theme.fg_muted()).child("Dense (2px)"))
+                        .child(grain().size_full().absolute().spacing(2.0)),
+                )
+                .child(
+                    div()
+                        .relative()
+                        .w(px(200.0))
+                        .h(px(120.0))
+                        .rounded_lg()
+                        .bg(theme.surface())
+                        .border_1()
+                        .border_color(theme.border())
+                        .child(div().p_3().text_color(theme.fg_muted()).child("Large dots"))
+                        .child(
+                            grain()
+                                .size_full()
+                                .absolute()
+                                .dot_size(2.0)
+                                .spacing(3.0)
+                                .intensity(0.08),
+                        ),
+                ),
+            )
+    }
+
     fn render_alert_page(&self, cx: &Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         v_stack()
@@ -1803,6 +1895,7 @@ impl Render for Showcase {
                 .child(self.render_loading_indicator_page(cx))
                 .child(self.render_progress_page(cx))
                 .child(self.render_skeleton_page(cx))
+                .child(self.render_grain_page(cx))
                 .child(self.render_alert_page(cx))
                 .child(self.render_tooltip_page(cx))
                 .child(self.render_card_page(cx))

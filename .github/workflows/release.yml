@@ -167,6 +167,8 @@ jobs:
     name: Deploy Release
     needs: release
     if: ${{ !inputs.dry_run }}
+    permissions:
+      contents: write
     uses: ./.github/workflows/release-deploy.yml
     with:
       version: ${{ needs.release.outputs.version }}

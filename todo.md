@@ -52,7 +52,7 @@
 - Pagination — pairs with Table
 - Form — state management wrapper around Field
 
-### Deferred
+### Deferred (see [#59](https://github.com/iamnbutler/gpuikit/issues/59))
 
 Hover Card, Alert Dialog, Sheet, Drawer, Menubar, Navigation Menu,
 Command, Combobox, Native Select, Resizable, Sidebar, Sonner,

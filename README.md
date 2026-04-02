@@ -10,10 +10,13 @@ A UI toolkit for GPUI applications.
 
 ```toml
 [dependencies]
-gpuikit = "*"
+gpuikit = { git = "https://github.com/iamnbutler/gpuikit", tag = "v0.3.0" }
+
 # OR to enable the text editor component:
-# gpuikit = { version = "*", features = ["editor"] }
+# gpuikit = { git = "https://github.com/iamnbutler/gpuikit", tag = "v0.3.0", features = ["editor"] }
 ```
+
+> **Note:** gpuikit is not yet on crates.io because it depends on gpui which is also not published there. Use the git dependency above.
 
 ## License
 

@@ -233,7 +233,7 @@ impl Render for DialogState {
         let description = self.description.clone();
         let footer = self.footer.clone();
 
-        let backdrop_color = theme.bg().opacity(0.8);
+        let backdrop_color = theme.overlay();
         let surface_color = theme.surface();
         let border_color = theme.border();
         let fg_color = theme.fg();

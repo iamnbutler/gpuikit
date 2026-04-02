@@ -55,7 +55,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-edit
-        run: cargo install cargo-edit --features vendored-openssl
+        run: cargo install cargo-edit
 
       - name: Get current version
         id: current

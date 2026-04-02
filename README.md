@@ -4,7 +4,7 @@
 
 A UI toolkit for GPUI applications.
 
-🚧 Note: Expect every release to have many, undocumented breaking changes for now. Use at your own risk and pin your verisons 🚧
+🚧 Note: Expect every release to have many, undocumented breaking changes for now. Use at your own risk and pin your versions 🚧
 
 ## Usage
 
@@ -24,15 +24,8 @@ Licensed under either of:
 
 at your option.
 
-### Next...
+## Components
 
-- checkbox
-- context menu
-- image
-- link
-- list item
-- modal
-- spinner
-- split button
-- toast
-- tooltip
+40+ components including: Accordion, Alert, Avatar, Badge, Breadcrumb, Button, Card, Checkbox, Collapsible, Dialog, Dropdown, Field, Input, Popover, Progress, Radio Group, Scroll Area, Select, Skeleton, Slider, Switch, Tabs, Textarea, Toast, Toggle, Tooltip, and more.
+
+See [todo.md](todo.md) for the full list and roadmap.

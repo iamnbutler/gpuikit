@@ -14,6 +14,9 @@
 //!     dialog("confirm-dialog")
 //!         .title("Are you sure?")
 //!         .description("This action cannot be undone.")
+//!         .content(|window, cx| {
+//!             div().child("Custom body content here").into_any_element()
+//!         })
 //!         .footer(|window, cx| {
 //!             h_stack()
 //!                 .gap_2()
@@ -54,6 +57,7 @@ pub struct Dialog {
     id: ElementId,
     title: Option<SharedString>,
     description: Option<SharedString>,
+    content: Option<Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>>,
     footer: Option<Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>>,
     close_on_escape: bool,
     close_on_backdrop_click: bool,
@@ -76,6 +80,7 @@ impl Dialog {
             id: id.into(),
             title: None,
             description: None,
+            content: None,
             footer: None,
             close_on_escape: true,
             close_on_backdrop_click: true,
@@ -92,6 +97,15 @@ impl Dialog {
     /// Set the dialog description.
     pub fn description(mut self, description: impl Into<SharedString>) -> Self {
         self.description = Some(description.into());
+        self
+    }
+
+    /// Set arbitrary body content rendered between description and footer.
+    pub fn content(
+        mut self,
+        content: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
+        self.content = Some(Rc::new(content));
         self
     }
 
@@ -134,6 +148,7 @@ pub struct DialogState {
     id: ElementId,
     title: Option<SharedString>,
     description: Option<SharedString>,
+    content: Option<Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>>,
     footer: Option<Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>>,
     close_on_escape: bool,
     close_on_backdrop_click: bool,
@@ -153,6 +168,7 @@ impl DialogState {
             id: dialog.id,
             title: dialog.title,
             description: dialog.description,
+            content: dialog.content,
             footer: dialog.footer,
             close_on_escape: dialog.close_on_escape,
             close_on_backdrop_click: dialog.close_on_backdrop_click,
@@ -231,6 +247,7 @@ impl Render for DialogState {
         let show_close_button = self.show_close_button;
         let title = self.title.clone();
         let description = self.description.clone();
+        let content = self.content.clone();
         let footer = self.footer.clone();
 
         let backdrop_color = theme.overlay();
@@ -294,9 +311,12 @@ impl Render for DialogState {
                                     .items_start()
                                     .justify_between()
                                     .p_4()
-                                    .when(description.is_some() || footer.is_some(), |this| {
-                                        this.pb_0()
-                                    })
+                                    .when(
+                                        description.is_some()
+                                            || content.is_some()
+                                            || footer.is_some(),
+                                        |this| this.pb_0(),
+                                    )
                                     // Title
                                     .when_some(title.clone(), |this, title| {
                                         this.child(
@@ -341,10 +361,22 @@ impl Render for DialogState {
                                 div()
                                     .px_4()
                                     .pt_2()
-                                    .when(footer.is_none(), |this| this.pb_4())
+                                    .when(content.is_none() && footer.is_none(), |this| {
+                                        this.pb_4()
+                                    })
                                     .text_sm()
                                     .text_color(fg_muted_color)
                                     .child(desc),
+                            )
+                        })
+                        // Content
+                        .when_some(content, |this, content| {
+                            this.child(
+                                div()
+                                    .px_4()
+                                    .pt_2()
+                                    .when(footer.is_none(), |this| this.pb_4())
+                                    .child(content(window, cx)),
                             )
                         })
                         // Footer

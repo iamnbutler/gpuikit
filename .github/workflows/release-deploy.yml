@@ -96,7 +96,7 @@ jobs:
       - name: Verify package version
         run: |
           EXPECTED="${{ needs.prepare.outputs.version }}"
-          ACTUAL=$(cargo pkgid | sed 's/.*@//')
+          ACTUAL=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
 
           if [ "$EXPECTED" != "$ACTUAL" ]; then
             echo "Error: Version mismatch!"

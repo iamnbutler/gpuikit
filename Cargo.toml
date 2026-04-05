@@ -1,6 +1,6 @@
 [package]
 name = "gpuikit"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["Nate Butler <iamnbutler@gmail.com>"]
 license = "MIT OR Apache-2.0"
@@ -37,9 +37,9 @@ name = "popover_demo"
 path = "examples/popover_demo.rs"
 
 [dependencies]
-# GPUI framework (using latest from zed repo)
-gpui = { git = "https://github.com/zed-industries/zed", package = "gpui" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", package = "gpui_platform", features = ["font-kit"] }
+# GPUI framework (from gpui-unofficial on crates.io)
+gpui = { package = "gpui-unofficial", version = "0.230.2" }
+gpui_platform = { package = "gpui-platform-gpui-unofficial", version = "0.230.2", features = ["font-kit"] }
 rust-embed = "8.2.0"
 anyhow = "1.0.79"
 serde = { version = "1.0", features = ["derive"] }
@@ -56,13 +56,13 @@ pulldown-cmark = { version = "0.12", default-features = false, features = ["simd
 
 # Editor dependencies (optional)
 syntect = { version = "5.3.0", optional = true }
-gpui_util = { git = "https://github.com/zed-industries/zed", package = "gpui_util", optional = true }
+gpui_util = { package = "gpui-util-gpui-unofficial", version = "0.230.2", optional = true }
 
 # Schema generation (optional)
 schemars = { version = "0.8", optional = true }
 
 [dev-dependencies]
-gpui = { git = "https://github.com/zed-industries/zed", package = "gpui", features = ["test-support"] }
+gpui = { package = "gpui-unofficial", version = "0.230.2", features = ["test-support"] }
 tempfile = "3.8"
 pretty_assertions = "1.4"
 
@@ -92,3 +92,4 @@ debug = 2
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+

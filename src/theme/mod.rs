@@ -187,40 +187,40 @@ pub struct Theme {
     pub variant: ThemeVariant,
 
     // Primitives
-    fg_color: Hsla,
-    bg_color: Hsla,
-    surface_color: Hsla,
-    border_color: Hsla,
-    accent_color: Hsla,
+    pub fg_color: Hsla,
+    pub bg_color: Hsla,
+    pub surface_color: Hsla,
+    pub border_color: Hsla,
+    pub accent_color: Hsla,
 
     // Overrides (None = use default from trait)
-    fg_muted_color: Option<Hsla>,
-    fg_disabled_color: Option<Hsla>,
-    surface_secondary_color: Option<Hsla>,
-    surface_tertiary_color: Option<Hsla>,
-    border_secondary_color: Option<Hsla>,
-    border_subtle_color: Option<Hsla>,
-    outline_color: Option<Hsla>,
-    accent_bg_color: Option<Hsla>,
-    accent_bg_hover_color: Option<Hsla>,
-    info_color: Option<Hsla>,
-    success_color: Option<Hsla>,
-    warning_color: Option<Hsla>,
-    danger_color: Option<Hsla>,
-    selection_color: Option<Hsla>,
-    button_bg_color: Option<Hsla>,
-    button_bg_hover_color: Option<Hsla>,
-    button_bg_active_color: Option<Hsla>,
-    button_border_color: Option<Hsla>,
-    input_bg_color: Option<Hsla>,
-    input_border_color: Option<Hsla>,
-    input_border_hover_color: Option<Hsla>,
-    input_border_focused_color: Option<Hsla>,
-    input_text_color: Option<Hsla>,
-    input_placeholder_color: Option<Hsla>,
-    input_selection_color: Option<Hsla>,
-    input_cursor_color: Option<Hsla>,
-    overlay_color: Option<Hsla>,
+    pub fg_muted_color: Option<Hsla>,
+    pub fg_disabled_color: Option<Hsla>,
+    pub surface_secondary_color: Option<Hsla>,
+    pub surface_tertiary_color: Option<Hsla>,
+    pub border_secondary_color: Option<Hsla>,
+    pub border_subtle_color: Option<Hsla>,
+    pub outline_color: Option<Hsla>,
+    pub accent_bg_color: Option<Hsla>,
+    pub accent_bg_hover_color: Option<Hsla>,
+    pub info_color: Option<Hsla>,
+    pub success_color: Option<Hsla>,
+    pub warning_color: Option<Hsla>,
+    pub danger_color: Option<Hsla>,
+    pub selection_color: Option<Hsla>,
+    pub button_bg_color: Option<Hsla>,
+    pub button_bg_hover_color: Option<Hsla>,
+    pub button_bg_active_color: Option<Hsla>,
+    pub button_border_color: Option<Hsla>,
+    pub input_bg_color: Option<Hsla>,
+    pub input_border_color: Option<Hsla>,
+    pub input_border_hover_color: Option<Hsla>,
+    pub input_border_focused_color: Option<Hsla>,
+    pub input_text_color: Option<Hsla>,
+    pub input_placeholder_color: Option<Hsla>,
+    pub input_selection_color: Option<Hsla>,
+    pub input_cursor_color: Option<Hsla>,
+    pub overlay_color: Option<Hsla>,
 }
 
 impl Themeable for Theme {
@@ -490,7 +490,7 @@ impl ActiveTheme for App {
     }
 }
 
-fn parse_hex(hex: &str) -> Hsla {
+pub fn parse_hex(hex: &str) -> Hsla {
     let hex = hex.trim_start_matches('#');
 
     let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);

@@ -167,6 +167,38 @@ pub trait Themeable {
     fn input_cursor(&self) -> Hsla {
         self.accent()
     }
+
+    // === Badge palette ===
+    // Colors for small colored indicators: icon badges, status dots, category tags.
+    // Defaults derive from semantic colors but at appropriate saturation for badge fills.
+
+    fn badge_blue(&self) -> Hsla {
+        self.info()
+    }
+
+    fn badge_gold(&self) -> Hsla {
+        self.warning()
+    }
+
+    fn badge_red(&self) -> Hsla {
+        self.danger()
+    }
+
+    fn badge_green(&self) -> Hsla {
+        self.success()
+    }
+
+    fn badge_teal(&self) -> Hsla {
+        hsla(180.0 / 360.0, 0.55, 0.45, 1.0)
+    }
+
+    fn badge_amber(&self) -> Hsla {
+        hsla(30.0 / 360.0, 0.7, 0.50, 1.0)
+    }
+
+    fn badge_gray(&self) -> Hsla {
+        self.fg_muted()
+    }
 }
 
 pub fn init(cx: &mut App) {
@@ -221,6 +253,13 @@ pub struct Theme {
     pub input_selection_color: Option<Hsla>,
     pub input_cursor_color: Option<Hsla>,
     pub overlay_color: Option<Hsla>,
+    pub badge_blue_color: Option<Hsla>,
+    pub badge_gold_color: Option<Hsla>,
+    pub badge_red_color: Option<Hsla>,
+    pub badge_green_color: Option<Hsla>,
+    pub badge_teal_color: Option<Hsla>,
+    pub badge_amber_color: Option<Hsla>,
+    pub badge_gray_color: Option<Hsla>,
 }
 
 impl Themeable for Theme {
@@ -343,6 +382,30 @@ impl Themeable for Theme {
         self.overlay_color
             .unwrap_or_else(|| hsla(0.0, 0.0, 0.0, 0.6))
     }
+    fn badge_blue(&self) -> Hsla {
+        self.badge_blue_color.unwrap_or_else(|| self.info())
+    }
+    fn badge_gold(&self) -> Hsla {
+        self.badge_gold_color.unwrap_or_else(|| self.warning())
+    }
+    fn badge_red(&self) -> Hsla {
+        self.badge_red_color.unwrap_or_else(|| self.danger())
+    }
+    fn badge_green(&self) -> Hsla {
+        self.badge_green_color.unwrap_or_else(|| self.success())
+    }
+    fn badge_teal(&self) -> Hsla {
+        self.badge_teal_color
+            .unwrap_or_else(|| hsla(180.0 / 360.0, 0.55, 0.45, 1.0))
+    }
+    fn badge_amber(&self) -> Hsla {
+        self.badge_amber_color
+            .unwrap_or_else(|| hsla(30.0 / 360.0, 0.7, 0.50, 1.0))
+    }
+    fn badge_gray(&self) -> Hsla {
+        self.badge_gray_color
+            .unwrap_or_else(|| self.fg_muted())
+    }
 }
 
 impl Theme {
@@ -392,6 +455,13 @@ impl Theme {
             input_selection_color: None,
             input_cursor_color: None,
             overlay_color: None,
+            badge_blue_color: None,
+            badge_gold_color: None,
+            badge_red_color: None,
+            badge_green_color: None,
+            badge_teal_color: None,
+            badge_amber_color: None,
+            badge_gray_color: None,
         }
     }
 

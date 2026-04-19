@@ -38,7 +38,6 @@ use gpuikit::{
         select::{select, SelectState},
         separator::separator,
         grain::grain,
-        skeleton::{skeleton, skeleton_avatar, skeleton_card, skeleton_text},
         switch::{switch, Switch},
         tabs::{tab, tabs, Tabs},
         textarea::textarea,
@@ -1190,40 +1189,6 @@ impl Showcase {
             )
     }
 
-    fn render_skeleton_page(&self, cx: &Context<Self>) -> impl IntoElement {
-        let theme = cx.theme();
-        v_stack()
-            .gap_2()
-            .child(
-                div()
-                    .text_lg()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(theme.fg_muted())
-                    .child("Skeleton"),
-            )
-            .child(
-                h_stack()
-                    .gap_4()
-                    .items_center()
-                    .child(skeleton_avatar())
-                    .child(
-                        v_stack()
-                            .gap_2()
-                            .child(skeleton_text().w(px(150.0)))
-                            .child(skeleton_text().w(px(100.0))),
-                    ),
-            )
-            .child(
-                h_stack()
-                    .gap_4()
-                    .mt_2()
-                    .child(skeleton().w(px(80.0)).h(px(32.0)))
-                    .child(skeleton().w(px(120.0)).h(px(32.0)))
-                    .child(skeleton().w(px(60.0)).h(px(32.0)).circle()),
-            )
-            .child(div().mt_2().child(skeleton_card()))
-    }
-
     fn render_grain_page(&self, cx: &Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         v_stack()
@@ -1894,7 +1859,6 @@ impl Render for Showcase {
                 .child(self.render_label_page(cx))
                 .child(self.render_loading_indicator_page(cx))
                 .child(self.render_progress_page(cx))
-                .child(self.render_skeleton_page(cx))
                 .child(self.render_grain_page(cx))
                 .child(self.render_alert_page(cx))
                 .child(self.render_tooltip_page(cx))

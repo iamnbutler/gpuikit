@@ -28,7 +28,6 @@ pub mod radio_group;
 pub mod select;
 pub mod scroll_area;
 pub mod separator;
-pub mod skeleton;
 pub mod slider;
 pub mod switch;
 pub mod tabs;

@@ -7,7 +7,7 @@ use gpui::{
 use gpui_platform;
 use gpuikit::input::InputState;
 use gpuikit::markdown::{Markdown, MarkdownElement};
-use gpuikit::theme::{ActiveTheme, Themeable};
+use gpuikit::theme::{ActiveTheme, GlobalTheme, Theme, Themeable};
 use gpuikit::{
     elements::{
         accordion::{accordion, accordion_item, AccordionState},
@@ -53,6 +53,7 @@ use gpuikit::{
 };
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 const SAMPLE_MARKDOWN: &str = r#"# Markdown Showcase
 
@@ -130,6 +131,16 @@ enum TextStyle {
 }
 
 #[derive(Clone, PartialEq, Debug)]
+enum ThemeChoice {
+    GruvboxDark,
+    GruvboxLight,
+    CatppuccinLatte,
+    CatppuccinFrappe,
+    CatppuccinMacchiato,
+    CatppuccinMocha,
+}
+
+#[derive(Clone, PartialEq, Debug)]
 enum Country {
     US,
     UK,
@@ -145,6 +156,7 @@ struct Showcase {
     toggled_count: usize,
     size_dropdown: Entity<DropdownState<Size>>,
     priority_dropdown: Entity<DropdownState<Priority>>,
+    theme_dropdown: Entity<DropdownState<ThemeChoice>>,
     country_select: Entity<SelectState<Country>>,
     markdown: Entity<Markdown>,
     checkbox_agree: Entity<Checkbox>,
@@ -193,6 +205,36 @@ impl Showcase {
                 ],
                 Priority::Normal,
             ))
+        });
+
+        let theme_dropdown = cx.new(|_cx| {
+            DropdownState::new(
+                dropdown(
+                    "theme-dropdown",
+                    vec![
+                        (ThemeChoice::GruvboxDark, "Gruvbox Dark"),
+                        (ThemeChoice::GruvboxLight, "Gruvbox Light"),
+                        (ThemeChoice::CatppuccinLatte, "Catppuccin Latte"),
+                        (ThemeChoice::CatppuccinFrappe, "Catppuccin Frappé"),
+                        (ThemeChoice::CatppuccinMacchiato, "Catppuccin Macchiato"),
+                        (ThemeChoice::CatppuccinMocha, "Catppuccin Mocha"),
+                    ],
+                    ThemeChoice::GruvboxDark,
+                )
+                .full_width(true)
+                .on_change(|choice, window, cx| {
+                    let theme = match choice {
+                        ThemeChoice::GruvboxDark => Theme::gruvbox_dark(),
+                        ThemeChoice::GruvboxLight => Theme::gruvbox_light(),
+                        ThemeChoice::CatppuccinLatte => Theme::catppuccin_latte(),
+                        ThemeChoice::CatppuccinFrappe => Theme::catppuccin_frappe(),
+                        ThemeChoice::CatppuccinMacchiato => Theme::catppuccin_macchiato(),
+                        ThemeChoice::CatppuccinMocha => Theme::catppuccin_mocha(),
+                    };
+                    cx.set_global(GlobalTheme(Arc::new(theme)));
+                    window.refresh();
+                }),
+            )
         });
 
         let country_select = cx.new(|_cx| {
@@ -417,6 +459,7 @@ impl Showcase {
             toggled_count: 0,
             size_dropdown,
             priority_dropdown,
+            theme_dropdown,
             country_select,
             markdown,
             checkbox_agree,
@@ -1822,14 +1865,25 @@ impl Render for Showcase {
             })
             .collect();
 
-        let sidebar = div()
+        let sidebar = v_stack()
             .w(px(200.))
             .min_h_full()
             .border_r_1()
             .border_color(border)
             .bg(surface)
             .flex_shrink_0()
-            .child(List::new("nav-list", entries).render(window, cx));
+            .child(
+                div()
+                    .flex_1()
+                    .child(List::new("nav-list", entries).render(window, cx)),
+            )
+            .child(
+                div()
+                    .p_2()
+                    .border_t_1()
+                    .border_color(border)
+                    .child(self.theme_dropdown.clone()),
+            );
 
         let content = match current_page.as_ref() {
             "Actions" => v_stack()

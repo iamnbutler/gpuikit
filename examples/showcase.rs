@@ -2038,8 +2038,6 @@ impl Render for Showcase {
             .child(
                 div()
                     .p_2()
-                    .border_t_1()
-                    .border_color(border)
                     .child(self.theme_dropdown.clone()),
             );
 

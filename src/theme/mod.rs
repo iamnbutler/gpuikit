@@ -527,6 +527,150 @@ impl Theme {
         theme
     }
 
+    /// Create a Catppuccin Latte (light) theme
+    pub fn catppuccin_latte() -> Self {
+        let mut theme = Theme::new(
+            "Catppuccin Latte",
+            ThemeVariant::Light,
+            parse_hex("#4c4f69"), // text
+            parse_hex("#eff1f5"), // base
+            parse_hex("#e6e9ef"), // mantle
+            parse_hex("#ccd0da"), // surface0
+            parse_hex("#8839ef"), // mauve
+        );
+        theme.fg_muted_color = Some(parse_hex("#6c6f85"));
+        theme.fg_disabled_color = Some(parse_hex("#9ca0b0"));
+        theme.surface_secondary_color = Some(parse_hex("#ccd0da"));
+        theme.surface_tertiary_color = Some(parse_hex("#bcc0cc"));
+        theme.border_secondary_color = Some(parse_hex("#acb0be"));
+        theme.border_subtle_color = Some(parse_hex("#e6e9ef"));
+        theme.info_color = Some(parse_hex("#1e66f5"));
+        theme.success_color = Some(parse_hex("#40a02b"));
+        theme.warning_color = Some(parse_hex("#df8e1d"));
+        theme.danger_color = Some(parse_hex("#d20f39"));
+        theme.button_bg_color = Some(parse_hex("#ccd0da"));
+        theme.button_bg_hover_color = Some(parse_hex("#bcc0cc"));
+        theme.button_bg_active_color = Some(parse_hex("#acb0be"));
+        theme.button_border_color = Some(parse_hex("#acb0be"));
+        theme.input_border_hover_color = Some(parse_hex("#acb0be"));
+        theme.badge_blue_color = Some(parse_hex("#1e66f5"));
+        theme.badge_gold_color = Some(parse_hex("#df8e1d"));
+        theme.badge_red_color = Some(parse_hex("#d20f39"));
+        theme.badge_green_color = Some(parse_hex("#40a02b"));
+        theme.badge_teal_color = Some(parse_hex("#179299"));
+        theme.badge_amber_color = Some(parse_hex("#fe640b"));
+        theme.badge_gray_color = Some(parse_hex("#6c6f85"));
+        theme
+    }
+
+    /// Create a Catppuccin Frappé theme
+    pub fn catppuccin_frappe() -> Self {
+        let mut theme = Theme::new(
+            "Catppuccin Frappé",
+            ThemeVariant::Dark,
+            parse_hex("#c6d0f5"), // text
+            parse_hex("#303446"), // base
+            parse_hex("#292c3c"), // mantle
+            parse_hex("#414559"), // surface0
+            parse_hex("#ca9ee6"), // mauve
+        );
+        theme.fg_muted_color = Some(parse_hex("#a5adce"));
+        theme.fg_disabled_color = Some(parse_hex("#838ba7"));
+        theme.surface_secondary_color = Some(parse_hex("#51576d"));
+        theme.surface_tertiary_color = Some(parse_hex("#626880"));
+        theme.border_secondary_color = Some(parse_hex("#626880"));
+        theme.border_subtle_color = Some(parse_hex("#292c3c"));
+        theme.info_color = Some(parse_hex("#8caaee"));
+        theme.success_color = Some(parse_hex("#a6d189"));
+        theme.warning_color = Some(parse_hex("#e5c890"));
+        theme.danger_color = Some(parse_hex("#e78284"));
+        theme.button_bg_color = Some(parse_hex("#414559"));
+        theme.button_bg_hover_color = Some(parse_hex("#51576d"));
+        theme.button_bg_active_color = Some(parse_hex("#626880"));
+        theme.button_border_color = Some(parse_hex("#626880"));
+        theme.input_border_hover_color = Some(parse_hex("#51576d"));
+        theme.badge_blue_color = Some(parse_hex("#8caaee"));
+        theme.badge_gold_color = Some(parse_hex("#e5c890"));
+        theme.badge_red_color = Some(parse_hex("#e78284"));
+        theme.badge_green_color = Some(parse_hex("#a6d189"));
+        theme.badge_teal_color = Some(parse_hex("#81c8be"));
+        theme.badge_amber_color = Some(parse_hex("#ef9f76"));
+        theme.badge_gray_color = Some(parse_hex("#a5adce"));
+        theme
+    }
+
+    /// Create a Catppuccin Macchiato theme
+    pub fn catppuccin_macchiato() -> Self {
+        let mut theme = Theme::new(
+            "Catppuccin Macchiato",
+            ThemeVariant::Dark,
+            parse_hex("#cad3f5"), // text
+            parse_hex("#24273a"), // base
+            parse_hex("#1e2030"), // mantle
+            parse_hex("#363a4f"), // surface0
+            parse_hex("#c6a0f6"), // mauve
+        );
+        theme.fg_muted_color = Some(parse_hex("#a5adcb"));
+        theme.fg_disabled_color = Some(parse_hex("#8087a2"));
+        theme.surface_secondary_color = Some(parse_hex("#494d64"));
+        theme.surface_tertiary_color = Some(parse_hex("#5b6078"));
+        theme.border_secondary_color = Some(parse_hex("#5b6078"));
+        theme.border_subtle_color = Some(parse_hex("#1e2030"));
+        theme.info_color = Some(parse_hex("#8aadf4"));
+        theme.success_color = Some(parse_hex("#a6da95"));
+        theme.warning_color = Some(parse_hex("#eed49f"));
+        theme.danger_color = Some(parse_hex("#ed8796"));
+        theme.button_bg_color = Some(parse_hex("#363a4f"));
+        theme.button_bg_hover_color = Some(parse_hex("#494d64"));
+        theme.button_bg_active_color = Some(parse_hex("#5b6078"));
+        theme.button_border_color = Some(parse_hex("#5b6078"));
+        theme.input_border_hover_color = Some(parse_hex("#494d64"));
+        theme.badge_blue_color = Some(parse_hex("#8aadf4"));
+        theme.badge_gold_color = Some(parse_hex("#eed49f"));
+        theme.badge_red_color = Some(parse_hex("#ed8796"));
+        theme.badge_green_color = Some(parse_hex("#a6da95"));
+        theme.badge_teal_color = Some(parse_hex("#8bd5ca"));
+        theme.badge_amber_color = Some(parse_hex("#f5a97f"));
+        theme.badge_gray_color = Some(parse_hex("#a5adcb"));
+        theme
+    }
+
+    /// Create a Catppuccin Mocha theme
+    pub fn catppuccin_mocha() -> Self {
+        let mut theme = Theme::new(
+            "Catppuccin Mocha",
+            ThemeVariant::Dark,
+            parse_hex("#cdd6f4"), // text
+            parse_hex("#1e1e2e"), // base
+            parse_hex("#181825"), // mantle
+            parse_hex("#313244"), // surface0
+            parse_hex("#cba6f7"), // mauve
+        );
+        theme.fg_muted_color = Some(parse_hex("#a6adc8"));
+        theme.fg_disabled_color = Some(parse_hex("#7f849c"));
+        theme.surface_secondary_color = Some(parse_hex("#45475a"));
+        theme.surface_tertiary_color = Some(parse_hex("#585b70"));
+        theme.border_secondary_color = Some(parse_hex("#585b70"));
+        theme.border_subtle_color = Some(parse_hex("#181825"));
+        theme.info_color = Some(parse_hex("#89b4fa"));
+        theme.success_color = Some(parse_hex("#a6e3a1"));
+        theme.warning_color = Some(parse_hex("#f9e2af"));
+        theme.danger_color = Some(parse_hex("#f38ba8"));
+        theme.button_bg_color = Some(parse_hex("#313244"));
+        theme.button_bg_hover_color = Some(parse_hex("#45475a"));
+        theme.button_bg_active_color = Some(parse_hex("#585b70"));
+        theme.button_border_color = Some(parse_hex("#585b70"));
+        theme.input_border_hover_color = Some(parse_hex("#45475a"));
+        theme.badge_blue_color = Some(parse_hex("#89b4fa"));
+        theme.badge_gold_color = Some(parse_hex("#f9e2af"));
+        theme.badge_red_color = Some(parse_hex("#f38ba8"));
+        theme.badge_green_color = Some(parse_hex("#a6e3a1"));
+        theme.badge_teal_color = Some(parse_hex("#94e2d5"));
+        theme.badge_amber_color = Some(parse_hex("#fab387"));
+        theme.badge_gray_color = Some(parse_hex("#a6adc8"));
+        theme
+    }
+
     pub fn get_global(cx: &App) -> &Arc<Theme> {
         &cx.global::<GlobalTheme>().0
     }

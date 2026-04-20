@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 use gpui::{
     div, px, size, App, AppContext, Application, Bounds, Context, Entity, FocusHandle, FontWeight,
-    InteractiveElement, IntoElement, Menu, ParentElement, Render, SharedString,
+    Hsla, InteractiveElement, IntoElement, Menu, ParentElement, Render, Rgba, SharedString,
     StatefulInteractiveElement, Styled, TitlebarOptions, Window, WindowBounds, WindowOptions,
 };
 use gpui_platform;
@@ -1823,6 +1823,164 @@ impl Showcase {
     fn render_markdown_page(&self, _cx: &Context<Self>) -> impl IntoElement {
         MarkdownElement::new(self.markdown.clone())
     }
+
+    fn render_theme_page(&self, cx: &Context<Self>) -> impl IntoElement {
+        let theme = cx.theme().clone();
+
+        let sections: Vec<(&str, Vec<(&str, Hsla)>)> = vec![
+            (
+                "Primitives",
+                vec![
+                    ("fg", theme.fg()),
+                    ("bg", theme.bg()),
+                    ("surface", theme.surface()),
+                    ("border", theme.border()),
+                    ("accent", theme.accent()),
+                ],
+            ),
+            (
+                "Foreground",
+                vec![
+                    ("fg_muted", theme.fg_muted()),
+                    ("fg_disabled", theme.fg_disabled()),
+                    ("placeholder", theme.placeholder()),
+                ],
+            ),
+            (
+                "Surface & Border",
+                vec![
+                    ("surface_secondary", theme.surface_secondary()),
+                    ("surface_tertiary", theme.surface_tertiary()),
+                    ("border_secondary", theme.border_secondary()),
+                    ("border_subtle", theme.border_subtle()),
+                    ("outline", theme.outline()),
+                ],
+            ),
+            (
+                "Accent",
+                vec![
+                    ("accent_bg", theme.accent_bg()),
+                    ("accent_bg_hover", theme.accent_bg_hover()),
+                    ("selection", theme.selection()),
+                ],
+            ),
+            (
+                "Semantic",
+                vec![
+                    ("info", theme.info()),
+                    ("success", theme.success()),
+                    ("warning", theme.warning()),
+                    ("danger", theme.danger()),
+                ],
+            ),
+            (
+                "Overlay",
+                vec![("overlay", theme.overlay())],
+            ),
+            (
+                "Button",
+                vec![
+                    ("button_bg", theme.button_bg()),
+                    ("button_bg_hover", theme.button_bg_hover()),
+                    ("button_bg_active", theme.button_bg_active()),
+                    ("button_border", theme.button_border()),
+                ],
+            ),
+            (
+                "Input",
+                vec![
+                    ("input_bg", theme.input_bg()),
+                    ("input_border", theme.input_border()),
+                    ("input_border_hover", theme.input_border_hover()),
+                    ("input_border_focused", theme.input_border_focused()),
+                    ("input_text", theme.input_text()),
+                    ("input_placeholder", theme.input_placeholder()),
+                    ("input_selection", theme.input_selection()),
+                    ("input_cursor", theme.input_cursor()),
+                ],
+            ),
+            (
+                "Badge",
+                vec![
+                    ("badge_blue", theme.badge_blue()),
+                    ("badge_gold", theme.badge_gold()),
+                    ("badge_red", theme.badge_red()),
+                    ("badge_green", theme.badge_green()),
+                    ("badge_teal", theme.badge_teal()),
+                    ("badge_amber", theme.badge_amber()),
+                    ("badge_gray", theme.badge_gray()),
+                ],
+            ),
+        ];
+
+        let mut root = v_stack().gap_6().child(
+            div()
+                .text_lg()
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_color(theme.fg_muted())
+                .child(format!("Theme — {}", theme.name)),
+        );
+
+        for (section_name, rows) in sections {
+            let mut section = v_stack().gap_1().child(
+                div()
+                    .text_sm()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .pb_1()
+                    .border_b_1()
+                    .border_color(theme.border_subtle())
+                    .child(section_name.to_string()),
+            );
+            for (name, color) in rows {
+                section = section.child(color_row(name, color, &theme));
+            }
+            root = root.child(section);
+        }
+
+        root
+    }
+}
+
+fn fmt_hex(color: Hsla) -> String {
+    let rgba: Rgba = color.into();
+    let r = (rgba.r * 255.0).round() as u8;
+    let g = (rgba.g * 255.0).round() as u8;
+    let b = (rgba.b * 255.0).round() as u8;
+    if rgba.a < 0.999 {
+        let a = (rgba.a * 255.0).round() as u8;
+        format!("#{r:02x}{g:02x}{b:02x}{a:02x}")
+    } else {
+        format!("#{r:02x}{g:02x}{b:02x}")
+    }
+}
+
+fn color_row(name: &str, color: Hsla, theme: &gpuikit::theme::Theme) -> gpui::Div {
+    h_stack()
+        .items_center()
+        .gap_3()
+        .py_1()
+        .child(
+            div()
+                .w(px(18.))
+                .h(px(18.))
+                .rounded_full()
+                .bg(color)
+                .border_1()
+                .border_color(theme.border_subtle()),
+        )
+        .child(
+            div()
+                .w(px(220.))
+                .text_sm()
+                .child(name.to_string()),
+        )
+        .child(
+            div()
+                .text_sm()
+                .text_color(theme.fg_muted())
+                .child(fmt_hex(color)),
+        )
 }
 
 impl Render for Showcase {
@@ -1836,7 +1994,7 @@ impl Render for Showcase {
         let surface = cx.theme().surface();
 
         // Build nav entries for the sidebar — one per category
-        let categories = ["Actions", "Inputs", "Display", "Layout", "Overlay", "Content"];
+        let categories = ["Actions", "Inputs", "Display", "Layout", "Overlay", "Content", "Theme"];
         let entries: Vec<ListEntry> = categories
             .iter()
             .map(|&cat| {
@@ -1939,6 +2097,7 @@ impl Render for Showcase {
                 .gap_8()
                 .child(self.render_markdown_page(cx))
                 .into_any_element(),
+            "Theme" => self.render_theme_page(cx).into_any_element(),
             _ => div().child("Unknown page").into_any_element(),
         };
 

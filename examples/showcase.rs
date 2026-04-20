@@ -37,7 +37,6 @@ use gpuikit::{
         scroll_area::scroll_area,
         select::{select, SelectState},
         separator::separator,
-        grain::grain,
         switch::{switch, Switch},
         tabs::{tab, tabs, Tabs},
         textarea::textarea,
@@ -454,7 +453,7 @@ impl Showcase {
 
         Self {
             focus_handle: cx.focus_handle(),
-            active_page: Rc::new(RefCell::new(SharedString::from("Actions"))),
+            active_page: Rc::new(RefCell::new(SharedString::from("button"))),
             click_count: 0,
             toggled_count: 0,
             size_dropdown,
@@ -1232,97 +1231,6 @@ impl Showcase {
             )
     }
 
-    fn render_grain_page(&self, cx: &Context<Self>) -> impl IntoElement {
-        let theme = cx.theme();
-        v_stack()
-            .gap_2()
-            .child(
-                div()
-                    .text_lg()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(theme.fg_muted())
-                    .child("Grain"),
-            )
-            .child(
-                h_stack().gap_4().child(
-                    // Dark surface with light grain
-                    div()
-                        .relative()
-                        .w(px(200.0))
-                        .h(px(120.0))
-                        .rounded_lg()
-                        .bg(theme.surface())
-                        .border_1()
-                        .border_color(theme.border())
-                        .child(div().p_3().text_color(theme.fg_muted()).child("Default grain"))
-                        .child(grain().size_full().absolute()),
-                )
-                .child(
-                    div()
-                        .relative()
-                        .w(px(200.0))
-                        .h(px(120.0))
-                        .rounded_lg()
-                        .bg(gpui::hsla(0.6, 0.4, 0.15, 1.0))
-                        .border_1()
-                        .border_color(theme.border())
-                        .child(
-                            div()
-                                .p_3()
-                                .text_color(gpui::hsla(0.0, 0.0, 0.9, 1.0))
-                                .child("Light grain"),
-                        )
-                        .child(grain().size_full().absolute().light()),
-                )
-                .child(
-                    div()
-                        .relative()
-                        .w(px(200.0))
-                        .h(px(120.0))
-                        .rounded_lg()
-                        .bg(theme.surface())
-                        .border_1()
-                        .border_color(theme.border())
-                        .child(div().p_3().text_color(theme.fg_muted()).child("High intensity"))
-                        .child(grain().size_full().absolute().intensity(0.15)),
-                ),
-            )
-            .child(
-                h_stack().gap_4().child(
-                    // Dense grain
-                    div()
-                        .relative()
-                        .w(px(200.0))
-                        .h(px(120.0))
-                        .rounded_lg()
-                        .bg(theme.surface())
-                        .border_1()
-                        .border_color(theme.border())
-                        .child(div().p_3().text_color(theme.fg_muted()).child("Dense (2px)"))
-                        .child(grain().size_full().absolute().spacing(2.0)),
-                )
-                .child(
-                    div()
-                        .relative()
-                        .w(px(200.0))
-                        .h(px(120.0))
-                        .rounded_lg()
-                        .bg(theme.surface())
-                        .border_1()
-                        .border_color(theme.border())
-                        .child(div().p_3().text_color(theme.fg_muted()).child("Large dots"))
-                        .child(
-                            grain()
-                                .size_full()
-                                .absolute()
-                                .dot_size(2.0)
-                                .spacing(3.0)
-                                .intensity(0.08),
-                        ),
-                ),
-            )
-    }
-
     fn render_alert_page(&self, cx: &Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         v_stack()
@@ -1993,35 +1901,87 @@ impl Render for Showcase {
         let border = cx.theme().border();
         let surface = cx.theme().surface();
 
-        // Build nav entries for the sidebar — one per category
-        let categories = ["Actions", "Inputs", "Display", "Layout", "Overlay", "Content", "Theme"];
-        let entries: Vec<ListEntry> = categories
-            .iter()
-            .map(|&cat| {
-                let page_cell = self.active_page.clone();
-                let name: SharedString = SharedString::from(cat);
-                let name_for_render = name.clone();
-                let name_for_click = name.clone();
-                let is_selected = current_page == name;
-                ListEntry::item(
-                    SharedString::from(format!("nav-{}", cat)),
-                    move |_w, _cx| {
-                        div()
-                            .px_2()
-                            .child(name_for_render.clone())
-                            .into_any_element()
-                    },
-                )
-                .on_click({
-                    let cell = page_cell.clone();
-                    move |_, window, _cx| {
-                        *cell.borrow_mut() = name_for_click.clone();
+        // Build nav entries for the sidebar — grouped by section
+        let nav_sections: Vec<(&str, Vec<(&str, &str)>)> = vec![
+            (
+                "Input",
+                vec![
+                    ("button", "Button"),
+                    ("toggle", "Toggle"),
+                    ("selection", "Selection"),
+                    ("dropdown", "Dropdown"),
+                    ("text", "Text"),
+                    ("tabs", "Tabs"),
+                ],
+            ),
+            (
+                "Display",
+                vec![
+                    ("avatar", "Avatar"),
+                    ("badge", "Badge"),
+                    ("loading", "Loading"),
+                    ("alert", "Alert"),
+                    ("tooltip", "Tooltip"),
+                    ("card", "Card"),
+                    ("aspect-ratio", "Aspect Ratio"),
+                ],
+            ),
+            (
+                "Layout",
+                vec![
+                    ("breadcrumb", "Breadcrumb"),
+                    ("separator", "Separator"),
+                    ("collapsible", "Collapsible"),
+                    ("scroll-area", "Scroll Area"),
+                    ("list", "List"),
+                ],
+            ),
+            (
+                "Overlay",
+                vec![
+                    ("popover", "Popover"),
+                    ("dialog", "Dialog"),
+                    ("context-menu", "Context Menu"),
+                    ("toast", "Toast"),
+                ],
+            ),
+            (
+                "Content",
+                vec![("markdown", "Markdown")],
+            ),
+            (
+                "System",
+                vec![("theme", "Theme")],
+            ),
+        ];
+
+        let mut entries: Vec<ListEntry> = Vec::new();
+        for (section_label, items) in &nav_sections {
+            entries.push(ListEntry::header(*section_label));
+            for (id, label) in items {
+                let id_owned: SharedString = SharedString::from(*id);
+                let id_for_click = id_owned.clone();
+                let label_owned: SharedString = SharedString::from(*label);
+                let is_selected = current_page == id_owned;
+                let cell = self.active_page.clone();
+                entries.push(
+                    ListEntry::item(
+                        SharedString::from(format!("nav-{}", id)),
+                        move |_w, _cx| {
+                            div()
+                                .px_2()
+                                .child(label_owned.clone())
+                                .into_any_element()
+                        },
+                    )
+                    .on_click(move |_, window, _cx| {
+                        *cell.borrow_mut() = id_for_click.clone();
                         window.refresh();
-                    }
-                })
-                .selected(is_selected)
-            })
-            .collect();
+                    })
+                    .selected(is_selected),
+                );
+            }
+        }
 
         let sidebar = v_stack()
             .w(px(200.))
@@ -2042,60 +2002,65 @@ impl Render for Showcase {
             );
 
         let content = match current_page.as_ref() {
-            "Actions" => v_stack()
+            "button" => v_stack()
                 .gap_8()
                 .child(self.render_button_page(window, cx))
-                .child(self.render_button_group_page(cx))
                 .child(self.render_icon_button_page(window, cx))
+                .child(self.render_button_group_page(cx))
                 .into_any_element(),
-            "Inputs" => v_stack()
+            "toggle" => v_stack()
                 .gap_8()
                 .child(self.render_checkbox_page(cx))
                 .child(self.render_switch_page(cx))
+                .into_any_element(),
+            "selection" => v_stack()
+                .gap_8()
                 .child(self.render_radio_group_page(cx))
                 .child(self.render_toggle_group_page(cx))
-                .child(self.render_tabs_page(cx))
+                .into_any_element(),
+            "dropdown" => v_stack()
+                .gap_8()
                 .child(self.render_dropdown_page(cx))
                 .child(self.render_select_page(cx))
+                .into_any_element(),
+            "text" => v_stack()
+                .gap_8()
                 .child(self.render_field_page(cx))
                 .child(self.render_input_group_page(cx))
                 .child(self.render_textarea_page(cx))
                 .into_any_element(),
-            "Display" => v_stack()
+            "tabs" => self.render_tabs_page(cx).into_any_element(),
+            "avatar" => self.render_avatar_page(cx).into_any_element(),
+            "badge" => v_stack()
                 .gap_8()
-                .child(self.render_avatar_page(cx))
                 .child(self.render_badge_page(cx))
-                .child(self.render_kbd_page(cx))
                 .child(self.render_label_page(cx))
+                .child(self.render_kbd_page(cx))
+                .into_any_element(),
+            "loading" => v_stack()
+                .gap_8()
                 .child(self.render_loading_indicator_page(cx))
                 .child(self.render_progress_page(cx))
-                .child(self.render_grain_page(cx))
-                .child(self.render_alert_page(cx))
-                .child(self.render_tooltip_page(cx))
-                .child(self.render_card_page(cx))
-                .child(self.render_aspect_ratio_page(cx))
                 .into_any_element(),
-            "Layout" => v_stack()
+            "alert" => self.render_alert_page(cx).into_any_element(),
+            "tooltip" => self.render_tooltip_page(cx).into_any_element(),
+            "card" => self.render_card_page(cx).into_any_element(),
+            "aspect-ratio" => self.render_aspect_ratio_page(cx).into_any_element(),
+            "breadcrumb" => self.render_breadcrumb_page(cx).into_any_element(),
+            "separator" => self.render_separator_page(cx).into_any_element(),
+            "collapsible" => v_stack()
                 .gap_8()
-                .child(self.render_breadcrumb_page(cx))
-                .child(self.render_separator_page(cx))
                 .child(self.render_collapsible_page(cx))
                 .child(self.render_accordion_page(cx))
-                .child(self.render_scroll_area_page(cx))
-                .child(self.render_list_page(window, cx))
                 .into_any_element(),
-            "Overlay" => v_stack()
-                .gap_8()
-                .child(self.render_popover_page(cx))
-                .child(self.render_dialog_page(window, cx))
-                .child(self.render_context_menu_page(cx))
-                .child(self.render_toast_page(window, cx))
-                .into_any_element(),
-            "Content" => v_stack()
-                .gap_8()
-                .child(self.render_markdown_page(cx))
-                .into_any_element(),
-            "Theme" => self.render_theme_page(cx).into_any_element(),
+            "scroll-area" => self.render_scroll_area_page(cx).into_any_element(),
+            "list" => self.render_list_page(window, cx).into_any_element(),
+            "popover" => self.render_popover_page(cx).into_any_element(),
+            "dialog" => self.render_dialog_page(window, cx).into_any_element(),
+            "context-menu" => self.render_context_menu_page(cx).into_any_element(),
+            "toast" => self.render_toast_page(window, cx).into_any_element(),
+            "markdown" => self.render_markdown_page(cx).into_any_element(),
+            "theme" => self.render_theme_page(cx).into_any_element(),
             _ => div().child("Unknown page").into_any_element(),
         };
 

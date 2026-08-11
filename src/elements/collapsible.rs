@@ -5,9 +5,9 @@ use crate::layout::h_stack;
 use crate::theme::{ActiveTheme, Themeable};
 use crate::traits::disableable::Disableable;
 use gpui::{
-    div, prelude::*, px, rems, AnyElement, App, Context, ElementId, EventEmitter, InteractiveElement,
-    IntoElement, MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement,
-    Styled, Window,
+    div, prelude::*, px, rems, AnyElement, App, Context, ElementId, EventEmitter,
+    InteractiveElement, IntoElement, MouseButton, ParentElement, Render, SharedString,
+    StatefulInteractiveElement, Styled, Window,
 };
 use std::rc::Rc;
 
@@ -48,7 +48,10 @@ impl Collapsible {
     }
 
     /// Set a custom trigger element via a render callback
-    pub fn trigger(mut self, render: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self {
+    pub fn trigger(
+        mut self,
+        render: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
         self.trigger_render = Some(Rc::new(render));
         self
     }
@@ -60,7 +63,10 @@ impl Collapsible {
     }
 
     /// Set the collapsible content via a render callback
-    pub fn content(mut self, render: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self {
+    pub fn content(
+        mut self,
+        render: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
         self.content_render = Some(Rc::new(render));
         self
     }
@@ -142,7 +148,9 @@ impl Render for Collapsible {
 
         // Build content element if open
         let content_element = if open {
-            self.content_render.as_ref().map(|render| render(window, cx))
+            self.content_render
+                .as_ref()
+                .map(|render| render(window, cx))
         } else {
             None
         };
@@ -179,13 +187,9 @@ impl Render for Collapsible {
                                 .justify_center()
                                 .size(px(16.))
                                 .child(if open {
-                                    Icons::chevron_down()
-                                        .size(px(14.))
-                                        .text_color(fg_muted)
+                                    Icons::chevron_down().size(px(14.)).text_color(fg_muted)
                                 } else {
-                                    Icons::chevron_right()
-                                        .size(px(14.))
-                                        .text_color(fg_muted)
+                                    Icons::chevron_right().size(px(14.)).text_color(fg_muted)
                                 }),
                         )
                     })

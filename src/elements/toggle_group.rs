@@ -240,7 +240,10 @@ impl<T: Clone + PartialEq + 'static> Render for ToggleGroup<T> {
                         };
 
                         div()
-                            .id(ElementId::NamedInteger("toggle-option".into(), index as u64))
+                            .id(ElementId::NamedInteger(
+                                "toggle-option".into(),
+                                index as u64,
+                            ))
                             .flex()
                             .items_center()
                             .justify_center()

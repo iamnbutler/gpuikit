@@ -403,8 +403,7 @@ impl Themeable for Theme {
             .unwrap_or_else(|| hsla(30.0 / 360.0, 0.7, 0.50, 1.0))
     }
     fn badge_gray(&self) -> Hsla {
-        self.badge_gray_color
-            .unwrap_or_else(|| self.fg_muted())
+        self.badge_gray_color.unwrap_or_else(|| self.fg_muted())
     }
 }
 

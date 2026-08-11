@@ -332,7 +332,14 @@ impl EditorElement {
                 .text_system()
                 .shape_line(line.clone(), font_size, &text_runs, None);
 
-        let _ = shaped_line.paint(point(text_x, line_bounds.origin.y), line_height, gpui::TextAlign::Left, None, window, cx);
+        let _ = shaped_line.paint(
+            point(text_x, line_bounds.origin.y),
+            line_height,
+            gpui::TextAlign::Left,
+            None,
+            window,
+            cx,
+        );
     }
 
     fn paint_cursor(&self, window: &mut Window, bounds: Bounds<Pixels>) {

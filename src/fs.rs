@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use gpui::Context;
+use gpui::TaskExt as _;
 use std::path::{Path, PathBuf};
 
 /// Represents a file with its contents and metadata

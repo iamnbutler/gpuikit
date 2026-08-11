@@ -239,11 +239,7 @@ impl PopoverState {
             return;
         };
 
-        let panel = PopoverPanel::build(
-            content_render,
-            window,
-            cx,
-        );
+        let panel = PopoverPanel::build(content_render, window, cx);
 
         cx.subscribe_in(
             &panel,
@@ -288,13 +284,7 @@ impl Render for PopoverState {
             .when_some(self.panel.clone(), |this, panel| {
                 this.child(
                     deferred(
-                        anchored().child(
-                            div()
-                                .occlude()
-                                .mt(offset.y)
-                                .ml(offset.x)
-                                .child(panel),
-                        ),
+                        anchored().child(div().occlude().mt(offset.y).ml(offset.x).child(panel)),
                     )
                     .with_priority(1),
                 )

@@ -142,12 +142,7 @@ impl RenderOnce for Field {
                         .child(label_text),
                 )
                 .when(self.required && !disabled, |this| {
-                    this.child(
-                        div()
-                            .text_sm()
-                            .text_color(theme.danger())
-                            .child("*"),
-                    )
+                    this.child(div().text_sm().text_color(theme.danger()).child("*"))
                 })
         });
 
@@ -162,12 +157,9 @@ impl RenderOnce for Field {
                 .child(desc)
         });
 
-        let error_element = self.error.map(|err| {
-            div()
-                .text_xs()
-                .text_color(theme.danger())
-                .child(err)
-        });
+        let error_element = self
+            .error
+            .map(|err| div().text_xs().text_color(theme.danger()).child(err));
 
         match self.label_position {
             LabelPosition::Above => {
@@ -177,18 +169,10 @@ impl RenderOnce for Field {
                     .flex_col()
                     .gap(rems(0.375))
                     .when(disabled, |el| el.cursor_not_allowed())
-                    .when_some(label_element, |container, label| {
-                        container.child(label)
-                    })
-                    .when_some(description_element, |container, desc| {
-                        container.child(desc)
-                    })
-                    .when_some(self.child, |container, child| {
-                        container.child(child)
-                    })
-                    .when_some(error_element, |container, err| {
-                        container.child(err)
-                    })
+                    .when_some(label_element, |container, label| container.child(label))
+                    .when_some(description_element, |container, desc| container.child(desc))
+                    .when_some(self.child, |container, child| container.child(child))
+                    .when_some(error_element, |container, err| container.child(err))
             }
             LabelPosition::Beside => {
                 // Horizontal layout: label beside input

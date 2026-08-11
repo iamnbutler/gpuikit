@@ -34,12 +34,16 @@ impl DialogExample {
         let mut subscriptions = Vec::new();
 
         // Track dialog open/close events
-        subscriptions.push(cx.subscribe(&simple_dialog, |_this, _, _event: &DialogOpened, _cx| {
-            println!("Simple dialog opened");
-        }));
-        subscriptions.push(cx.subscribe(&simple_dialog, |_this, _, _event: &DialogClosed, _cx| {
-            println!("Simple dialog closed");
-        }));
+        subscriptions.push(
+            cx.subscribe(&simple_dialog, |_this, _, _event: &DialogOpened, _cx| {
+                println!("Simple dialog opened");
+            }),
+        );
+        subscriptions.push(
+            cx.subscribe(&simple_dialog, |_this, _, _event: &DialogClosed, _cx| {
+                println!("Simple dialog closed");
+            }),
+        );
 
         Self {
             focus_handle: cx.focus_handle(),
@@ -87,15 +91,15 @@ impl Render for DialogExample {
             )
             // Button
             .child(
-                h_stack().gap_4().child(
-                    button("open-simple", "Open Dialog").on_click(cx.listener(
+                h_stack()
+                    .gap_4()
+                    .child(button("open-simple", "Open Dialog").on_click(cx.listener(
                         |this, _, window, cx| {
                             this.simple_dialog.update(cx, |dialog, cx| {
                                 dialog.open(window, cx);
                             });
                         },
-                    )),
-                ),
+                    ))),
             )
             // Dialog - rendered on top using deferred()
             .child(self.simple_dialog.clone())

@@ -36,7 +36,11 @@ impl PopoverDemo {
                                     .font_weight(gpui::FontWeight::SEMIBOLD)
                                     .child("Basic Popover"),
                             )
-                            .child(div().text_xs().child("Click outside or press Escape to close."))
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .child("Click outside or press Escape to close."),
+                            )
                             .into_any_element()
                     }),
             )

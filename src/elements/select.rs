@@ -187,9 +187,9 @@ impl<T: Clone + PartialEq + 'static> SelectState<T> {
 
     /// Get the index of the currently selected option, or None if nothing selected.
     fn selected_index(&self) -> Option<usize> {
-        self.selected.as_ref().and_then(|selected| {
-            self.options.iter().position(|(v, _)| v == selected)
-        })
+        self.selected
+            .as_ref()
+            .and_then(|selected| self.options.iter().position(|(v, _)| v == selected))
     }
 
     /// Update the selected value programmatically.

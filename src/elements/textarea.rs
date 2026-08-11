@@ -176,10 +176,9 @@ impl RenderOnce for Textarea {
             .text_sm()
             .when(disabled, |this| this.cursor_not_allowed().opacity(0.65))
             .when(!disabled && !read_only, |this| {
-                this.cursor_text()
-                    .when(!is_focused, |this| {
-                        this.hover(|style| style.border_color(theme.input_border_hover()))
-                    })
+                this.cursor_text().when(!is_focused, |this| {
+                    this.hover(|style| style.border_color(theme.input_border_hover()))
+                })
             })
             .when(read_only && !disabled, |this| this.cursor_default())
             .child(inner)

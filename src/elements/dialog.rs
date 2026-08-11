@@ -332,10 +332,11 @@ impl Render for DialogState {
                                     // Close button
                                     .when(show_close_button, |this| {
                                         this.child(
-                                            icon_button("dialog-close", Icons::cross_1())
-                                                .on_click(cx.listener(|this, _, _window, cx| {
+                                            icon_button("dialog-close", Icons::cross_1()).on_click(
+                                                cx.listener(|this, _, _window, cx| {
                                                     this.close(cx);
-                                                })),
+                                                }),
+                                            ),
                                         )
                                     }),
                             )
@@ -346,9 +347,7 @@ impl Render for DialogState {
                                 div()
                                     .px_4()
                                     .pt_2()
-                                    .when(content.is_none() && footer.is_none(), |this| {
-                                        this.pb_4()
-                                    })
+                                    .when(content.is_none() && footer.is_none(), |this| this.pb_4())
                                     .text_sm()
                                     .text_color(fg_muted_color)
                                     .child(desc),

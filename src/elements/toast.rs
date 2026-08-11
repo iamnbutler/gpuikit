@@ -25,8 +25,8 @@
 use crate::icons::Icons;
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    deferred, div, prelude::*, px, rems, AnyElement, App, ClickEvent, Context, ElementId,
-    Entity, Global, Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement, Render,
+    deferred, div, prelude::*, px, rems, AnyElement, App, ClickEvent, Context, ElementId, Entity,
+    Global, Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement, Render,
     SharedString, StatefulInteractiveElement, Styled, Svg, Window,
 };
 use smol::Timer;
@@ -124,7 +124,10 @@ struct ToastState {
     description: Option<SharedString>,
     variant: ToastVariant,
     icon: ToastIcon,
-    action: Option<(SharedString, Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>)>,
+    action: Option<(
+        SharedString,
+        Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>,
+    )>,
     on_dismiss: Option<Rc<dyn Fn(&mut Window, &mut App) + 'static>>,
     generation: usize,
 }
@@ -136,7 +139,10 @@ pub struct Toast {
     variant: ToastVariant,
     icon: ToastIcon,
     duration: Duration,
-    action: Option<(SharedString, Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>)>,
+    action: Option<(
+        SharedString,
+        Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>,
+    )>,
     on_dismiss: Option<Rc<dyn Fn(&mut Window, &mut App) + 'static>>,
 }
 
@@ -405,9 +411,11 @@ impl Render for ToastManager {
                         ),
                         |d| d.flex_col_reverse(),
                     )
-                    .children(toasts.into_iter().map(|toast_entity| {
-                        self.render_toast(&toast_entity, window, cx)
-                    })),
+                    .children(
+                        toasts
+                            .into_iter()
+                            .map(|toast_entity| self.render_toast(&toast_entity, window, cx)),
+                    ),
             );
 
         deferred(container)
@@ -426,7 +434,14 @@ impl ToastManager {
         let toast = toast_entity.read(cx);
 
         // Extract theme colors
-        let (fg_color, fg_muted_color, surface_color, border_theme_color, variant_color, border_color) = {
+        let (
+            fg_color,
+            fg_muted_color,
+            surface_color,
+            border_theme_color,
+            variant_color,
+            border_color,
+        ) = {
             let theme = cx.theme();
             let variant = toast.variant;
             (
@@ -464,10 +479,12 @@ impl ToastManager {
             // Icon
             .when(matches!(icon_mode, ToastIcon::Default), |toast_div| {
                 toast_div.child(
-                    div()
-                        .flex_none()
-                        .pt(px(2.0))
-                        .child(variant.default_icon().size(px(16.0)).text_color(variant_color)),
+                    div().flex_none().pt(px(2.0)).child(
+                        variant
+                            .default_icon()
+                            .size(px(16.0))
+                            .text_color(variant_color),
+                    ),
                 )
             })
             // Content
@@ -499,29 +516,27 @@ impl ToastManager {
                     // Action button
                     .when_some(action, |content, (label, handler)| {
                         content.child(
-                            div()
-                                .mt_1()
-                                .child(
-                                    div()
-                                        .id("toast-action")
-                                        .text_sm()
-                                        .font_weight(gpui::FontWeight::MEDIUM)
-                                        .text_color(variant_color)
-                                        .cursor_pointer()
-                                        .hover(|style| style.underline())
-                                        .on_mouse_down(MouseButton::Left, |_, window, _| {
-                                            window.prevent_default()
+                            div().mt_1().child(
+                                div()
+                                    .id("toast-action")
+                                    .text_sm()
+                                    .font_weight(gpui::FontWeight::MEDIUM)
+                                    .text_color(variant_color)
+                                    .cursor_pointer()
+                                    .hover(|style| style.underline())
+                                    .on_mouse_down(MouseButton::Left, |_, window, _| {
+                                        window.prevent_default()
+                                    })
+                                    .on_click({
+                                        let handler = handler.clone();
+                                        let toast_entity = toast_entity_for_action.clone();
+                                        cx.listener(move |this, event, window, cx| {
+                                            handler(event, window, cx);
+                                            this.dismiss_toast(&toast_entity, window, cx);
                                         })
-                                        .on_click({
-                                            let handler = handler.clone();
-                                            let toast_entity = toast_entity_for_action.clone();
-                                            cx.listener(move |this, event, window, cx| {
-                                                handler(event, window, cx);
-                                                this.dismiss_toast(&toast_entity, window, cx);
-                                            })
-                                        })
-                                        .child(label),
-                                ),
+                                    })
+                                    .child(label),
+                            ),
                         )
                     }),
             )
@@ -617,13 +632,25 @@ mod tests {
             ToastVariant::Destructive,
         ] {
             let color = variant.color(&theme);
-            assert!(color.a > 0.0, "Variant {:?} should have non-zero alpha", variant);
+            assert!(
+                color.a > 0.0,
+                "Variant {:?} should have non-zero alpha",
+                variant
+            );
 
             let bg = variant.bg_color(&theme);
-            assert!(bg.a > 0.0 && bg.a < 1.0, "Variant {:?} bg should be translucent", variant);
+            assert!(
+                bg.a > 0.0 && bg.a < 1.0,
+                "Variant {:?} bg should be translucent",
+                variant
+            );
 
             let border = variant.border_color(&theme);
-            assert!(border.a > 0.0 && border.a < 1.0, "Variant {:?} border should be translucent", variant);
+            assert!(
+                border.a > 0.0 && border.a < 1.0,
+                "Variant {:?} border should be translucent",
+                variant
+            );
         }
     }
 

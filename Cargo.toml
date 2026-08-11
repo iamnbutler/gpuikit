@@ -38,8 +38,8 @@ path = "examples/popover_demo.rs"
 
 [dependencies]
 # GPUI framework (from gpui-unofficial on crates.io)
-gpui = { package = "gpui-unofficial", version = "0.230.2" }
-gpui_platform = { package = "gpui-platform-gpui-unofficial", version = "0.230.2", features = ["font-kit"] }
+gpui = { package = "gpui-unofficial", version = "1.14.2" }
+gpui_platform = { package = "gpui-platform-gpui-unofficial", version = "1.14.2", features = ["font-kit"] }
 rust-embed = "8.2.0"
 anyhow = "1.0.79"
 serde = { version = "1.0", features = ["derive"] }
@@ -56,13 +56,13 @@ pulldown-cmark = { version = "0.12", default-features = false, features = ["simd
 
 # Editor dependencies (optional)
 syntect = { version = "5.3.0", optional = true }
-gpui_util = { package = "gpui-util-gpui-unofficial", version = "0.230.2", optional = true }
+gpui_util = { package = "gpui-util-gpui-unofficial", version = "1.14.2", optional = true }
 
 # Schema generation (optional)
 schemars = { version = "0.8", optional = true }
 
 [dev-dependencies]
-gpui = { package = "gpui-unofficial", version = "0.230.2", features = ["test-support"] }
+gpui = { package = "gpui-unofficial", version = "1.14.2", features = ["test-support"] }
 tempfile = "3.8"
 pretty_assertions = "1.4"
 
@@ -70,11 +70,14 @@ pretty_assertions = "1.4"
 default = []
 editor = ["dep:syntect", "dep:gpui_util"]
 schema = ["dep:schemars"]
+# Compile Metal shaders at runtime instead of at build time (no Xcode Metal
+# toolchain required).
+runtime_shaders = ["gpui_platform/runtime_shaders"]
 
 # Lints
 [lints.rust]
 missing_docs = "warn"
-rust_2018_idioms = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
 elided_lifetimes_in_paths = "allow"
 
 # Optimize release builds

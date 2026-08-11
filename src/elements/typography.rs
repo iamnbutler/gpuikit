@@ -8,21 +8,21 @@
 //! use gpuikit::elements::typography::*;
 //!
 //! // Headings
-//! h1("Main Title")
-//! h2("Section Title")
-//! h3("Subsection")
-//! h4("Minor Heading")
+//! let _ = h1("Main Title");
+//! let _ = h2("Section Title");
+//! let _ = h3("Subsection");
+//! let _ = h4("Minor Heading");
 //!
 //! // Paragraphs
-//! p("Paragraph content...")
+//! let _ = p("Paragraph content...");
 //!
 //! // Text utilities with variants
-//! text("Inline text").muted()
-//! text("Warning").destructive()
-//! text("Code").code()
+//! let _ = text("Inline text").muted();
+//! let _ = text("Warning").destructive();
+//! let _ = text("Code").code();
 //!
 //! // Builder pattern options
-//! h1("Title").align(TextAlign::Center).truncate(true)
+//! let _ = h1("Title").align(TextAlign::Center).truncate(true);
 //! ```
 
 use crate::theme::{ActiveTheme, Themeable};

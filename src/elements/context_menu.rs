@@ -26,9 +26,9 @@
 use crate::elements::kbd::{kbd, KbdSize};
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    anchored, deferred, div, point, prelude::*, px, App, AnyElement, Context, Corner,
-    DismissEvent, ElementId, Entity, EventEmitter, FocusHandle, Focusable, IntoElement,
-    MouseButton, ParentElement, Point, Render, SharedString, Styled, Svg, Window,
+    anchored, deferred, div, point, prelude::*, px, Anchor, AnyElement, App, Context, DismissEvent,
+    ElementId, Entity, EventEmitter, FocusHandle, Focusable, IntoElement, MouseButton,
+    ParentElement, Point, Render, SharedString, Styled, Svg, Window,
 };
 use std::rc::Rc;
 
@@ -324,8 +324,10 @@ impl Render for ContextMenuPopup {
                         let label_element = div().flex_1().child(item.label.clone());
 
                         // Keyboard shortcut (if any)
-                        let kbd_element =
-                            item.kbd.clone().map(|shortcut| kbd(shortcut).size(KbdSize::Small));
+                        let kbd_element = item
+                            .kbd
+                            .clone()
+                            .map(|shortcut| kbd(shortcut).size(KbdSize::Small));
 
                         row = row.when_some(icon_element, |this, icon| this.child(icon));
                         row = row.child(label_element);
@@ -438,7 +440,6 @@ impl ContextMenuState {
             cx.notify();
         }
     }
-
 }
 
 impl Render for ContextMenuState {
@@ -470,7 +471,7 @@ impl Render for ContextMenuState {
                 this.child(
                     deferred(
                         anchored()
-                            .anchor(Corner::TopLeft)
+                            .anchor(Anchor::TopLeft)
                             .position(cursor_pos)
                             .child(div().occlude().child(popup)),
                     )

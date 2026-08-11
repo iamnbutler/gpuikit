@@ -285,9 +285,7 @@ impl Render for AccordionState {
                                         this.toggle(item_id.clone(), cx);
                                     }))
                             })
-                            .when(disabled, |this| {
-                                this.cursor_not_allowed().opacity(0.5)
-                            })
+                            .when(disabled, |this| this.cursor_not_allowed().opacity(0.5))
                             .child(
                                 div()
                                     .text_sm()
@@ -300,19 +298,15 @@ impl Render for AccordionState {
                                     .child(header),
                             )
                             .child(
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .child(
-                                        if is_expanded {
-                                            Icons::chevron_down()
-                                        } else {
-                                            Icons::chevron_right()
-                                        }
-                                        .size(px(14.))
-                                        .text_color(theme.fg_muted()),
-                                    ),
+                                div().flex().items_center().justify_center().child(
+                                    if is_expanded {
+                                        Icons::chevron_down()
+                                    } else {
+                                        Icons::chevron_right()
+                                    }
+                                    .size(px(14.))
+                                    .text_color(theme.fg_muted()),
+                                ),
                             ),
                     )
                     .when(is_expanded, |this| {
@@ -324,16 +318,12 @@ impl Render for AccordionState {
                                 .bg(theme.surface())
                                 .border_t_1()
                                 .border_color(theme.border_subtle())
-                                .when(!is_last, |this| {
-                                    this.border_b_0()
-                                })
+                                .when(!is_last, |this| this.border_b_0())
                                 .child(
                                     div()
                                         .text_sm()
                                         .text_color(theme.fg_muted())
-                                        .when_some(content, |this, content| {
-                                            this.child(content)
-                                        }),
+                                        .when_some(content, |this, content| this.child(content)),
                                 ),
                         )
                     })

@@ -176,14 +176,11 @@ fn render_addon(
             .when(matches!(position, AddonPosition::Right), |el| {
                 el.border_l_1()
             })
-            .child(
-                icon.size(px(16.))
-                    .text_color(if disabled {
-                        theme.fg_disabled()
-                    } else {
-                        theme.fg_muted()
-                    }),
-            )
+            .child(icon.size(px(16.)).text_color(if disabled {
+                theme.fg_disabled()
+            } else {
+                theme.fg_muted()
+            }))
             .into_any_element(),
 
         InputAddon::Text(text) => gpui::div()

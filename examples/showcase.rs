@@ -273,8 +273,11 @@ impl Showcase {
 
         let switch_wifi = cx.new(|_cx| switch("wifi-switch", true).label("Wi-Fi"));
         let switch_bluetooth = cx.new(|_cx| switch("bluetooth-switch", false).label("Bluetooth"));
-        let switch_airplane =
-            cx.new(|_cx| switch("airplane-switch", false).label("Airplane Mode").disabled(true));
+        let switch_airplane = cx.new(|_cx| {
+            switch("airplane-switch", false)
+                .label("Airplane Mode")
+                .disabled(true)
+        });
 
         let collapsible_basic = cx.new(|_cx| {
             collapsible("collapsible-basic")
@@ -296,11 +299,7 @@ impl Showcase {
                 .content(|_window, _cx| {
                     v_stack()
                         .gap_2()
-                        .child(
-                            div()
-                                .text_sm()
-                                .child("Configure your preferences below:"),
-                        )
+                        .child(div().text_sm().child("Configure your preferences below:"))
                         .child(
                             h_stack()
                                 .gap_2()
@@ -408,9 +407,7 @@ impl Showcase {
             DialogState::new(
                 dialog("showcase-dialog")
                     .title("Confirm Action")
-                    .description(
-                        "Are you sure you want to proceed? This action cannot be undone.",
-                    )
+                    .description("Are you sure you want to proceed? This action cannot be undone.")
                     .footer(|_window, _cx| {
                         h_stack()
                             .gap_2()
@@ -483,7 +480,11 @@ impl Showcase {
         }
     }
 
-    fn render_button_page(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_button_page(
+        &mut self,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -504,12 +505,12 @@ impl Showcase {
                         },
                     )))
                     .child(button("disabled-btn", "Disabled Button").disabled(true))
-                    .child(button("reset-btn", "Reset Counter").on_click(
-                        cx.listener(|showcase, _event, _window, cx| {
+                    .child(button("reset-btn", "Reset Counter").on_click(cx.listener(
+                        |showcase, _event, _window, cx| {
                             showcase.click_count = 0;
                             cx.notify();
-                        }),
-                    )),
+                        },
+                    ))),
             )
             .child(
                 h_stack()
@@ -556,19 +557,19 @@ impl Showcase {
                     ),
             )
             .child(
-                h_stack()
-                    .gap_2()
-                    .items_center()
-                    .mt_2()
-                    .child(
-                        div()
-                            .text_color(theme.fg_muted())
-                            .child("(horizontal / vertical)"),
-                    ),
+                h_stack().gap_2().items_center().mt_2().child(
+                    div()
+                        .text_color(theme.fg_muted())
+                        .child("(horizontal / vertical)"),
+                ),
             )
     }
 
-    fn render_icon_button_page(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_icon_button_page(
+        &mut self,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -588,10 +589,7 @@ impl Showcase {
                     .child(icon_button("icon-gear", DefaultIcons::gear()))
                     .child(icon_button("icon-bell", DefaultIcons::bell()))
                     .child(icon_button("icon-home", DefaultIcons::home()))
-                    .child(icon_button(
-                        "icon-search",
-                        DefaultIcons::magnifying_glass(),
-                    ))
+                    .child(icon_button("icon-search", DefaultIcons::magnifying_glass()))
                     .child(icon_button("icon-plus", DefaultIcons::plus()))
                     .child(icon_button("icon-trash", DefaultIcons::trash())),
             )
@@ -600,13 +598,9 @@ impl Showcase {
                     .gap_2()
                     .items_center()
                     .child(
-                        icon_button("icon-selected", DefaultIcons::check_circled())
-                            .selected(true),
+                        icon_button("icon-selected", DefaultIcons::check_circled()).selected(true),
                     )
-                    .child(
-                        icon_button("icon-disabled", DefaultIcons::lock_closed())
-                            .disabled(true),
-                    )
+                    .child(icon_button("icon-disabled", DefaultIcons::lock_closed()).disabled(true))
                     .child(
                         div()
                             .text_color(theme.fg_muted())
@@ -620,50 +614,41 @@ impl Showcase {
                     .child(
                         icon_button("toggle-star", DefaultIcons::star())
                             .use_state()
-                            .on_toggle(cx.listener(
-                                |showcase, toggled, _window, cx| {
-                                    if *toggled {
-                                        showcase.toggled_count += 1;
-                                    } else {
-                                        showcase.toggled_count = showcase
-                                            .toggled_count
-                                            .saturating_sub(1);
-                                    }
-                                    cx.notify();
-                                },
-                            )),
+                            .on_toggle(cx.listener(|showcase, toggled, _window, cx| {
+                                if *toggled {
+                                    showcase.toggled_count += 1;
+                                } else {
+                                    showcase.toggled_count =
+                                        showcase.toggled_count.saturating_sub(1);
+                                }
+                                cx.notify();
+                            })),
                     )
                     .child(
                         icon_button("toggle-heart", DefaultIcons::heart())
                             .use_state()
-                            .on_toggle(cx.listener(
-                                |showcase, toggled, _window, cx| {
-                                    if *toggled {
-                                        showcase.toggled_count += 1;
-                                    } else {
-                                        showcase.toggled_count = showcase
-                                            .toggled_count
-                                            .saturating_sub(1);
-                                    }
-                                    cx.notify();
-                                },
-                            )),
+                            .on_toggle(cx.listener(|showcase, toggled, _window, cx| {
+                                if *toggled {
+                                    showcase.toggled_count += 1;
+                                } else {
+                                    showcase.toggled_count =
+                                        showcase.toggled_count.saturating_sub(1);
+                                }
+                                cx.notify();
+                            })),
                     )
                     .child(
                         icon_button("toggle-bell", DefaultIcons::bell())
                             .use_state()
-                            .on_toggle(cx.listener(
-                                |showcase, toggled, _window, cx| {
-                                    if *toggled {
-                                        showcase.toggled_count += 1;
-                                    } else {
-                                        showcase.toggled_count = showcase
-                                            .toggled_count
-                                            .saturating_sub(1);
-                                    }
-                                    cx.notify();
-                                },
-                            )),
+                            .on_toggle(cx.listener(|showcase, toggled, _window, cx| {
+                                if *toggled {
+                                    showcase.toggled_count += 1;
+                                } else {
+                                    showcase.toggled_count =
+                                        showcase.toggled_count.saturating_sub(1);
+                                }
+                                cx.notify();
+                            })),
                     )
                     .child(
                         h_stack()
@@ -809,12 +794,7 @@ impl Showcase {
                     .child(
                         v_stack()
                             .gap_1()
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(theme.fg_muted())
-                                    .child("Size"),
-                            )
+                            .child(div().text_sm().text_color(theme.fg_muted()).child("Size"))
                             .child(self.size_dropdown.clone()),
                     )
                     .child(
@@ -844,10 +824,7 @@ impl Showcase {
                                 div()
                                     .text_color(theme.accent())
                                     .font_weight(FontWeight::BOLD)
-                                    .child(format!(
-                                        "{:?}",
-                                        self.size_dropdown.read(cx).selected
-                                    )),
+                                    .child(format!("{:?}", self.size_dropdown.read(cx).selected)),
                             ),
                     )
                     .child(
@@ -881,45 +858,39 @@ impl Showcase {
                     .child("Select"),
             )
             .child(
-                h_stack()
-                    .gap_4()
-                    .items_start()
-                    .child(
-                        v_stack()
-                            .gap_1()
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(theme.fg_muted())
-                                    .child("Country"),
-                            )
-                            .child(self.country_select.clone()),
-                    ),
+                h_stack().gap_4().items_start().child(
+                    v_stack()
+                        .gap_1()
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(theme.fg_muted())
+                                .child("Country"),
+                        )
+                        .child(self.country_select.clone()),
+                ),
             )
             .child(
-                h_stack()
-                    .gap_4()
-                    .items_start()
-                    .child(
-                        h_stack()
-                            .gap_2()
-                            .items_center()
-                            .text_color(theme.fg_muted())
-                            .child("Selected country:")
-                            .child(
-                                div()
-                                    .text_color(theme.accent())
-                                    .font_weight(FontWeight::BOLD)
-                                    .child(
-                                        self.country_select
-                                            .read(cx)
-                                            .selected
-                                            .as_ref()
-                                            .map(|c| format!("{:?}", c))
-                                            .unwrap_or_else(|| "None".to_string()),
-                                    ),
-                            ),
-                    ),
+                h_stack().gap_4().items_start().child(
+                    h_stack()
+                        .gap_2()
+                        .items_center()
+                        .text_color(theme.fg_muted())
+                        .child("Selected country:")
+                        .child(
+                            div()
+                                .text_color(theme.accent())
+                                .font_weight(FontWeight::BOLD)
+                                .child(
+                                    self.country_select
+                                        .read(cx)
+                                        .selected
+                                        .as_ref()
+                                        .map(|c| format!("{:?}", c))
+                                        .unwrap_or_else(|| "None".to_string()),
+                                ),
+                        ),
+                ),
             )
     }
 
@@ -1016,9 +987,7 @@ impl Showcase {
                             )
                             .child(
                                 input_group(&self.input_with_icon, cx)
-                                    .left_addon(InputAddon::icon(
-                                        DefaultIcons::magnifying_glass(),
-                                    )),
+                                    .left_addon(InputAddon::icon(DefaultIcons::magnifying_glass())),
                             ),
                     )
                     .child(
@@ -1048,9 +1017,7 @@ impl Showcase {
                             )
                             .child(
                                 input_group(&self.input_with_button, cx)
-                                    .right_addon(InputAddon::button(
-                                        button("go-btn", "Go"),
-                                    )),
+                                    .right_addon(InputAddon::button(button("go-btn", "Go"))),
                             ),
                     ),
             )
@@ -1074,14 +1041,12 @@ impl Showcase {
                             ),
                     )
                     .child(
-                        field()
-                            .label("Disabled")
-                            .child(
-                                textarea(&self.textarea_example, cx)
-                                    .placeholder("This is disabled...")
-                                    .rows(2)
-                                    .disabled(true),
-                            ),
+                        field().label("Disabled").child(
+                            textarea(&self.textarea_example, cx)
+                                .placeholder("This is disabled...")
+                                .rows(2)
+                                .disabled(true),
+                        ),
                     ),
             )
     }
@@ -1099,8 +1064,7 @@ impl Showcase {
             )
             .child(
                 h_stack().gap_2().child(
-                    avatar("https://avatars.githubusercontent.com/u/1714999?v=4")
-                        .size(px(32.)),
+                    avatar("https://avatars.githubusercontent.com/u/1714999?v=4").size(px(32.)),
                 ),
             )
     }
@@ -1246,9 +1210,7 @@ impl Showcase {
                 v_stack()
                     .gap_2()
                     .child(alert("This is a default alert message."))
-                    .child(
-                        alert("Informational: Your session will expire in 5 minutes.").info(),
-                    )
+                    .child(alert("Informational: Your session will expire in 5 minutes.").info())
                     .child(alert("Success! Your changes have been saved.").success())
                     .child(alert("Warning: This action cannot be undone.").warning())
                     .child(alert("Error: Failed to connect to server.").destructive())
@@ -1277,16 +1239,16 @@ impl Showcase {
                 h_stack()
                     .gap_2()
                     .child(
-                        button("tooltip-btn-1", "Hover me")
-                            .tooltip(tooltip("This is a tooltip")),
+                        button("tooltip-btn-1", "Hover me").tooltip(tooltip("This is a tooltip")),
                     )
                     .child(
                         icon_button("tooltip-icon", DefaultIcons::info_circled())
                             .tooltip(tooltip("More information")),
                     )
-                    .child(button("tooltip-btn-2", "Another one").tooltip(
-                        tooltip("Tooltips work on any element with an id"),
-                    )),
+                    .child(
+                        button("tooltip-btn-2", "Another one")
+                            .tooltip(tooltip("Tooltips work on any element with an id")),
+                    ),
             )
     }
 
@@ -1339,19 +1301,17 @@ impl Showcase {
                                     .child("1:1 Square"),
                             )
                             .child(
-                                aspect_ratio_square()
-                                    .width(px(80.0))
-                                    .child(
-                                        div()
-                                            .size_full()
-                                            .bg(theme.accent())
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .text_xs()
-                                            .text_color(theme.bg())
-                                            .child("1:1"),
-                                    ),
+                                aspect_ratio_square().width(px(80.0)).child(
+                                    div()
+                                        .size_full()
+                                        .bg(theme.accent())
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .text_xs()
+                                        .text_color(theme.bg())
+                                        .child("1:1"),
+                                ),
                             ),
                     )
                     .child(
@@ -1364,19 +1324,17 @@ impl Showcase {
                                     .child("16:9 Video"),
                             )
                             .child(
-                                aspect_ratio_video()
-                                    .width(px(160.0))
-                                    .child(
-                                        div()
-                                            .size_full()
-                                            .bg(theme.surface_secondary())
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .text_xs()
-                                            .text_color(theme.fg())
-                                            .child("16:9"),
-                                    ),
+                                aspect_ratio_video().width(px(160.0)).child(
+                                    div()
+                                        .size_full()
+                                        .bg(theme.surface_secondary())
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .text_xs()
+                                        .text_color(theme.fg())
+                                        .child("16:9"),
+                                ),
                             ),
                     )
                     .child(
@@ -1389,19 +1347,17 @@ impl Showcase {
                                     .child("4:3 Photo"),
                             )
                             .child(
-                                aspect_ratio(4.0 / 3.0)
-                                    .width(px(120.0))
-                                    .child(
-                                        div()
-                                            .size_full()
-                                            .bg(theme.accent_bg())
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .text_xs()
-                                            .text_color(theme.accent())
-                                            .child("4:3"),
-                                    ),
+                                aspect_ratio(4.0 / 3.0).width(px(120.0)).child(
+                                    div()
+                                        .size_full()
+                                        .bg(theme.accent_bg())
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .text_xs()
+                                        .text_color(theme.accent())
+                                        .child("4:3"),
+                                ),
                             ),
                     ),
             )
@@ -1578,7 +1534,11 @@ impl Showcase {
             )
     }
 
-    fn render_list_page(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_list_page(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -1654,7 +1614,11 @@ impl Showcase {
             .child(self.popover_example.clone())
     }
 
-    fn render_dialog_page(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_dialog_page(
+        &mut self,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -1665,14 +1629,13 @@ impl Showcase {
                     .text_color(theme.fg_muted())
                     .child("Dialog"),
             )
-            .child(
-                button("open-dialog", "Open Dialog")
-                    .on_click(cx.listener(|showcase, _, window, cx| {
-                        showcase.dialog_example.update(cx, |dialog, cx| {
-                            dialog.open(window, cx);
-                        });
-                    })),
-            )
+            .child(button("open-dialog", "Open Dialog").on_click(cx.listener(
+                |showcase, _, window, cx| {
+                    showcase.dialog_example.update(cx, |dialog, cx| {
+                        dialog.open(window, cx);
+                    });
+                },
+            )))
     }
 
     fn render_context_menu_page(&self, cx: &Context<Self>) -> impl IntoElement {
@@ -1689,7 +1652,11 @@ impl Showcase {
             .child(self.context_menu_example.clone())
     }
 
-    fn render_toast_page(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_toast_page(
+        &mut self,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -1703,28 +1670,25 @@ impl Showcase {
             .child(
                 h_stack()
                     .gap_2()
-                    .child(
-                        button("toast-default", "Default")
-                            .on_click(cx.listener(|_, _, window, cx| {
-                                cx.toast("This is a default toast").show(window, cx);
-                            })),
-                    )
-                    .child(
-                        button("toast-success", "Success")
-                            .on_click(cx.listener(|_, _, window, cx| {
-                                cx.toast("Changes saved successfully")
-                                    .success()
-                                    .show(window, cx);
-                            })),
-                    )
-                    .child(
-                        button("toast-warning", "Warning")
-                            .on_click(cx.listener(|_, _, window, cx| {
-                                cx.toast("Please check your input")
-                                    .warning()
-                                    .show(window, cx);
-                            })),
-                    ),
+                    .child(button("toast-default", "Default").on_click(cx.listener(
+                        |_, _, window, cx| {
+                            cx.toast("This is a default toast").show(window, cx);
+                        },
+                    )))
+                    .child(button("toast-success", "Success").on_click(cx.listener(
+                        |_, _, window, cx| {
+                            cx.toast("Changes saved successfully")
+                                .success()
+                                .show(window, cx);
+                        },
+                    )))
+                    .child(button("toast-warning", "Warning").on_click(cx.listener(
+                        |_, _, window, cx| {
+                            cx.toast("Please check your input")
+                                .warning()
+                                .show(window, cx);
+                        },
+                    ))),
             )
     }
 
@@ -1781,10 +1745,7 @@ impl Showcase {
                     ("danger", theme.danger()),
                 ],
             ),
-            (
-                "Overlay",
-                vec![("overlay", theme.overlay())],
-            ),
+            ("Overlay", vec![("overlay", theme.overlay())]),
             (
                 "Button",
                 vec![
@@ -1877,12 +1838,7 @@ fn color_row(name: &str, color: Hsla, theme: &gpuikit::theme::Theme) -> gpui::Di
                 .border_1()
                 .border_color(theme.border_subtle()),
         )
-        .child(
-            div()
-                .w(px(220.))
-                .text_sm()
-                .child(name.to_string()),
-        )
+        .child(div().w(px(220.)).text_sm().child(name.to_string()))
         .child(
             div()
                 .text_sm()
@@ -1945,14 +1901,8 @@ impl Render for Showcase {
                     ("toast", "Toast"),
                 ],
             ),
-            (
-                "Content",
-                vec![("markdown", "Markdown")],
-            ),
-            (
-                "System",
-                vec![("theme", "Theme")],
-            ),
+            ("Content", vec![("markdown", "Markdown")]),
+            ("System", vec![("theme", "Theme")]),
         ];
 
         let mut entries: Vec<ListEntry> = Vec::new();
@@ -1965,15 +1915,9 @@ impl Render for Showcase {
                 let is_selected = current_page == id_owned;
                 let cell = self.active_page.clone();
                 entries.push(
-                    ListEntry::item(
-                        SharedString::from(format!("nav-{}", id)),
-                        move |_w, _cx| {
-                            div()
-                                .px_2()
-                                .child(label_owned.clone())
-                                .into_any_element()
-                        },
-                    )
+                    ListEntry::item(SharedString::from(format!("nav-{}", id)), move |_w, _cx| {
+                        div().px_2().child(label_owned.clone()).into_any_element()
+                    })
                     .on_click(move |_, window, _cx| {
                         *cell.borrow_mut() = id_for_click.clone();
                         window.refresh();
@@ -1995,11 +1939,7 @@ impl Render for Showcase {
                     .flex_1()
                     .child(List::new("nav-list", entries).render(window, cx)),
             )
-            .child(
-                div()
-                    .p_2()
-                    .child(self.theme_dropdown.clone()),
-            );
+            .child(div().p_2().child(self.theme_dropdown.clone()));
 
         let content = match current_page.as_ref() {
             "button" => v_stack()

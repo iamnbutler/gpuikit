@@ -134,80 +134,74 @@ impl Render for Tabs {
             .border_color(theme.border())
             .pb(px(1.0));
 
-        div()
-            .id(self.id.clone())
-            .flex()
-            .flex_col()
-            .child(
-                tab_list.children(
-                    self.tabs
-                        .iter()
-                        .enumerate()
-                        .map(|(index, tab)| {
-                            let is_selected = selected.as_ref() == Some(&tab.id);
-                            let is_disabled = group_disabled || tab.disabled;
-                            let label = tab.label.clone();
+        div().id(self.id.clone()).flex().flex_col().child(
+            tab_list.children(
+                self.tabs
+                    .iter()
+                    .enumerate()
+                    .map(|(index, tab)| {
+                        let is_selected = selected.as_ref() == Some(&tab.id);
+                        let is_disabled = group_disabled || tab.disabled;
+                        let label = tab.label.clone();
 
-                            let text_color = if is_disabled {
-                                theme.fg_disabled()
-                            } else if is_selected {
-                                theme.accent()
-                            } else {
-                                theme.fg_muted()
-                            };
+                        let text_color = if is_disabled {
+                            theme.fg_disabled()
+                        } else if is_selected {
+                            theme.accent()
+                        } else {
+                            theme.fg_muted()
+                        };
 
-                            let bg = if is_selected && !is_disabled {
-                                theme.accent_bg()
-                            } else {
-                                gpui::Hsla::transparent_black()
-                            };
+                        let bg = if is_selected && !is_disabled {
+                            theme.accent_bg()
+                        } else {
+                            gpui::Hsla::transparent_black()
+                        };
 
-                            let border_color = if is_selected && !is_disabled {
-                                theme.accent()
-                            } else {
-                                gpui::Hsla::transparent_black()
-                            };
+                        let border_color = if is_selected && !is_disabled {
+                            theme.accent()
+                        } else {
+                            gpui::Hsla::transparent_black()
+                        };
 
-                            div()
-                                .id(ElementId::NamedInteger("tab".into(), index as u64))
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .px(rems(0.75))
-                                .py(rems(0.5))
-                                .text_sm()
-                                .text_color(text_color)
-                                .bg(bg)
-                                .border_b_2()
-                                .border_color(border_color)
-                                .mb(px(-1.0)) // Overlap with container border
-                                .rounded_t(px(4.0))
-                                .when(!is_disabled, |this| {
-                                    this.cursor_pointer()
-                                        .on_mouse_down(MouseButton::Left, |_, window, _| {
-                                            window.prevent_default()
-                                        })
-                                        .on_click(cx.listener(move |this, _, _, cx| {
-                                            this.select_tab(index, cx);
-                                        }))
-                                        .hover(|style| {
-                                            if is_selected {
-                                                style
-                                            } else {
-                                                style
-                                                    .text_color(theme.fg())
-                                                    .bg(theme.surface_secondary())
-                                            }
-                                        })
-                                })
-                                .when(is_disabled, |this| {
-                                    this.cursor_not_allowed().opacity(0.65)
-                                })
-                                .child(label)
-                        })
-                        .collect::<Vec<_>>(),
-                ),
-            )
+                        div()
+                            .id(ElementId::NamedInteger("tab".into(), index as u64))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .px(rems(0.75))
+                            .py(rems(0.5))
+                            .text_sm()
+                            .text_color(text_color)
+                            .bg(bg)
+                            .border_b_2()
+                            .border_color(border_color)
+                            .mb(px(-1.0)) // Overlap with container border
+                            .rounded_t(px(4.0))
+                            .when(!is_disabled, |this| {
+                                this.cursor_pointer()
+                                    .on_mouse_down(MouseButton::Left, |_, window, _| {
+                                        window.prevent_default()
+                                    })
+                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                        this.select_tab(index, cx);
+                                    }))
+                                    .hover(|style| {
+                                        if is_selected {
+                                            style
+                                        } else {
+                                            style
+                                                .text_color(theme.fg())
+                                                .bg(theme.surface_secondary())
+                                        }
+                                    })
+                            })
+                            .when(is_disabled, |this| this.cursor_not_allowed().opacity(0.65))
+                            .child(label)
+                    })
+                    .collect::<Vec<_>>(),
+            ),
+        )
     }
 }
 

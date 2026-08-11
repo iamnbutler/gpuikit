@@ -1,4 +1,4 @@
-use unicode_bidi::{BidiClass, bidi_class};
+use unicode_bidi::{bidi_class, BidiClass};
 
 /// Text direction for bidirectional text support.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

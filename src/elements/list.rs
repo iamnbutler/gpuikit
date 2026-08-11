@@ -41,9 +41,7 @@ type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 #[derive(Clone)]
 pub enum ListEntry {
     /// A section header label, rendered bottom-aligned with space above.
-    Header {
-        label: SharedString,
-    },
+    Header { label: SharedString },
     /// A content item rendered by a callback, with an optional click handler.
     Item {
         id: ElementId,
@@ -79,7 +77,10 @@ impl ListEntry {
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
     ) -> Self {
-        if let ListEntry::Item { ref mut on_click, .. } = self {
+        if let ListEntry::Item {
+            ref mut on_click, ..
+        } = self
+        {
             *on_click = Some(Rc::new(handler));
         }
         self
@@ -87,7 +88,10 @@ impl ListEntry {
 
     /// Mark this entry as selected.
     pub fn selected(mut self, is_selected: bool) -> Self {
-        if let ListEntry::Item { ref mut selected, .. } = self {
+        if let ListEntry::Item {
+            ref mut selected, ..
+        } = self
+        {
             *selected = is_selected;
         }
         self
@@ -145,60 +149,56 @@ impl List {
         let accent = theme.accent();
         let accent_bg = theme.accent_bg();
 
-        let list = uniform_list(
-            self.id,
-            entry_count,
-            move |range, window, cx| {
-                range
-                    .map(|ix| {
-                        let entry = &entries[ix];
-                        match entry {
-                            ListEntry::Header { label } => div()
+        let list = uniform_list(self.id, entry_count, move |range, window, cx| {
+            range
+                .map(|ix| {
+                    let entry = &entries[ix];
+                    match entry {
+                        ListEntry::Header { label } => div()
+                            .h(item_height)
+                            .w_full()
+                            .flex()
+                            .items_end()
+                            .px_2()
+                            .pb(px(2.))
+                            .child(
+                                div()
+                                    .text_size(font_size - px(1.))
+                                    .text_color(fg_muted)
+                                    .child(label.clone()),
+                            )
+                            .into_any_element(),
+                        ListEntry::Item {
+                            id,
+                            render,
+                            on_click,
+                            selected,
+                        } => {
+                            let content = render(window, cx);
+                            let row = div()
+                                .id(id.clone())
                                 .h(item_height)
                                 .w_full()
                                 .flex()
-                                .items_end()
-                                .px_2()
-                                .pb(px(2.))
-                                .child(
-                                    div()
-                                        .text_size(font_size - px(1.))
-                                        .text_color(fg_muted)
-                                        .child(label.clone()),
-                                )
-                                .into_any_element(),
-                            ListEntry::Item { id, render, on_click, selected } => {
-                                let content = render(window, cx);
-                                let row = div()
-                                    .id(id.clone())
-                                    .h(item_height)
-                                    .w_full()
-                                    .flex()
-                                    .items_center()
-                                    .text_size(font_size)
-                                    .rounded_sm()
-                                    .when(*selected, |el| {
-                                        el.bg(accent_bg)
-                                            .text_color(accent)
+                                .items_center()
+                                .text_size(font_size)
+                                .rounded_sm()
+                                .when(*selected, |el| el.bg(accent_bg).text_color(accent))
+                                .when(!*selected, |el| {
+                                    el.text_color(fg).hover(|s| s.bg(accent_bg.opacity(0.5)))
+                                })
+                                .when_some(on_click.clone(), |el, handler| {
+                                    el.cursor_pointer().on_click(move |event, window, cx| {
+                                        handler(event, window, cx);
                                     })
-                                    .when(!*selected, |el| {
-                                        el.text_color(fg)
-                                            .hover(|s| s.bg(accent_bg.opacity(0.5)))
-                                    })
-                                    .when_some(on_click.clone(), |el, handler| {
-                                        el.cursor_pointer()
-                                            .on_click(move |event, window, cx| {
-                                                handler(event, window, cx);
-                                            })
-                                    })
-                                    .child(content);
-                                row.into_any_element()
-                            }
+                                })
+                                .child(content);
+                            row.into_any_element()
                         }
-                    })
-                    .collect()
-            },
-        )
+                    }
+                })
+                .collect()
+        })
         .size_full();
 
         match self.scroll_handle {

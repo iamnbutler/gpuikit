@@ -5,8 +5,8 @@
 use crate::icons::Icons;
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, prelude::FluentBuilder, px, rems, App, ClickEvent, Context, ElementId, Entity,
-    Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce, SharedString,
+    div, prelude::FluentBuilder, px, rems, App, ClickEvent, Context, ElementId, Entity, Hsla,
+    InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce, SharedString,
     StatefulInteractiveElement, Styled, Svg, Window,
 };
 
@@ -184,7 +184,14 @@ impl Alert {
 impl RenderOnce for Alert {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         // Extract theme colors first to avoid borrow conflicts
-        let (fg_color, fg_muted_color, surface_secondary_color, variant_color, bg_color, border_color) = {
+        let (
+            fg_color,
+            fg_muted_color,
+            surface_secondary_color,
+            variant_color,
+            bg_color,
+            border_color,
+        ) = {
             let theme = cx.theme();
             (
                 theme.fg(),
@@ -268,11 +275,7 @@ impl RenderOnce for Alert {
                         content.child(
                             div()
                                 .text_sm()
-                                .text_color(if has_title {
-                                    fg_muted_color
-                                } else {
-                                    fg_color
-                                })
+                                .text_color(if has_title { fg_muted_color } else { fg_color })
                                 .child(description),
                         )
                     }),

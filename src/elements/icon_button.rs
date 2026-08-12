@@ -2,7 +2,7 @@ use crate::theme::{ActiveTheme, Themeable};
 use crate::traits::{clickable::Clickable, disableable::Disableable, selectable::Selectable};
 use gpui::{
     prelude::FluentBuilder, px, AnyView, App, ClickEvent, Context, ElementId, Entity,
-    InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce,
+    InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, RenderOnce,
     StatefulInteractiveElement, Styled, Svg, Window,
 };
 
@@ -28,6 +28,12 @@ pub struct IconButton {
     /// Called when toggle state changes (only used with internal state)
     on_toggle: Option<Box<dyn Fn(&bool, &mut Window, &mut App) + 'static>>,
     tooltip: Option<Box<dyn Fn(&mut Window, &mut App) -> AnyView + 'static>>,
+    /// Button box width (default 24px)
+    width: Option<Pixels>,
+    /// Button box height (default 24px)
+    height: Option<Pixels>,
+    /// Rendered icon size (default 16px)
+    icon_size: Option<Pixels>,
 }
 
 impl IconButton {
@@ -41,7 +47,36 @@ impl IconButton {
             handler: None,
             on_toggle: None,
             tooltip: None,
+            width: None,
+            height: None,
+            icon_size: None,
         }
+    }
+
+    /// Set the button box to a square of the given size (default 24px).
+    pub fn size(mut self, size: impl Into<Pixels>) -> Self {
+        let size = size.into();
+        self.width = Some(size);
+        self.height = Some(size);
+        self
+    }
+
+    /// Set the button box width (default 24px).
+    pub fn width(mut self, width: impl Into<Pixels>) -> Self {
+        self.width = Some(width.into());
+        self
+    }
+
+    /// Set the button box height (default 24px).
+    pub fn height(mut self, height: impl Into<Pixels>) -> Self {
+        self.height = Some(height.into());
+        self
+    }
+
+    /// Set the rendered icon size within the button (default 16px).
+    pub fn icon_size(mut self, size: impl Into<Pixels>) -> Self {
+        self.icon_size = Some(size.into());
+        self
     }
 
     /// Enable internal state management for toggle behavior.
@@ -126,7 +161,8 @@ impl RenderOnce for IconButton {
 
         gpui::div()
             .id(self.id)
-            .size(px(24.))
+            .w(self.width.unwrap_or(px(24.)))
+            .h(self.height.unwrap_or(px(24.)))
             .flex()
             .flex_none()
             .items_center()
@@ -162,7 +198,11 @@ impl RenderOnce for IconButton {
                     })
             })
             .when_some(self.tooltip, |el, tooltip| el.tooltip(tooltip))
-            .child(self.icon.size(px(16.)).text_color(icon_color))
+            .child(
+                self.icon
+                    .size(self.icon_size.unwrap_or(px(16.)))
+                    .text_color(icon_color),
+            )
     }
 }
 

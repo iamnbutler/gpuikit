@@ -55,8 +55,14 @@ actions!(
         Cut,
         /// Copy selected text to clipboard.
         Copy,
-        /// Insert a newline at the cursor position.
+        /// Insert a newline at the cursor position, or submit when the input's
+        /// submit mode is `SubmitOn::Enter`.
         Enter,
+        /// Submit the input's content (fires `InputStateEvent::Submit` on
+        /// inputs configured with a submit mode).
+        Submit,
+        /// Insert a newline at the cursor position regardless of submit mode.
+        InsertNewline,
         /// Move cursor one word to the left.
         WordLeft,
         /// Move cursor one word to the right.
@@ -116,6 +122,16 @@ pub struct InputBindings {
     /// Binding for inserting a newline (multi-line) or confirming input (single-line).
     /// Default: `enter`
     pub enter: Option<KeyBinding>,
+
+    /// Binding for submitting the input via `InputStateEvent::Submit`.
+    /// Only fires on inputs configured with a submit mode ([`InputState::submit_on`]).
+    /// Default: `cmd-enter` (macOS) / `ctrl-enter` (other platforms)
+    pub submit: Option<KeyBinding>,
+
+    /// Binding for inserting a newline regardless of submit mode — the escape
+    /// hatch when `enter` is configured to submit.
+    /// Default: `shift-enter`
+    pub insert_newline: Option<KeyBinding>,
 
     /// Binding for moving the cursor one character to the left.
     /// Default: `left`
@@ -238,6 +254,8 @@ impl Default for InputBindings {
                 delete_to_end_of_line: Some(KeyBinding::new("ctrl-k", DeleteToEndOfLine, context)),
                 tab: Some(KeyBinding::new("tab", Tab, context)),
                 enter: Some(KeyBinding::new("enter", Enter, context)),
+                submit: Some(KeyBinding::new("cmd-enter", Submit, context)),
+                insert_newline: Some(KeyBinding::new("shift-enter", InsertNewline, context)),
                 left: Some(KeyBinding::new("left", Left, context)),
                 right: Some(KeyBinding::new("right", Right, context)),
                 up: Some(KeyBinding::new("up", Up, context)),
@@ -293,6 +311,8 @@ impl Default for InputBindings {
                 )),
                 tab: Some(KeyBinding::new("tab", Tab, context)),
                 enter: Some(KeyBinding::new("enter", Enter, context)),
+                submit: Some(KeyBinding::new("ctrl-enter", Submit, context)),
+                insert_newline: Some(KeyBinding::new("shift-enter", InsertNewline, context)),
                 left: Some(KeyBinding::new("left", Left, context)),
                 right: Some(KeyBinding::new("right", Right, context)),
                 up: Some(KeyBinding::new("up", Up, context)),
@@ -350,6 +370,8 @@ impl InputBindings {
             delete_to_end_of_line: None,
             tab: None,
             enter: None,
+            submit: None,
+            insert_newline: None,
             left: None,
             right: None,
             up: None,
@@ -395,6 +417,8 @@ impl InputBindings {
                 .or(defaults.delete_to_end_of_line),
             tab: self.tab.or(defaults.tab),
             enter: self.enter.or(defaults.enter),
+            submit: self.submit.or(defaults.submit),
+            insert_newline: self.insert_newline.or(defaults.insert_newline),
             left: self.left.or(defaults.left),
             right: self.right.or(defaults.right),
             up: self.up.or(defaults.up),
@@ -434,6 +458,8 @@ impl InputBindings {
             self.delete_to_end_of_line,
             self.tab,
             self.enter,
+            self.submit,
+            self.insert_newline,
             self.left,
             self.right,
             self.up,

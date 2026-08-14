@@ -15,9 +15,10 @@ use unicode_segmentation::UnicodeSegmentation;
 use super::bidi::{detect_base_direction, TextDirection};
 use super::bindings::{
     Backspace, Copy, Cut, Delete, DeleteToBeginningOfLine, DeleteToEndOfLine, DeleteWordLeft,
-    DeleteWordRight, Down, End, Enter, Home, Left, MoveToBeginning, MoveToEnd, Paste, Redo, Right,
-    SelectAll, SelectDown, SelectLeft, SelectRight, SelectToBeginning, SelectToEnd, SelectUp,
-    SelectWordLeft, SelectWordRight, Tab, Undo, Up, WordLeft, WordRight,
+    DeleteWordRight, Down, End, Enter, Home, InsertNewline, Left, MoveToBeginning, MoveToEnd,
+    Paste, Redo, Right, SelectAll, SelectDown, SelectLeft, SelectRight, SelectToBeginning,
+    SelectToEnd, SelectUp, SelectWordLeft, SelectWordRight, Submit, Tab, Undo, Up, WordLeft,
+    WordRight,
 };
 
 /// Default interval for grouping consecutive edits into a single undo entry.
@@ -42,9 +43,28 @@ pub enum InputStateEvent {
     Undo,
     /// Emitted when a redo operation is performed.
     Redo,
+    /// Emitted when the submit keystroke fires on an input configured with a
+    /// submit mode ([`InputState::submit_on`]). The content is left in place —
+    /// the subscriber decides whether to read and clear it.
+    Submit,
 }
 
 impl EventEmitter<InputStateEvent> for InputState {}
+
+/// Which keystroke fires [`InputStateEvent::Submit`].
+///
+/// In either mode `shift-enter` always inserts a newline (multiline inputs),
+/// and the submit keystroke leaves the content untouched — the subscriber
+/// reads and clears it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SubmitOn {
+    /// `enter` submits; newlines are typed with `shift-enter`. The chat
+    /// convention.
+    Enter,
+    /// `cmd-enter` (`ctrl-enter` off-mac) submits; `enter` inserts a newline.
+    /// The compose-then-send convention.
+    CmdEnter,
+}
 
 /// A patch-based history entry for memory-efficient undo/redo operations.
 /// Instead of storing the full content, we store only the change needed to reverse the edit.
@@ -120,6 +140,8 @@ pub struct InputState {
     pub(crate) available_height: Pixels,
     pub(crate) available_width: Pixels,
     multiline: bool,
+    /// Which keystroke fires [`InputStateEvent::Submit`], if any.
+    submit_on: Option<SubmitOn>,
     /// Stack of previous states for undo.
     undo_stack: Vec<HistoryEntry>,
     /// Stack of undone states for redo.
@@ -191,6 +213,7 @@ impl InputState {
             available_height: px(0.),
             available_width: px(0.),
             multiline: false,
+            submit_on: None,
             undo_stack: Vec::new(),
             cached_utf16_len: None,
             redo_stack: Vec::new(),
@@ -210,6 +233,18 @@ impl InputState {
     /// Returns whether this input allows multiple lines.
     pub fn is_multiline(&self) -> bool {
         self.multiline
+    }
+
+    /// Configures which keystroke fires [`InputStateEvent::Submit`].
+    /// `None` (the default) keeps enter inserting newlines and emits nothing.
+    pub fn submit_on(mut self, mode: impl Into<Option<SubmitOn>>) -> Self {
+        self.submit_on = mode.into();
+        self
+    }
+
+    /// Returns the configured submit mode, if any.
+    pub fn submit_mode(&self) -> Option<SubmitOn> {
+        self.submit_on
     }
 
     /// Enables or disables cursor blinking.
@@ -730,6 +765,27 @@ impl InputState {
     }
 
     pub(crate) fn enter(&mut self, _: &Enter, window: &mut Window, cx: &mut Context<Self>) {
+        if self.submit_on == Some(SubmitOn::Enter) {
+            cx.emit(InputStateEvent::Submit);
+        } else if self.multiline {
+            self.replace_text_in_range(None, "\n", window, cx);
+        }
+    }
+
+    pub(crate) fn submit(&mut self, _: &Submit, _window: &mut Window, cx: &mut Context<Self>) {
+        // Fires in both modes: cmd-enter submitting alongside plain enter is
+        // harmless muscle memory; without a mode it stays inert.
+        if self.submit_on.is_some() {
+            cx.emit(InputStateEvent::Submit);
+        }
+    }
+
+    pub(crate) fn insert_newline(
+        &mut self,
+        _: &InsertNewline,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.multiline {
             self.replace_text_in_range(None, "\n", window, cx);
         }

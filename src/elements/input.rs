@@ -14,8 +14,8 @@ use gpui::{
     DispatchPhase, Element, ElementId, Entity, FocusHandle, Focusable, GlobalElementId, Hitbox,
     HitboxBehavior, Hsla, InspectorElementId, InteractiveElement, Interactivity, IntoElement,
     LayoutId, Length, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point,
-    ScrollWheelEvent, SharedString, StyleRefinement, Styled, TextAlign, TextRun, TextStyle, Window,
-    WrappedLine,
+    ScrollWheelEvent, SharedString, StyleRefinement, Styled, TextAlign, TextRun, TextStyle,
+    TextStyleRefinement, Window, WrappedLine,
 };
 
 use crate::theme::{ActiveTheme, Themeable};
@@ -178,6 +178,12 @@ impl Input {
             InputState::delete_to_end_of_line,
         );
         register_action(&mut self.interactivity, &self.input, InputState::enter);
+        register_action(&mut self.interactivity, &self.input, InputState::submit);
+        register_action(
+            &mut self.interactivity,
+            &self.input,
+            InputState::insert_newline,
+        );
         register_action(&mut self.interactivity, &self.input, InputState::tab);
         register_action(&mut self.interactivity, &self.input, InputState::paste);
         register_action(&mut self.interactivity, &self.input, InputState::copy);
@@ -249,25 +255,36 @@ impl Element for Input {
         let mut resolved_text_style = None;
         let multiline = self.multiline;
 
+        // Content text defaults to the theme foreground — the window's
+        // inherited style bottoms out at gpui's default (black), which is
+        // invisible on dark themes. The element's own text-style refinement
+        // is applied on top, so an explicit `.text_color()` still wins.
+        let themed_color = TextStyleRefinement {
+            color: Some(cx.theme().fg()),
+            ..Default::default()
+        };
+
         let layout_id = self.interactivity.request_layout(
             global_id,
             inspector_id,
             window,
             cx,
             |element_style, window, cx| {
-                window.with_text_style(element_style.text_style().cloned(), |window| {
-                    resolved_text_style = Some(window.text_style());
+                window.with_text_style(Some(themed_color.clone()), |window| {
+                    window.with_text_style(element_style.text_style().cloned(), |window| {
+                        resolved_text_style = Some(window.text_style());
 
-                    let mut layout_style = element_style.clone();
-                    if multiline {
-                        if let Length::Auto = layout_style.size.width {
-                            layout_style.size.width = relative(1.).into();
+                        let mut layout_style = element_style.clone();
+                        if multiline {
+                            if let Length::Auto = layout_style.size.width {
+                                layout_style.size.width = relative(1.).into();
+                            }
+                            if let Length::Auto = layout_style.size.height {
+                                layout_style.size.height = relative(1.).into();
+                            }
                         }
-                        if let Length::Auto = layout_style.size.height {
-                            layout_style.size.height = relative(1.).into();
-                        }
-                    }
-                    window.request_layout(layout_style, None, cx)
+                        window.request_layout(layout_style, None, cx)
+                    })
                 })
             },
         );

@@ -35,4 +35,4 @@ pub use bidi::{detect_base_direction, TextDirection};
 pub use bindings::{bind_input_keys, InputBindings, INPUT_CONTEXT};
 pub use blink::CursorBlink;
 pub use handler::*;
-pub use state::{InputLineLayout, InputState, InputStateEvent};
+pub use state::{InputLineLayout, InputState, InputStateEvent, SubmitOn};

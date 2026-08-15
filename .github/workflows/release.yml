@@ -117,9 +117,11 @@ jobs:
           if [ -z "$PREV_TAG" ]; then
             # First release - get all commits
             COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges)
+            CHANGELOG_LINK="First release"
           else
             # Get commits since last tag
             COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+            CHANGELOG_LINK="https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG}"
           fi
 
           # Create release notes file
@@ -128,7 +130,7 @@ jobs:
 
           ${COMMITS:-No changes recorded}
 
-          **Full Changelog**: ${PREV_TAG:+https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG}}${PREV_TAG:-First release}
+          **Full Changelog**: ${CHANGELOG_LINK}
           EOF
 
           echo "Release notes generated"

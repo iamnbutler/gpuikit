@@ -30,8 +30,8 @@ pub use style::*;
 
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, prelude::*, rems, App, Context, Entity, IntoElement, ParentElement, SharedString, Styled,
-    Window,
+    div, prelude::*, rems, App, Context, ElementId, Entity, IntoElement, ParentElement,
+    SharedString, Styled, Window,
 };
 use pulldown_cmark::{Alignment, Event, Tag, TagEnd};
 
@@ -146,10 +146,10 @@ struct MarkdownRenderer {
     in_heading: Option<HeadingLevel>,
     in_code_block: bool,
     in_block_quote: bool,
-    in_link: Option<LinkContext>,
     in_image: Option<ImageContext>,
     list_stack: Vec<ListContext>,
-    link_counter: usize,
+    /// Monotonic id source for elements that need one (interactive text).
+    element_counter: usize,
 
     // Table state
     in_table: bool,
@@ -161,11 +161,6 @@ struct MarkdownRenderer {
     // Rich text tracking
     current_text: RichText,
     active_style: InlineStyle,
-}
-
-#[derive(Clone, Debug)]
-struct LinkContext {
-    url: String,
 }
 
 #[derive(Clone, Debug)]
@@ -188,10 +183,9 @@ impl MarkdownRenderer {
             in_heading: None,
             in_code_block: false,
             in_block_quote: false,
-            in_link: None,
             in_image: None,
             list_stack: Vec::new(),
-            link_counter: 0,
+            element_counter: 0,
             in_table: false,
             table_alignments: Vec::new(),
             table_rows: Vec::new(),
@@ -221,7 +215,15 @@ impl MarkdownRenderer {
             Event::End(tag) => self.handle_end_tag(tag, cx),
             Event::Text(text) => self.handle_text(text),
             Event::Code(code) => self.handle_inline_code(code),
-            Event::SoftBreak => self.current_text.push(" ", self.active_style),
+            // Agent/LLM output often uses single newlines as real breaks;
+            // `soft_break_as_hard_break` opts into honoring them.
+            Event::SoftBreak => {
+                if self.style.soft_break_as_hard_break {
+                    self.current_text.push("\n", self.active_style)
+                } else {
+                    self.current_text.push(" ", self.active_style)
+                }
+            }
             Event::HardBreak => self.current_text.push("\n", self.active_style),
             Event::Rule => self.push_divider(cx),
             Event::TaskListMarker(checked) => self.handle_task_marker(*checked),
@@ -259,9 +261,9 @@ impl MarkdownRenderer {
                 self.active_style.strikethrough = true;
             }
             Tag::Link { dest_url, .. } => {
-                self.in_link = Some(LinkContext {
-                    url: dest_url.to_string(),
-                });
+                // Inline: the link is a styled, clickable range of the
+                // surrounding text run, not its own block element.
+                self.active_style.link = Some(self.current_text.add_link(dest_url.to_string()));
             }
             Tag::Image {
                 dest_url, title, ..
@@ -332,7 +334,7 @@ impl MarkdownRenderer {
                 self.active_style.strikethrough = false;
             }
             TagEnd::Link => {
-                self.flush_link(cx);
+                self.active_style.link = None;
             }
             TagEnd::Image => {
                 self.flush_image(cx);
@@ -374,14 +376,30 @@ impl MarkdownRenderer {
     }
 
     fn handle_inline_code(&mut self, code: &str) {
-        self.current_text.push("`", self.active_style);
-        self.current_text.push(code, self.active_style);
-        self.current_text.push("`", self.active_style);
+        // A styled span (background wash via the palette), not literal
+        // backticks in the text.
+        let mut style = self.active_style;
+        style.code = true;
+        self.current_text.push(code, style);
     }
 
     fn handle_task_marker(&mut self, checked: bool) {
         let marker = if checked { "☑ " } else { "☐ " };
         self.current_text.push(marker, self.active_style);
+    }
+
+    /// Theme-resolved colors for inline code and link spans.
+    fn palette(&self, cx: &App) -> InlinePalette {
+        let theme = cx.theme();
+        InlinePalette {
+            code_background: Some(self.style.inline_code_bg.unwrap_or(theme.surface())),
+            link_color: Some(self.style.link_color.unwrap_or(theme.accent())),
+        }
+    }
+
+    fn next_id(&mut self) -> ElementId {
+        self.element_counter += 1;
+        ElementId::NamedInteger("md-run".into(), self.element_counter as u64)
     }
 
     fn flush_paragraph(&mut self, cx: &App) {
@@ -390,7 +408,8 @@ impl MarkdownRenderer {
         }
 
         let rich_text = std::mem::take(&mut self.current_text);
-        let element = elements::rich_paragraph(&rich_text, &self.style.body, cx);
+        let (id, palette) = (self.next_id(), self.palette(cx));
+        let element = elements::rich_paragraph(id, &rich_text, &self.style.body, &palette, cx);
         self.elements.push(element.into_any_element());
     }
 
@@ -407,9 +426,11 @@ impl MarkdownRenderer {
             elements::HeadingLevel::H4 => &self.style.h4,
             elements::HeadingLevel::H5 => &self.style.h5,
             elements::HeadingLevel::H6 => &self.style.h6,
-        };
+        }
+        .clone();
 
-        let element = elements::rich_heading(&rich_text, heading_style, cx);
+        let (id, palette) = (self.next_id(), self.palette(cx));
+        let element = elements::rich_heading(id, &rich_text, &heading_style, &palette, cx);
         self.elements.push(element.into_any_element());
     }
 
@@ -419,11 +440,14 @@ impl MarkdownRenderer {
         }
 
         let rich_text = std::mem::take(&mut self.current_text);
+        let (id, palette) = (self.next_id(), self.palette(cx));
         let element = elements::rich_block_quote(
+            id,
             &rich_text,
             &self.style.body,
             self.style.block_quote_border,
             self.style.block_quote_text,
+            &palette,
             cx,
         );
         self.elements.push(element.into_any_element());
@@ -469,28 +493,16 @@ impl MarkdownRenderer {
         };
 
         let indent_level = self.list_stack.len().saturating_sub(1);
-        let element =
-            elements::rich_list_item(&rich_text, marker, indent_level, &self.style.body, cx);
-        self.elements.push(element.into_any_element());
-    }
-
-    fn flush_link(&mut self, cx: &App) {
-        let link_ctx = match self.in_link.take() {
-            Some(ctx) => ctx,
-            None => return,
-        };
-
-        if self.current_text.is_empty() {
-            return;
-        }
-
-        let text = self.current_text.to_plain_text();
-        self.current_text.clear();
-
-        let id: SharedString = format!("md-link-{}", self.link_counter).into();
-        self.link_counter += 1;
-
-        let element = elements::link(id, text, link_ctx.url.into(), self.style.link_color, cx);
+        let (id, palette) = (self.next_id(), self.palette(cx));
+        let element = elements::rich_list_item(
+            id,
+            &rich_text,
+            marker,
+            indent_level,
+            &self.style.body,
+            &palette,
+            cx,
+        );
         self.elements.push(element.into_any_element());
     }
 
@@ -557,7 +569,9 @@ impl MarkdownRenderer {
                     .when(row_idx > 0, |el| el.border_t_1().border_color(border_color))
                     .children(row.into_iter().enumerate().map(|(col_idx, cell)| {
                         let alignment = alignments.get(col_idx).copied().unwrap_or(Alignment::None);
-                        let (text, highlights) = cell.to_highlights();
+                        // Styled (code wash, link color) but not clickable —
+                        // cells sit in a custom layout without element ids.
+                        let (text, highlights) = cell.to_highlights_with(&self.palette(cx));
                         let styled_text: SharedString = text.into();
 
                         div()

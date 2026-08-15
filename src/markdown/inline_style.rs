@@ -1,17 +1,38 @@
 //! Inline text styling for markdown rendering.
 //!
 //! This module provides types for tracking and rendering inline text styles
-//! like bold, italic, and strikethrough within markdown text.
+//! like bold, italic, strikethrough, inline code, and links within markdown
+//! text. Code and links stay *inline* — spans within one text run — rather
+//! than being flushed as separate block elements, so a sentence survives
+//! having a link or a code chip in the middle of it.
 
-use gpui::{FontStyle, FontWeight, HighlightStyle, StrikethroughStyle};
+use gpui::{FontStyle, FontWeight, HighlightStyle, Hsla, SharedString, StrikethroughStyle};
 use std::ops::Range;
 
 /// Inline text style flags that can be combined.
+///
+/// `link` is an index into the owning [`RichText`]'s URL table rather than
+/// the URL itself, which keeps this type `Copy` and keeps span merging
+/// correct: two adjacent links to different URLs have different indices, so
+/// they never merge into one clickable range.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct InlineStyle {
     pub bold: bool,
     pub italic: bool,
     pub strikethrough: bool,
+    pub code: bool,
+    pub link: Option<u32>,
+}
+
+/// Theme-resolved colors for the inline styles that need them. Resolved by
+/// the element (which has the theme) and passed into
+/// [`RichText::to_highlights_with`]; `None` leaves that aspect unstyled.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct InlinePalette {
+    /// Background wash behind inline code spans.
+    pub code_background: Option<Hsla>,
+    /// Text color for link spans (they are also underlined).
+    pub link_color: Option<Hsla>,
 }
 
 impl InlineStyle {
@@ -34,7 +55,16 @@ impl InlineStyle {
         self
     }
 
+    pub fn with_code(mut self) -> Self {
+        self.code = true;
+        self
+    }
+
     pub fn to_highlight_style(self) -> HighlightStyle {
+        self.to_highlight_style_with(&InlinePalette::default())
+    }
+
+    pub fn to_highlight_style_with(self, palette: &InlinePalette) -> HighlightStyle {
         let mut style = HighlightStyle::default();
 
         if self.bold {
@@ -52,11 +82,24 @@ impl InlineStyle {
             });
         }
 
+        if self.code {
+            style.background_color = palette.code_background;
+        }
+
+        if self.link.is_some() {
+            style.color = palette.link_color;
+            style.underline = Some(gpui::UnderlineStyle {
+                thickness: gpui::px(1.0),
+                color: palette.link_color,
+                wavy: false,
+            });
+        }
+
         style
     }
 
     pub fn is_empty(&self) -> bool {
-        !self.bold && !self.italic && !self.strikethrough
+        !self.bold && !self.italic && !self.strikethrough && !self.code && self.link.is_none()
     }
 }
 
@@ -67,15 +110,53 @@ pub struct TextSpan {
     pub style: InlineStyle,
 }
 
-/// Rich text container that holds styled text spans.
+/// Rich text container that holds styled text spans, plus the URL table that
+/// link spans index into.
 #[derive(Clone, Debug, Default)]
 pub struct RichText {
     spans: Vec<TextSpan>,
+    links: Vec<SharedString>,
 }
 
 impl RichText {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Register a link destination, returning the index for
+    /// [`InlineStyle::link`] on the spans that carry its text.
+    pub fn add_link(&mut self, url: impl Into<SharedString>) -> u32 {
+        self.links.push(url.into());
+        (self.links.len() - 1) as u32
+    }
+
+    /// The registered link destinations, in registration order.
+    pub fn links(&self) -> &[SharedString] {
+        &self.links
+    }
+
+    /// Byte ranges of the flattened text that are links, with their
+    /// destinations — the input for an interactive text element's clickable
+    /// ranges. Adjacent spans of the same link merge into one range.
+    pub fn link_ranges(&self) -> Vec<(Range<usize>, SharedString)> {
+        let mut ranges: Vec<(Range<usize>, u32)> = Vec::new();
+        let mut offset = 0;
+        for span in &self.spans {
+            let end = offset + span.text.len();
+            if let Some(link) = span.style.link {
+                match ranges.last_mut() {
+                    Some((range, last)) if *last == link && range.end == offset => {
+                        range.end = end;
+                    }
+                    _ => ranges.push((offset..end, link)),
+                }
+            }
+            offset = end;
+        }
+        ranges
+            .into_iter()
+            .filter_map(|(range, ix)| Some((range, self.links.get(ix as usize)?.clone())))
+            .collect()
     }
 
     pub fn push(&mut self, text: impl Into<String>, style: InlineStyle) {
@@ -104,6 +185,7 @@ impl RichText {
 
     pub fn clear(&mut self) {
         self.spans.clear();
+        self.links.clear();
     }
 
     pub fn to_plain_text(&self) -> String {
@@ -111,6 +193,13 @@ impl RichText {
     }
 
     pub fn to_highlights(&self) -> (String, Vec<(Range<usize>, HighlightStyle)>) {
+        self.to_highlights_with(&InlinePalette::default())
+    }
+
+    pub fn to_highlights_with(
+        &self,
+        palette: &InlinePalette,
+    ) -> (String, Vec<(Range<usize>, HighlightStyle)>) {
         let mut text = String::new();
         let mut highlights = Vec::new();
 
@@ -120,7 +209,7 @@ impl RichText {
             let end = text.len();
 
             if !span.style.is_empty() {
-                highlights.push((start..end, span.style.to_highlight_style()));
+                highlights.push((start..end, span.style.to_highlight_style_with(palette)));
             }
         }
 
@@ -243,5 +332,143 @@ mod tests {
         rt.push_plain("Text");
         rt.push_plain("");
         assert_eq!(rt.spans().len(), 1);
+    }
+
+    #[test]
+    fn test_code_span_styles_without_backticks() {
+        let mut rt = RichText::new();
+        rt.push_plain("run ");
+        rt.push("cargo test", InlineStyle::new().with_code());
+        rt.push_plain(" first");
+
+        let palette = InlinePalette {
+            code_background: Some(gpui::hsla(0., 0., 0.5, 1.)),
+            link_color: None,
+        };
+        let (text, highlights) = rt.to_highlights_with(&palette);
+        assert_eq!(text, "run cargo test first");
+        assert_eq!(highlights.len(), 1);
+        assert_eq!(highlights[0].0, 4..14);
+        assert_eq!(highlights[0].1.background_color, palette.code_background);
+    }
+
+    #[test]
+    fn test_link_spans_stay_inline_and_click_ranges_resolve() {
+        let mut rt = RichText::new();
+        rt.push_plain("see ");
+        let a = rt.add_link("https://a.example");
+        rt.push(
+            "first",
+            InlineStyle {
+                link: Some(a),
+                ..Default::default()
+            },
+        );
+        rt.push_plain(" and ");
+        let b = rt.add_link("https://b.example");
+        rt.push(
+            "second",
+            InlineStyle {
+                link: Some(b),
+                ..Default::default()
+            },
+        );
+
+        // The sentence survives as one text run…
+        let (text, _) = rt.to_highlights();
+        assert_eq!(text, "see first and second");
+
+        // …with two distinct clickable ranges pointing at their own URLs.
+        let ranges = rt.link_ranges();
+        assert_eq!(ranges.len(), 2);
+        assert_eq!(ranges[0].0, 4..9);
+        assert_eq!(ranges[0].1.as_ref(), "https://a.example");
+        assert_eq!(ranges[1].0, 14..20);
+        assert_eq!(ranges[1].1.as_ref(), "https://b.example");
+    }
+
+    #[test]
+    fn test_adjacent_spans_of_different_links_do_not_merge() {
+        let mut rt = RichText::new();
+        let a = rt.add_link("https://a.example");
+        let b = rt.add_link("https://b.example");
+        rt.push(
+            "one",
+            InlineStyle {
+                link: Some(a),
+                ..Default::default()
+            },
+        );
+        rt.push(
+            "two",
+            InlineStyle {
+                link: Some(b),
+                ..Default::default()
+            },
+        );
+        assert_eq!(rt.spans().len(), 2);
+        assert_eq!(rt.link_ranges().len(), 2);
+    }
+
+    #[test]
+    fn test_split_link_spans_merge_into_one_range() {
+        // A link whose text is interrupted by emphasis is still one link.
+        let mut rt = RichText::new();
+        let a = rt.add_link("https://a.example");
+        let plain = InlineStyle {
+            link: Some(a),
+            ..Default::default()
+        };
+        let bold = InlineStyle {
+            link: Some(a),
+            bold: true,
+            ..Default::default()
+        };
+        rt.push("very ", plain);
+        rt.push("bold", bold);
+        rt.push(" link", plain);
+
+        let ranges = rt.link_ranges();
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].0, 0..14);
+    }
+
+    #[test]
+    fn test_link_styling_applies_color_and_underline() {
+        let mut rt = RichText::new();
+        let a = rt.add_link("https://a.example");
+        rt.push(
+            "link",
+            InlineStyle {
+                link: Some(a),
+                ..Default::default()
+            },
+        );
+
+        let palette = InlinePalette {
+            code_background: None,
+            link_color: Some(gpui::hsla(0.6, 0.8, 0.5, 1.)),
+        };
+        let (_, highlights) = rt.to_highlights_with(&palette);
+        assert_eq!(highlights.len(), 1);
+        assert_eq!(highlights[0].1.color, palette.link_color);
+        assert!(highlights[0].1.underline.is_some());
+    }
+
+    #[test]
+    fn test_clear_drops_links_too() {
+        let mut rt = RichText::new();
+        let a = rt.add_link("https://a.example");
+        rt.push(
+            "x",
+            InlineStyle {
+                link: Some(a),
+                ..Default::default()
+            },
+        );
+        rt.clear();
+        assert!(rt.is_empty());
+        assert!(rt.links().is_empty());
+        assert!(rt.link_ranges().is_empty());
     }
 }

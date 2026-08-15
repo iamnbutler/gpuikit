@@ -1,10 +1,11 @@
 //! Heading element for markdown.
 
 use crate::theme::{ActiveTheme, Themeable};
-use gpui::{div, prelude::*, rems, App, ParentElement, SharedString, Styled, StyledText};
+use gpui::{div, prelude::*, rems, App, ElementId, ParentElement, Styled};
 
-use super::super::inline_style::RichText;
+use super::super::inline_style::{InlinePalette, RichText};
 use super::super::style::TextStyle;
+use super::paragraph::rich_text_run;
 
 /// Heading level (h1-h6).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -46,13 +47,17 @@ pub fn heading(text: impl Into<String>, style: &TextStyle, cx: &App) -> impl Int
         .child(text)
 }
 
-/// Render a heading element with rich text (supporting bold, italic, strikethrough).
-pub fn rich_heading(rich_text: &RichText, style: &TextStyle, cx: &App) -> impl IntoElement {
+/// Render a heading element with rich text (bold, italic, strikethrough,
+/// inline code, and clickable links).
+pub fn rich_heading(
+    id: impl Into<ElementId>,
+    rich_text: &RichText,
+    style: &TextStyle,
+    palette: &InlinePalette,
+    cx: &App,
+) -> impl IntoElement {
     let theme = cx.theme();
     let text_color = style.color.unwrap_or(theme.fg());
-    let (text, highlights) = rich_text.to_highlights();
-
-    let styled_text: SharedString = text.into();
 
     div()
         .w_full()
@@ -61,5 +66,5 @@ pub fn rich_heading(rich_text: &RichText, style: &TextStyle, cx: &App) -> impl I
         .font_weight(style.weight)
         .text_color(text_color)
         .mt(rems(style.margin_top))
-        .child(StyledText::new(styled_text).with_highlights(highlights))
+        .child(rich_text_run(id, rich_text, palette))
 }

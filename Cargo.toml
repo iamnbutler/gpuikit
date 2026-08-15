@@ -17,6 +17,10 @@ name = "gpuikit"
 path = "src/lib.rs"
 
 [[example]]
+name = "markdown_selection"
+path = "examples/markdown_selection.rs"
+
+[[example]]
 name = "showcase"
 path = "examples/showcase.rs"
 

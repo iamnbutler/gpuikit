@@ -136,6 +136,8 @@ pub struct MarkdownStyle {
     pub rule_color: Option<Hsla>,
     /// Link text color.
     pub link_color: Option<Hsla>,
+    /// Background for selected text (default: theme accent at 25%).
+    pub selection_background: Option<Hsla>,
 }
 
 impl Default for MarkdownStyle {
@@ -163,6 +165,7 @@ impl Default for MarkdownStyle {
             block_quote_text: None,
             rule_color: None,
             link_color: None,
+            selection_background: None,
         }
     }
 }
@@ -216,6 +219,12 @@ impl MarkdownStyle {
     /// Set the link color.
     pub fn link_color(mut self, color: Hsla) -> Self {
         self.link_color = Some(color);
+        self
+    }
+
+    /// Set the background color for selected text.
+    pub fn selection_background(mut self, color: Hsla) -> Self {
+        self.selection_background = Some(color);
         self
     }
 }

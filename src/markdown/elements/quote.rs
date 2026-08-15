@@ -5,7 +5,7 @@ use gpui::{div, prelude::*, px, rems, App, ElementId, ParentElement, Styled};
 
 use super::super::inline_style::{InlinePalette, RichText};
 use super::super::style::TextStyle;
-use super::paragraph::rich_text_run;
+use super::paragraph::{rich_text_run, RunContext};
 
 /// Render a block quote element with plain text.
 pub fn block_quote(
@@ -31,14 +31,16 @@ pub fn block_quote(
 }
 
 /// Render a block quote element with rich text (bold, italic, strikethrough,
-/// inline code, and clickable links).
-pub fn rich_block_quote(
+/// inline code, clickable links, and selection).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn rich_block_quote(
     id: impl Into<ElementId>,
     rich_text: &RichText,
     style: &TextStyle,
     border_color: Option<gpui::Hsla>,
     text_color: Option<gpui::Hsla>,
     palette: &InlinePalette,
+    run_cx: RunContext,
     cx: &App,
 ) -> impl IntoElement {
     let theme = cx.theme();
@@ -52,5 +54,5 @@ pub fn rich_block_quote(
         .line_height(rems(style.size * style.line_height))
         .text_color(text_color.unwrap_or(theme.fg_muted()))
         .italic()
-        .child(rich_text_run(id, rich_text, palette))
+        .child(rich_text_run(id, rich_text, palette, run_cx))
 }

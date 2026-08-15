@@ -21,11 +21,15 @@
 mod elements;
 mod inline_style;
 mod parser;
+mod selectable_text;
+mod selection;
 mod style;
 
 pub use elements::*;
 pub use inline_style::*;
 pub use parser::*;
+pub use selectable_text::SelectableText;
+pub use selection::{MarkdownSelection, SelectionPosition};
 pub use style::*;
 
 use crate::theme::{ActiveTheme, Themeable};
@@ -41,6 +45,8 @@ use pulldown_cmark::{Alignment, Event, Tag, TagEnd};
 pub struct Markdown {
     source: SharedString,
     events: Vec<MarkdownEvent>,
+    /// Document-wide text selection, shared with every rendered run.
+    selection: MarkdownSelection,
 }
 
 /// Parsed markdown event with source range information.
@@ -55,7 +61,11 @@ impl Markdown {
     pub fn new(source: impl Into<SharedString>, _cx: &mut Context<Self>) -> Self {
         let source: SharedString = source.into();
         let events = Self::parse(&source);
-        Self { source, events }
+        Self {
+            source,
+            events,
+            selection: MarkdownSelection::new(),
+        }
     }
 
     /// Get the source text.
@@ -63,11 +73,25 @@ impl Markdown {
         &self.source
     }
 
-    /// Update the markdown content.
+    /// Update the markdown content. Drops any selection — its offsets
+    /// belong to the old text.
     pub fn set_source(&mut self, source: impl Into<SharedString>, cx: &mut Context<Self>) {
         self.source = source.into();
         self.events = Self::parse(&self.source);
+        self.selection.clear();
         cx.notify();
+    }
+
+    /// The document's selection handle — for clearing it from outside (e.g.
+    /// when another document in the same view starts a selection).
+    pub fn selection(&self) -> MarkdownSelection {
+        self.selection.clone()
+    }
+
+    /// The currently selected text, if any — what ⌘C should copy. Routing
+    /// the copy binding is the embedding app's job; this is the value.
+    pub fn selected_text(&self) -> Option<String> {
+        self.selection.selected_text()
     }
 
     fn parse(source: &str) -> Vec<MarkdownEvent> {
@@ -130,9 +154,14 @@ impl RenderOnce for MarkdownElement {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let markdown = self.markdown.read(cx);
         let events = markdown.events.clone();
+        let selection = markdown.selection.clone();
         let style = self.style.clone();
 
-        let renderer = MarkdownRenderer::new(style);
+        // New frame: the previous frame's run layouts are about to be
+        // dropped and must not be hit-tested.
+        selection.begin_frame();
+
+        let renderer = MarkdownRenderer::new(style, selection);
         renderer.render_events(&events, cx)
     }
 }
@@ -150,6 +179,10 @@ struct MarkdownRenderer {
     list_stack: Vec<ListContext>,
     /// Monotonic id source for elements that need one (interactive text).
     element_counter: usize,
+    /// Document-order index for selectable text runs.
+    run_counter: usize,
+    /// Shared selection state, handed to every run.
+    selection: MarkdownSelection,
 
     // Table state
     in_table: bool,
@@ -176,9 +209,10 @@ struct ListContext {
 }
 
 impl MarkdownRenderer {
-    fn new(style: MarkdownStyle) -> Self {
+    fn new(style: MarkdownStyle, selection: MarkdownSelection) -> Self {
         Self {
             style,
+            selection,
             elements: Vec::new(),
             in_heading: None,
             in_code_block: false,
@@ -186,6 +220,7 @@ impl MarkdownRenderer {
             in_image: None,
             list_stack: Vec::new(),
             element_counter: 0,
+            run_counter: 0,
             in_table: false,
             table_alignments: Vec::new(),
             table_rows: Vec::new(),
@@ -402,6 +437,24 @@ impl MarkdownRenderer {
         ElementId::NamedInteger("md-run".into(), self.element_counter as u64)
     }
 
+    /// Selection context for the next text run, in document order. The
+    /// counter here must tick once per selectable run and nowhere else —
+    /// it is the identity the per-frame registry and the highlights agree
+    /// on.
+    fn next_run_cx(&mut self, cx: &App) -> elements::RunContext {
+        let run = self.run_counter;
+        self.run_counter += 1;
+        let theme = cx.theme();
+        elements::RunContext {
+            selection: self.selection.clone(),
+            run,
+            selection_background: self
+                .style
+                .selection_background
+                .unwrap_or_else(|| theme.accent().opacity(0.25)),
+        }
+    }
+
     fn flush_paragraph(&mut self, cx: &App) {
         if self.current_text.is_empty() {
             return;
@@ -409,7 +462,9 @@ impl MarkdownRenderer {
 
         let rich_text = std::mem::take(&mut self.current_text);
         let (id, palette) = (self.next_id(), self.palette(cx));
-        let element = elements::rich_paragraph(id, &rich_text, &self.style.body, &palette, cx);
+        let run_cx = self.next_run_cx(cx);
+        let element =
+            elements::rich_paragraph(id, &rich_text, &self.style.body, &palette, run_cx, cx);
         self.elements.push(element.into_any_element());
     }
 
@@ -430,7 +485,8 @@ impl MarkdownRenderer {
         .clone();
 
         let (id, palette) = (self.next_id(), self.palette(cx));
-        let element = elements::rich_heading(id, &rich_text, &heading_style, &palette, cx);
+        let run_cx = self.next_run_cx(cx);
+        let element = elements::rich_heading(id, &rich_text, &heading_style, &palette, run_cx, cx);
         self.elements.push(element.into_any_element());
     }
 
@@ -441,6 +497,7 @@ impl MarkdownRenderer {
 
         let rich_text = std::mem::take(&mut self.current_text);
         let (id, palette) = (self.next_id(), self.palette(cx));
+        let run_cx = self.next_run_cx(cx);
         let element = elements::rich_block_quote(
             id,
             &rich_text,
@@ -448,6 +505,7 @@ impl MarkdownRenderer {
             self.style.block_quote_border,
             self.style.block_quote_text,
             &palette,
+            run_cx,
             cx,
         );
         self.elements.push(element.into_any_element());
@@ -461,13 +519,16 @@ impl MarkdownRenderer {
         let text = self.current_text.to_plain_text();
         self.current_text.clear();
 
+        let (id, run_cx) = (self.next_id(), self.next_run_cx(cx));
         let element = elements::code_block(
+            id,
             text,
             None,
             &self.style.code,
             &self.style.code_font_family,
             self.style.code_block_bg,
             self.style.code_block_border,
+            run_cx,
             cx,
         );
         self.elements.push(element.into_any_element());
@@ -494,6 +555,7 @@ impl MarkdownRenderer {
 
         let indent_level = self.list_stack.len().saturating_sub(1);
         let (id, palette) = (self.next_id(), self.palette(cx));
+        let run_cx = self.next_run_cx(cx);
         let element = elements::rich_list_item(
             id,
             &rich_text,
@@ -501,6 +563,7 @@ impl MarkdownRenderer {
             indent_level,
             &self.style.body,
             &palette,
+            run_cx,
             cx,
         );
         self.elements.push(element.into_any_element());

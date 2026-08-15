@@ -1,23 +1,30 @@
 //! Code block element for markdown.
 
 use crate::theme::{ActiveTheme, Themeable};
-use gpui::{div, prelude::*, rems, App, ParentElement, SharedString, Styled};
+use gpui::{div, prelude::*, rems, App, ElementId, ParentElement, SharedString, Styled};
 
+use super::super::selectable_text::SelectableText;
 use super::super::style::TextStyle;
+use super::paragraph::{selection_styled_text, RunContext};
 
-/// Render a code block element.
+/// Render a code block element. The text inside is a selectable run — code
+/// is the thing people copy most.
 ///
 /// TODO: Replace with gpuikit-editor readonly view for syntax highlighting.
-pub fn code_block(
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn code_block(
+    id: impl Into<ElementId>,
     text: String,
     _language: Option<&str>,
     style: &TextStyle,
     font_family: &SharedString,
     bg: Option<gpui::Hsla>,
     border: Option<gpui::Hsla>,
+    run_cx: RunContext,
     cx: &App,
 ) -> impl IntoElement {
     let theme = cx.theme();
+    let styled = selection_styled_text(text, Vec::new(), &run_cx);
 
     div()
         .px(rems(1.0))
@@ -31,7 +38,12 @@ pub fn code_block(
         .font_family(font_family.clone())
         .text_color(style.color.unwrap_or(theme.fg()))
         .overflow_hidden()
-        .child(text)
+        .child(SelectableText::new(
+            id,
+            styled,
+            run_cx.run,
+            run_cx.selection,
+        ))
 }
 
 /// Render inline code.

@@ -5,7 +5,7 @@ use gpui::{div, prelude::*, rems, App, ElementId, ParentElement, Styled};
 
 use super::super::inline_style::{InlinePalette, RichText};
 use super::super::style::TextStyle;
-use super::paragraph::rich_text_run;
+use super::paragraph::{rich_text_run, RunContext};
 
 /// Render a list item element with plain text.
 pub fn list_item(
@@ -33,14 +33,16 @@ pub fn list_item(
 }
 
 /// Render a list item element with rich text (bold, italic, strikethrough,
-/// inline code, and clickable links).
-pub fn rich_list_item(
+/// inline code, clickable links, and selection).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn rich_list_item(
     id: impl Into<ElementId>,
     rich_text: &RichText,
     marker: String,
     indent_level: usize,
     style: &TextStyle,
     palette: &InlinePalette,
+    run_cx: RunContext,
     cx: &App,
 ) -> impl IntoElement {
     let indent = rems(indent_level as f32 * 1.5);
@@ -56,7 +58,11 @@ pub fn rich_list_item(
         .line_height(rems(style.size * style.line_height))
         .text_color(text_color)
         .child(div().flex_none().child(marker))
-        .child(div().flex_1().child(rich_text_run(id, rich_text, palette)))
+        .child(
+            div()
+                .flex_1()
+                .child(rich_text_run(id, rich_text, palette, run_cx)),
+        )
 }
 
 /// Get the marker for an unordered list item.

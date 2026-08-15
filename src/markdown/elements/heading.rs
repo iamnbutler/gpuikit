@@ -5,7 +5,7 @@ use gpui::{div, prelude::*, rems, App, ElementId, ParentElement, Styled};
 
 use super::super::inline_style::{InlinePalette, RichText};
 use super::super::style::TextStyle;
-use super::paragraph::rich_text_run;
+use super::paragraph::{rich_text_run, RunContext};
 
 /// Heading level (h1-h6).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -48,12 +48,13 @@ pub fn heading(text: impl Into<String>, style: &TextStyle, cx: &App) -> impl Int
 }
 
 /// Render a heading element with rich text (bold, italic, strikethrough,
-/// inline code, and clickable links).
-pub fn rich_heading(
+/// inline code, clickable links, and selection).
+pub(crate) fn rich_heading(
     id: impl Into<ElementId>,
     rich_text: &RichText,
     style: &TextStyle,
     palette: &InlinePalette,
+    run_cx: RunContext,
     cx: &App,
 ) -> impl IntoElement {
     let theme = cx.theme();
@@ -66,5 +67,5 @@ pub fn rich_heading(
         .font_weight(style.weight)
         .text_color(text_color)
         .mt(rems(style.margin_top))
-        .child(rich_text_run(id, rich_text, palette))
+        .child(rich_text_run(id, rich_text, palette, run_cx))
 }

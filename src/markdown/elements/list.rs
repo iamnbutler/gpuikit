@@ -1,10 +1,11 @@
 //! List elements for markdown.
 
 use crate::theme::{ActiveTheme, Themeable};
-use gpui::{div, prelude::*, rems, App, ParentElement, SharedString, Styled, StyledText};
+use gpui::{div, prelude::*, rems, App, ElementId, ParentElement, Styled};
 
-use super::super::inline_style::RichText;
+use super::super::inline_style::{InlinePalette, RichText};
 use super::super::style::TextStyle;
+use super::paragraph::rich_text_run;
 
 /// Render a list item element with plain text.
 pub fn list_item(
@@ -31,20 +32,20 @@ pub fn list_item(
         .child(div().flex_1().child(text))
 }
 
-/// Render a list item element with rich text (supporting bold, italic, strikethrough).
+/// Render a list item element with rich text (bold, italic, strikethrough,
+/// inline code, and clickable links).
 pub fn rich_list_item(
+    id: impl Into<ElementId>,
     rich_text: &RichText,
     marker: String,
     indent_level: usize,
     style: &TextStyle,
+    palette: &InlinePalette,
     cx: &App,
 ) -> impl IntoElement {
     let indent = rems(indent_level as f32 * 1.5);
     let theme = cx.theme();
     let text_color = style.color.unwrap_or(theme.fg());
-    let (text, highlights) = rich_text.to_highlights();
-
-    let styled_text: SharedString = text.into();
 
     div()
         .flex()
@@ -55,11 +56,7 @@ pub fn rich_list_item(
         .line_height(rems(style.size * style.line_height))
         .text_color(text_color)
         .child(div().flex_none().child(marker))
-        .child(
-            div()
-                .flex_1()
-                .child(StyledText::new(styled_text).with_highlights(highlights)),
-        )
+        .child(div().flex_1().child(rich_text_run(id, rich_text, palette)))
 }
 
 /// Get the marker for an unordered list item.

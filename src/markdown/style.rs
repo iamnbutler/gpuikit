@@ -113,6 +113,14 @@ pub struct MarkdownStyle {
     /// Vertical spacing between block elements in rems.
     pub block_spacing: f32,
 
+    // Behavior
+    /// Render soft breaks (single newlines) as hard line breaks.
+    ///
+    /// CommonMark renders a single newline as a space, which is right for
+    /// hand-authored prose but wrong for LLM/agent output, where a single
+    /// newline is almost always an intended break. Off by default.
+    pub soft_break_as_hard_break: bool,
+
     // Colors (None = use theme defaults)
     /// Code block background color.
     pub code_block_bg: Option<Hsla>,
@@ -146,6 +154,8 @@ impl Default for MarkdownStyle {
 
             block_spacing: 0.5,
 
+            soft_break_as_hard_break: false,
+
             code_block_bg: None,
             code_block_border: None,
             inline_code_bg: None,
@@ -172,6 +182,13 @@ impl MarkdownStyle {
     /// Set the block spacing.
     pub fn block_spacing(mut self, spacing: f32) -> Self {
         self.block_spacing = spacing;
+        self
+    }
+
+    /// Render soft breaks (single newlines) as hard line breaks — the right
+    /// setting for LLM/agent-generated markdown.
+    pub fn soft_break_as_hard_break(mut self, enabled: bool) -> Self {
+        self.soft_break_as_hard_break = enabled;
         self
     }
 
@@ -218,6 +235,16 @@ mod tests {
 
         let ratio = h1.size / h2.size;
         assert!((ratio - TYPESCALE_RATIO).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_soft_break_option_defaults_off() {
+        assert!(!MarkdownStyle::default().soft_break_as_hard_break);
+        assert!(
+            MarkdownStyle::new()
+                .soft_break_as_hard_break(true)
+                .soft_break_as_hard_break
+        );
     }
 
     #[test]

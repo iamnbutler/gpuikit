@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Breaking Changes
+
+- Context Menu was rewritten. It is now an element you attach to a trigger you
+  have already built — `context_menu(id, my_element).menu(|menu, window, cx| …)`
+  — rather than an `Entity<ContextMenuState>` the view has to own and render.
+  `ContextMenuState`, `ContextMenu::trigger` and `menu_separator` are gone;
+  `menu_item` takes only a label, and entries are assembled with
+  `menu.item(…).separator().header(…)` instead of a `Vec<MenuEntry>`
+
+### Added
+
+- Context Menu: gpui action support (`menu_item("Rename").action(Box::new(Rename))`),
+  which dispatches to whatever was focused before the menu opened and reads the
+  item's keyboard shortcut from the keymap instead of hardcoding it
+- Context Menu: section headers, checkmark items (`toggled`), keyboard
+  navigation that skips separators and disabled items, hover and keyboard focus
+  kept in sync, scroll-into-view in long menus, focus restored on dismiss, and
+  edge-aware positioning
+- `examples/context_menu.rs`, demonstrating both closure- and action-driven items
+
 ## [0.6.0] - 2026-08-14
 
 ### Breaking Changes

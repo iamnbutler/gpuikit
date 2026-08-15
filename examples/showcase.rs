@@ -21,7 +21,7 @@ use gpuikit::{
         card::card,
         checkbox::{checkbox, Checkbox},
         collapsible::{collapsible, Collapsible},
-        context_menu::{context_menu, menu_item, menu_separator, ContextMenuState},
+        context_menu::{context_menu, menu_item},
         dialog::{dialog, DialogState},
         dropdown::{dropdown, DropdownState},
         field::{field, LabelPosition},
@@ -176,7 +176,8 @@ struct Showcase {
     textarea_example: Entity<InputState>,
     popover_example: Entity<PopoverState>,
     dialog_example: Entity<DialogState>,
-    context_menu_example: Entity<ContextMenuState>,
+    context_menu_pinned: bool,
+    context_menu_status: SharedString,
 }
 
 impl Showcase {
@@ -419,35 +420,6 @@ impl Showcase {
             )
         });
 
-        let context_menu_example = cx.new(|_cx| {
-            ContextMenuState::new(
-                context_menu("showcase-context-menu")
-                    .trigger(|_window, cx| {
-                        let theme = cx.theme();
-                        div()
-                            .px_4()
-                            .py_3()
-                            .rounded_md()
-                            .border_1()
-                            .border_color(theme.border())
-                            .bg(theme.surface())
-                            .text_sm()
-                            .text_color(theme.fg_muted())
-                            .child("Right-click here")
-                            .into_any_element()
-                    })
-                    .menu(|_window, _cx| {
-                        vec![
-                            menu_item("cut", "Cut").kbd("Cmd+X").into(),
-                            menu_item("copy", "Copy").kbd("Cmd+C").into(),
-                            menu_item("paste", "Paste").kbd("Cmd+V").into(),
-                            menu_separator().into(),
-                            menu_item("delete", "Delete").destructive().into(),
-                        ]
-                    }),
-            )
-        });
-
         Self {
             focus_handle: cx.focus_handle(),
             active_page: Rc::new(RefCell::new(SharedString::from("button"))),
@@ -476,7 +448,8 @@ impl Showcase {
             textarea_example,
             popover_example,
             dialog_example,
-            context_menu_example,
+            context_menu_pinned: true,
+            context_menu_status: "No action chosen yet.".into(),
         }
     }
 
@@ -1640,8 +1613,25 @@ impl Showcase {
 
     fn render_context_menu_page(&self, cx: &Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
+        let this = cx.entity();
+        let pinned = self.context_menu_pinned;
+
+        // The trigger is an ordinary element. The menu attaches to what the
+        // view already renders instead of taking over how it is built.
+        let target = div()
+            .px_8()
+            .py_6()
+            .rounded_md()
+            .border_1()
+            .border_color(theme.border())
+            .bg(theme.surface())
+            .text_sm()
+            .text_color(theme.fg_muted())
+            .child("Right-click here");
+
         v_stack()
             .gap_4()
+            .items_start()
             .child(
                 div()
                     .text_lg()
@@ -1649,7 +1639,68 @@ impl Showcase {
                     .text_color(theme.fg_muted())
                     .child("Context Menu"),
             )
-            .child(self.context_menu_example.clone())
+            .child(
+                context_menu("showcase-context-menu", target).menu(move |menu, _window, _cx| {
+                    let choose = |label: &'static str| {
+                        let this = this.clone();
+                        move |_window: &mut Window, cx: &mut App| {
+                            this.update(cx, |showcase: &mut Showcase, cx| {
+                                showcase.context_menu_status = format!("Chose “{label}”").into();
+                                cx.notify();
+                            });
+                        }
+                    };
+
+                    menu.header("Edit")
+                        .item(
+                            menu_item("Cut")
+                                .icon(DefaultIcons::scissors)
+                                .kbd("⌘X")
+                                .on_click(choose("Cut")),
+                        )
+                        .item(
+                            menu_item("Copy")
+                                .icon(DefaultIcons::copy)
+                                .kbd("⌘C")
+                                .on_click(choose("Copy")),
+                        )
+                        .item(
+                            menu_item("Paste")
+                                .icon(DefaultIcons::clipboard)
+                                .kbd("⌘V")
+                                // Nothing to paste: shown, but not choosable.
+                                .disabled(true),
+                        )
+                        .separator()
+                        .item(menu_item("Pinned").toggled(pinned).on_click({
+                            let this = this.clone();
+                            move |_window, cx| {
+                                this.update(cx, |showcase: &mut Showcase, cx| {
+                                    showcase.context_menu_pinned = !showcase.context_menu_pinned;
+                                    showcase.context_menu_status = if showcase.context_menu_pinned {
+                                        "Pinned".into()
+                                    } else {
+                                        "Unpinned".into()
+                                    };
+                                    cx.notify();
+                                });
+                            }
+                        }))
+                        .separator()
+                        .item(
+                            menu_item("Delete")
+                                .icon(DefaultIcons::trash)
+                                .destructive()
+                                .on_click(choose("Delete")),
+                        )
+                }),
+            )
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(theme.fg_muted())
+                    .child(self.context_menu_status.clone()),
+            )
     }
 
     fn render_toast_page(

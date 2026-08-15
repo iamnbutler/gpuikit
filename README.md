@@ -10,10 +10,10 @@ A UI toolkit for GPUI applications.
 
 ```toml
 [dependencies]
-gpuikit = "0.4"
+gpuikit = "0.7"
 
 # OR to enable the text editor component:
-# gpuikit = { version = "0.4", features = ["editor"] }
+# gpuikit = { version = "0.7", features = ["editor"] }
 ```
 
 ## License

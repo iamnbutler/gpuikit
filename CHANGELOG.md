@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.7.0] - 2026-08-15
 
 ### Breaking Changes
 
@@ -15,6 +15,15 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Markdown text selection: drag to select across a whole document, double-click
+  for a word, triple-click for a block. `Markdown::selected_text()` returns the
+  selection for the embedding app to put on the clipboard, and
+  `MarkdownStyle::selection_background` styles it. Selecting inside one document
+  clears the selection in its siblings, so a page of separate documents behaves
+  like one. Needs the retained `Entity<Markdown>` form — see
+  `examples/markdown_selection.rs`
+- `MarkdownStyle::soft_break_as_hard_break`, for source where a single newline
+  is meant as a line break, as in LLM and GitHub-flavored output
 - Context Menu: gpui action support (`menu_item("Rename").action(Box::new(Rename))`),
   which dispatches to whatever was focused before the menu opened and reads the
   item's keyboard shortcut from the keymap instead of hardcoding it
@@ -22,7 +31,13 @@ All notable changes to this project will be documented in this file.
   navigation that skips separators and disabled items, hover and keyboard focus
   kept in sync, scroll-into-view in long menus, focus restored on dismiss, and
   edge-aware positioning
-- `examples/context_menu.rs`, demonstrating both closure- and action-driven items
+- `examples/context_menu.rs` and `examples/markdown_selection.rs`
+
+### Fixed
+
+- Markdown inline links and inline code no longer end the paragraph they appear
+  in. A link mid-sentence used to flush the run and push the rest of the
+  sentence onto its own line
 
 ## [0.6.0] - 2026-08-14
 

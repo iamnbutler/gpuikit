@@ -76,6 +76,11 @@ fn main() {
         .with_assets(gpuikit::assets());
     app.run(|cx: &mut App| {
         gpuikit::theme::init(cx);
+        // Syntax highlighting for the ```rust fence above. Opt-in: loading
+        // syntect's syntax and theme sets is not free, so a document with no
+        // code in it should not pay for them. Run with `--features editor`.
+        #[cfg(feature = "editor")]
+        gpuikit::markdown::init_code_highlighting(cx);
         cx.bind_keys([KeyBinding::new("cmd-c", CopySelection, None)]);
         cx.open_window(
             WindowOptions {

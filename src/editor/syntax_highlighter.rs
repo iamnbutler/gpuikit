@@ -52,6 +52,114 @@ impl SyntaxHighlighter {
         }
     }
 
+    /// The theme highlighting currently uses.
+    pub fn current_theme(&self) -> String {
+        self.inner.borrow().current_theme.clone()
+    }
+
+    /// Resolve a language token — a code fence's info string, a file
+    /// extension, a syntax name — to the canonical syntax name
+    /// [`highlight_block`](Self::highlight_block) expects, or `None` if
+    /// nothing in the syntax set matches.
+    ///
+    /// `"rs"`, `"rust"` and `"Rust"` all resolve to `"Rust"`. The lowercased
+    /// retry is not redundant: syntect's `find_syntax_by_token` matches
+    /// *names* case-insensitively but *extensions* exactly, so `"JS"` misses
+    /// on both passes without it.
+    pub fn resolve_language(&self, token: &str) -> Option<String> {
+        let token = token.trim();
+        if token.is_empty() {
+            return None;
+        }
+
+        let inner = self.inner.borrow();
+        let lowered = token.to_ascii_lowercase();
+        inner
+            .syntax_set
+            .find_syntax_by_token(token)
+            .or_else(|| inner.syntax_set.find_syntax_by_token(&lowered))
+            .map(|syntax| syntax.name.clone())
+    }
+
+    /// Highlight a whole block of text in one stateless pass.
+    ///
+    /// Unlike [`highlight_line`](Self::highlight_line), this keeps its parse
+    /// and highlight state local to the call, so two blocks of the same
+    /// language cannot contaminate each other (or a live editor) by both
+    /// starting at line 0. Multi-line constructs — a block comment, a raw
+    /// string — carry across lines *within* the block, which is the point.
+    ///
+    /// Returns sorted, disjoint byte ranges over `text`, each on a char
+    /// boundary. Ranges syntect gave no opinion about are simply absent, so
+    /// the caller's own text color shows through. Background colors are
+    /// dropped: they are the syntect theme's block background, which would
+    /// paint over the surface the code block already draws.
+    ///
+    /// `language` must be a canonical syntax name — see
+    /// [`resolve_language`](Self::resolve_language). An unknown one yields no
+    /// highlights rather than an error, so the caller renders plain.
+    pub fn highlight_block(
+        &self,
+        text: &str,
+        language: &str,
+    ) -> Vec<(std::ops::Range<usize>, gpui::HighlightStyle)> {
+        use syntect::util::LinesWithEndings;
+
+        let inner = self.inner.borrow();
+
+        let Some(syntax) = inner.syntax_set.find_syntax_by_name(language) else {
+            return Vec::new();
+        };
+        let Some(theme) = inner
+            .theme_set
+            .themes
+            .get(&inner.current_theme)
+            .or_else(|| inner.theme_set.themes.values().next())
+        else {
+            return Vec::new();
+        };
+
+        let highlighter = Highlighter::new(theme);
+        let mut parse_state = ParseState::new(syntax);
+        let mut highlight_state = HighlightState::new(&highlighter, ScopeStack::new());
+
+        let mut highlights: Vec<(std::ops::Range<usize>, gpui::HighlightStyle)> = Vec::new();
+        let mut offset = 0usize;
+
+        for line in LinesWithEndings::from(text) {
+            // Parse once and highlight from that same op list. `highlight_line`
+            // parses a second time "to update state", which makes every line
+            // look like it occurred twice; doing it once here is what keeps
+            // the cross-line state honest.
+            let ops = parse_state
+                .parse_line(line, &inner.syntax_set)
+                .unwrap_or_default();
+
+            for (style, piece) in
+                HighlightIterator::new(&mut highlight_state, &ops, line, &highlighter)
+            {
+                let start = offset;
+                offset += piece.len();
+                if piece.is_empty() {
+                    continue;
+                }
+
+                let highlight = style_to_highlight(style);
+                match highlights.last_mut() {
+                    // Merge with the immediately preceding span when it is
+                    // contiguous and identical, so the range list stays short
+                    // and trivially sorted and disjoint.
+                    Some((range, previous)) if range.end == start && *previous == highlight => {
+                        range.end = offset;
+                    }
+                    _ => highlights.push((start..offset, highlight)),
+                }
+            }
+        }
+
+        highlights
+    }
+
     pub fn available_themes(&self) -> Vec<String> {
         self.inner
             .borrow()
@@ -514,6 +622,34 @@ fn style_color_to_hsla(color: syntect::highlighting::Color) -> Hsla {
 
 fn style_to_hsla(style: Style) -> Hsla {
     style_color_to_hsla(style.foreground)
+}
+
+/// A syntect span style as a gpui [`HighlightStyle`](gpui::HighlightStyle).
+///
+/// Every field stays `None` unless syntect actually asked for it, so a span
+/// the theme has no opinion about inherits the surrounding text's style.
+/// `background_color` is deliberately never set: syntect puts the theme's own
+/// block background on *every* span, which would paint over the code block's
+/// surface and fight the selection highlight.
+fn style_to_highlight(style: Style) -> gpui::HighlightStyle {
+    use syntect::highlighting::FontStyle as SyntectFontStyle;
+
+    gpui::HighlightStyle {
+        color: Some(style_to_hsla(style)),
+        font_weight: style
+            .font_style
+            .contains(SyntectFontStyle::BOLD)
+            .then_some(FontWeight::BOLD),
+        font_style: style
+            .font_style
+            .contains(SyntectFontStyle::ITALIC)
+            .then_some(FontStyle::Italic),
+        underline: style
+            .font_style
+            .contains(SyntectFontStyle::UNDERLINE)
+            .then(Default::default),
+        ..Default::default()
+    }
 }
 
 fn get_font_style(style: Style) -> (FontWeight, FontStyle) {

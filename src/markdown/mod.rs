@@ -427,6 +427,23 @@ struct MarkdownRenderer {
     // Rich text tracking
     current_text: RichText,
     active_style: InlineStyle,
+
+    /// Every list row this renderer emitted, in document order.
+    ///
+    /// A rendered element only reports its height, which cannot say which
+    /// marker a row got, what it was indented by, or which row a piece of text
+    /// landed in — exactly what nesting scrambles.
+    #[cfg(test)]
+    emitted_list_items: Vec<ListRow>,
+}
+
+/// One row `flush_list_item` emitted, as the tests read it.
+#[cfg(test)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ListRow {
+    marker: String,
+    indent_level: usize,
+    text: String,
 }
 
 #[derive(Clone, Debug)]
@@ -461,6 +478,8 @@ impl MarkdownRenderer {
             in_table_head: false,
             current_text: RichText::new(),
             active_style: InlineStyle::default(),
+            #[cfg(test)]
+            emitted_list_items: Vec::new(),
         }
     }
 
@@ -491,7 +510,7 @@ impl MarkdownRenderer {
 
     fn handle_event(&mut self, event: &Event<'static>, cx: &App) {
         match event {
-            Event::Start(tag) => self.handle_start_tag(tag),
+            Event::Start(tag) => self.handle_start_tag(tag, cx),
             Event::End(tag) => self.handle_end_tag(tag, cx),
             Event::Text(text) => self.handle_text(text),
             Event::Code(code) => self.handle_inline_code(code),
@@ -512,7 +531,9 @@ impl MarkdownRenderer {
         }
     }
 
-    fn handle_start_tag(&mut self, tag: &Tag<'static>) {
+    /// Takes `cx` because a nested list flushes its parent's item, and
+    /// flushing builds an element.
+    fn handle_start_tag(&mut self, tag: &Tag<'static>, cx: &App) {
         match tag {
             Tag::Paragraph => {}
             Tag::Heading { level, .. } => {
@@ -527,6 +548,21 @@ impl MarkdownRenderer {
                     parser::code_block_language(kind).and_then(code_highlight::normalize_language);
             }
             Tag::List(start) => {
+                // A list nested under an item opens *before* that item ends,
+                // so the parent's text is still buffered here. Left there, the
+                // first child item's flush would pick it up and emit both as
+                // one row, and the parent's own `End(Item)` would then find an
+                // empty buffer and emit nothing.
+                //
+                // Flushed before the push, so the parent's row gets its own
+                // indent, its own marker and — for an ordered list — its own
+                // ordinal rather than the child's first one. Guarded on a
+                // non-empty stack because a top-level list has no parent item
+                // to attribute a row to.
+                if !self.list_stack.is_empty() {
+                    self.flush_list_item(cx);
+                }
+
                 self.list_stack.push(ListContext {
                     ordered: start.is_some(),
                     current_index: start.unwrap_or(1),
@@ -813,6 +849,14 @@ impl MarkdownRenderer {
         };
 
         let indent_level = self.list_stack.len().saturating_sub(1);
+
+        #[cfg(test)]
+        self.emitted_list_items.push(ListRow {
+            marker: marker.clone(),
+            indent_level,
+            text: rich_text.to_plain_text(),
+        });
+
         let palette = self.palette(cx);
         let (id, run_cx) = self.next_run(cx);
         let element = elements::rich_list_item(
@@ -1052,7 +1096,7 @@ mod tests {
 
             let fence = |info: &'static str| Tag::CodeBlock(CodeBlockKind::Fenced(info.into()));
 
-            renderer.handle_start_tag(&fence("rust,ignore"));
+            renderer.handle_start_tag(&fence("rust,ignore"), cx);
             assert_eq!(
                 renderer.code_block_language.as_deref(),
                 Some("rust"),
@@ -1069,7 +1113,7 @@ mod tests {
                 fence("text"),
                 Tag::CodeBlock(CodeBlockKind::Indented),
             ] {
-                renderer.handle_start_tag(&no_language);
+                renderer.handle_start_tag(&no_language, cx);
                 assert_eq!(
                     renderer.code_block_language, None,
                     "{no_language:?} names no language"
@@ -1147,14 +1191,180 @@ mod tests {
 
     #[gpui::test]
     fn a_long_nested_list_item_wraps(cx: &mut TestAppContext) {
-        // An indented item, so the row is rendered at `indent_level > 0`.
-        // (Separately, and not fixed here: the parent item's own text is
-        // swallowed by the nested one, so this renders as a single row.)
+        // An indented item, so the row is rendered at `indent_level > 0`. The
+        // parent now emits a row of its own, so subtract it to measure the
+        // nested one — what is left is the nested row plus the block gap.
         let line = line(cx);
         let paragraph = height(cx, LONG);
-        let item = height(cx, &format!("- parent\n    - {LONG}"));
+        let parent = height(cx, "- parent");
+        let item = height(cx, &format!("- parent\n    - {LONG}")) - parent;
 
         assert_wrapped_like_a_paragraph(item, paragraph, line);
+    }
+
+    // --- nested lists ---
+
+    /// Drive the renderer over `source` and report the list rows it emitted,
+    /// as `(marker, indent level, text)` in document order. No window is
+    /// needed: this reads what `flush_list_item` built, not what it laid out.
+    fn list_rows(cx: &mut TestAppContext, source: &str) -> Vec<(String, usize, String)> {
+        cx.update(crate::theme::init);
+        let events = Markdown::parse(source, false);
+
+        cx.update(|cx: &mut App| {
+            let mut renderer =
+                MarkdownRenderer::new(MarkdownStyle::default(), MarkdownSelection::new());
+            for event in &events {
+                renderer.handle_event(&event.event, cx);
+            }
+            renderer
+                .emitted_list_items
+                .iter()
+                .map(|row| (row.marker.clone(), row.indent_level, row.text.clone()))
+                .collect()
+        })
+    }
+
+    /// A nested document and the same items un-indented must lay out to the
+    /// same height: nesting changes a row's indent, never whether it exists.
+    /// Comparing against the flat form hardcodes neither the line height nor
+    /// the block spacing.
+    #[track_caller]
+    fn assert_same_row_count(cx: &mut TestAppContext, nested: &str, flat: &str) {
+        let nested_height = height(cx, nested);
+        let flat_height = height(cx, flat);
+
+        assert_eq!(
+            nested_height, flat_height,
+            "{nested:?} laid out to {nested_height:?}, but the same items flat \
+             ({flat:?}) came to {flat_height:?}"
+        );
+    }
+
+    #[gpui::test]
+    fn a_nested_list_does_not_swallow_its_parents_text(cx: &mut TestAppContext) {
+        // The whole bug: `- x` with an indented `- y` under it used to render
+        // as one row reading "xy", because the child's flush picked up the
+        // parent's still-buffered text.
+        assert_eq!(
+            list_rows(cx, "- x\n    - y"),
+            vec![
+                ("•".to_string(), 0, "x".to_string()),
+                ("•".to_string(), 1, "y".to_string()),
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn an_ordered_list_nested_in_an_unordered_one(cx: &mut TestAppContext) {
+        assert_eq!(
+            list_rows(cx, "- x\n    1. y\n    2. z"),
+            vec![
+                ("•".to_string(), 0, "x".to_string()),
+                ("1.".to_string(), 1, "y".to_string()),
+                ("2.".to_string(), 1, "z".to_string()),
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn an_unordered_list_nested_in_an_ordered_one(cx: &mut TestAppContext) {
+        assert_eq!(
+            list_rows(cx, "1. x\n    - y"),
+            vec![
+                ("1.".to_string(), 0, "x".to_string()),
+                ("•".to_string(), 1, "y".to_string()),
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn three_levels_of_nesting_each_keep_their_own_row(cx: &mut TestAppContext) {
+        assert_eq!(
+            list_rows(cx, "- a\n    - b\n        - c"),
+            vec![
+                ("•".to_string(), 0, "a".to_string()),
+                ("•".to_string(), 1, "b".to_string()),
+                ("•".to_string(), 2, "c".to_string()),
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn a_parent_with_inline_styles_keeps_its_own_row(cx: &mut TestAppContext) {
+        // The `rich_list_item` path: bold, code and a link put spans in the
+        // parent's buffer, which is what the child used to inherit.
+        assert_eq!(
+            list_rows(cx, "- **bold** and `code` and a [link](#)\n    - child"),
+            vec![
+                ("•".to_string(), 0, "bold and code and a link".to_string()),
+                ("•".to_string(), 1, "child".to_string()),
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn a_nested_list_does_not_renumber_its_parents_siblings(cx: &mut TestAppContext) {
+        // The parent's row is emitted from inside the *child's* `Start(List)`,
+        // which is where the parent's ordinal is taken. Flush after pushing
+        // the child's context and `x` burns the child's `1.` while `z`
+        // silently becomes `1.` too.
+        assert_eq!(
+            list_rows(cx, "1. x\n    - y\n2. z"),
+            vec![
+                ("1.".to_string(), 0, "x".to_string()),
+                ("•".to_string(), 1, "y".to_string()),
+                ("2.".to_string(), 0, "z".to_string()),
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn nested_task_items_keep_their_own_checkboxes(cx: &mut TestAppContext) {
+        // Checkboxes are pushed into `current_text`, so they travelled with
+        // whatever the flush picked up: both used to land on one row.
+        assert_eq!(
+            list_rows(cx, "- [ ] parent\n    - [x] child"),
+            vec![
+                ("•".to_string(), 0, "☐ parent".to_string()),
+                ("•".to_string(), 1, "☑ child".to_string()),
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn a_parent_with_no_text_of_its_own_emits_no_row(cx: &mut TestAppContext) {
+        // Nothing buffered to flush, so the guard in `flush_list_item` has to
+        // keep the extra flush from inventing a blank row.
+        assert_eq!(
+            list_rows(cx, "-\n    - child"),
+            vec![("•".to_string(), 1, "child".to_string())]
+        );
+    }
+
+    #[gpui::test]
+    fn a_list_that_follows_a_paragraph_does_not_absorb_it(cx: &mut TestAppContext) {
+        // A top-level `Tag::List` has no parent item to attribute a row to,
+        // and the paragraph already flushed at `End(Paragraph)`. An unguarded
+        // flush here could only ever invent a row.
+        assert_eq!(
+            list_rows(cx, "A paragraph.\n\n- item"),
+            vec![("•".to_string(), 0, "item".to_string())]
+        );
+    }
+
+    #[gpui::test]
+    fn a_nested_list_lays_out_as_many_rows_as_a_flat_one(cx: &mut TestAppContext) {
+        assert_same_row_count(cx, "- x\n    - y", "- x\n- y");
+    }
+
+    #[gpui::test]
+    fn a_deeply_nested_list_lays_out_as_many_rows_as_a_flat_one(cx: &mut TestAppContext) {
+        assert_same_row_count(
+            cx,
+            "1. a\n    - b\n        - c\n2. d",
+            "1. a\n- b\n- c\n2. d",
+        );
     }
 
     #[gpui::test]

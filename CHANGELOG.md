@@ -32,6 +32,12 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- A markdown list nested under an item no longer swallows that item's text.
+  `- x` with an indented `- y` under it rendered as a single row: the nested
+  list opened while the parent's text was still buffered, so the child's first
+  item picked it up and the parent emitted nothing. The parent now gets its own
+  row, at its own indent, with its own marker — and, in an ordered list, its own
+  number, so a nested list no longer renumbers its parent's siblings
 - Markdown list items and table cells now wrap. The text beside a list marker,
   and the text in a table cell, is a flex item, and a flex item's automatic
   minimum size is one unbroken line — so a long item ran off the edge of the

@@ -557,11 +557,20 @@ impl MarkdownRenderer {
             Tag::TableCell => {
                 self.current_text.clear();
             }
+            // Listed rather than folded into a `_ => {}` wildcard on purpose:
+            // an exhaustive match is what turns a pulldown-cmark upgrade into a
+            // compile error instead of silently dropped styling.
+            //
+            // Superscript and Subscript are inert because the options that
+            // produce them are off (see `parser::default_options`) *and*
+            // because `InlineStyle` has nowhere to put them.
             Tag::FootnoteDefinition(_)
             | Tag::MetadataBlock(_)
             | Tag::DefinitionList
             | Tag::DefinitionListTitle
             | Tag::DefinitionListDefinition
+            | Tag::Superscript
+            | Tag::Subscript
             | Tag::HtmlBlock => {}
         }
     }
@@ -632,6 +641,8 @@ impl MarkdownRenderer {
             | TagEnd::DefinitionList
             | TagEnd::DefinitionListTitle
             | TagEnd::DefinitionListDefinition
+            | TagEnd::Superscript
+            | TagEnd::Subscript
             | TagEnd::HtmlBlock => {}
         }
     }

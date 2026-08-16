@@ -6,6 +6,35 @@
 pub use pulldown_cmark::{CodeBlockKind, LinkType, Options, Parser};
 
 /// Default parsing options with GFM support enabled.
+///
+/// This is the *only* option set the renderer uses — [`Markdown::parse`] calls
+/// it rather than assembling the same flags inline, so a change here changes
+/// every document.
+///
+/// The options deliberately left off, and what turning one on would do to
+/// documents that render correctly today:
+///
+/// - `ENABLE_SUBSCRIPT` — takes `~x~` *away from strikethrough* and emits
+///   [`pulldown_cmark::Tag::Subscript`] instead, silently restyling existing
+///   documents. See
+///   `single_tilde_is_strikethrough_not_subscript`.
+/// - `ENABLE_SUPERSCRIPT` — claims `^x^`, which is literal text today.
+/// - Both also need somewhere to land: `InlineStyle` carries no baseline
+///   shift, and neither does `gpui::HighlightStyle`, so enabling them without
+///   that work would parse correctly and render identically to plain text.
+/// - `ENABLE_WIKILINKS` — turns `[[foo|bar]]` into a link. See
+///   `wikilinks_stay_literal_text`.
+/// - `ENABLE_MATH` — claims `$x$` and `$$x$$` as `InlineMath`/`DisplayMath`,
+///   which the renderer drops on the floor.
+/// - `ENABLE_DEFINITION_LIST` — claims `term\n: definition`; the renderer has
+///   no element for it and would swallow the text.
+/// - `ENABLE_SMART_PUNCTUATION` — rewrites quotes and dashes, which is wrong
+///   inside a document quoting code.
+/// - `ENABLE_HEADING_ATTRIBUTES`, `ENABLE_*_METADATA_BLOCKS`,
+///   `ENABLE_OLD_FOOTNOTES` — no renderer support, or superseded by
+///   `ENABLE_GFM`.
+///
+/// [`Markdown::parse`]: super::Markdown
 pub fn default_options() -> Options {
     Options::ENABLE_TABLES
         | Options::ENABLE_FOOTNOTES
@@ -67,5 +96,141 @@ mod tests {
 
         let indented = CodeBlockKind::Indented;
         assert_eq!(code_block_language(&indented), None);
+    }
+
+    // The tests below pin behaviour that a change to `default_options` would
+    // alter silently — nothing else in the crate would fail to compile, and the
+    // documents would just render differently. They are pure parse tests: no
+    // gpui, no window.
+
+    #[test]
+    fn default_options_are_exactly_the_gfm_five() {
+        let options = default_options();
+
+        for on in [
+            Options::ENABLE_TABLES,
+            Options::ENABLE_FOOTNOTES,
+            Options::ENABLE_STRIKETHROUGH,
+            Options::ENABLE_TASKLISTS,
+            Options::ENABLE_GFM,
+        ] {
+            assert!(options.contains(on), "expected {on:?} to be enabled");
+        }
+
+        for off in [
+            Options::ENABLE_SMART_PUNCTUATION,
+            Options::ENABLE_HEADING_ATTRIBUTES,
+            Options::ENABLE_YAML_STYLE_METADATA_BLOCKS,
+            Options::ENABLE_PLUSES_DELIMITED_METADATA_BLOCKS,
+            Options::ENABLE_OLD_FOOTNOTES,
+            Options::ENABLE_MATH,
+            Options::ENABLE_DEFINITION_LIST,
+            Options::ENABLE_SUPERSCRIPT,
+            Options::ENABLE_SUBSCRIPT,
+            Options::ENABLE_WIKILINKS,
+        ] {
+            assert!(!options.contains(off), "expected {off:?} to be disabled");
+        }
+    }
+
+    /// `ENABLE_SUBSCRIPT` is not a free upgrade: pulldown-cmark's own docs say
+    /// that with it on, `~x~` parses as subscript *instead of* strikethrough.
+    /// Turning it on would restyle every document already using single tildes.
+    #[test]
+    fn single_tilde_is_strikethrough_not_subscript() {
+        use pulldown_cmark::{Event, Tag};
+
+        let events: Vec<_> = parse("~struck~").collect();
+
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, Event::Start(Tag::Strikethrough))),
+            "single tildes should still be strikethrough: {events:?}"
+        );
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, Event::Start(Tag::Subscript))),
+            "subscript must stay off: {events:?}"
+        );
+    }
+
+    #[test]
+    fn wikilinks_stay_literal_text() {
+        use pulldown_cmark::{Event, Tag};
+
+        let events: Vec<_> = parse("[[foo|bar]]").collect();
+
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, Event::Start(Tag::Link { .. }))),
+            "wikilinks must stay off: {events:?}"
+        );
+    }
+
+    /// GFM alerts ride in on the `BlockQuote` tag's payload rather than a tag
+    /// of their own, so the renderer's `Tag::BlockQuote(_)` arm sees them.
+    #[test]
+    fn gfm_alerts_reach_block_quote_kind() {
+        use pulldown_cmark::{BlockQuoteKind, Event, Tag};
+
+        let events: Vec<_> = parse("> [!NOTE]\n> Something worth knowing.").collect();
+
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, Event::Start(Tag::BlockQuote(Some(BlockQuoteKind::Note))))),
+            "expected a Note alert: {events:?}"
+        );
+    }
+
+    #[test]
+    fn task_list_markers_are_emitted() {
+        use pulldown_cmark::Event;
+
+        let events: Vec<_> = parse("- [x] done\n- [ ] todo").collect();
+        let markers: Vec<bool> = events
+            .iter()
+            .filter_map(|e| match e {
+                Event::TaskListMarker(checked) => Some(*checked),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(markers, vec![true, false]);
+    }
+
+    #[test]
+    fn table_column_alignments_survive() {
+        use pulldown_cmark::{Alignment, Event, Tag};
+
+        let source = "| a | b | c |\n|:--|:-:|--:|\n| 1 | 2 | 3 |";
+        let alignments = parse(source).find_map(|e| match e {
+            Event::Start(Tag::Table(alignments)) => Some(alignments),
+            _ => None,
+        });
+
+        assert_eq!(
+            alignments,
+            Some(vec![Alignment::Left, Alignment::Center, Alignment::Right])
+        );
+    }
+
+    /// The renderer keeps `into_offset_iter` ranges and slices the source with
+    /// them; a range landing mid-codepoint would panic on a non-ASCII document.
+    #[test]
+    fn offset_ranges_land_on_char_boundaries() {
+        let source = "# Überschrift\n\nEin Absatz mit **fettem** Text — und einem Emoji 🎉.\n\n\
+                      - Ein Listenpunkt mit `Code`\n";
+
+        for (event, range) in parse(source).into_offset_iter() {
+            assert!(
+                source.is_char_boundary(range.start) && source.is_char_boundary(range.end),
+                "range {range:?} splits a codepoint for {event:?}"
+            );
+            assert!(range.end <= source.len(), "range {range:?} out of bounds");
+        }
     }
 }

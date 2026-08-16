@@ -60,7 +60,7 @@ unicode-segmentation = "1.10"
 smol = "2.0"
 
 # Markdown parsing
-pulldown-cmark = { version = "0.12", default-features = false, features = ["simd"] }
+pulldown-cmark = { version = "0.13.4", default-features = false, features = ["simd"] }
 
 # Closes syntax a partially streamed markdown document leaves open, so a
 # half-written `**bold` does not flash as literal asterisks (optional)

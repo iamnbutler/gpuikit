@@ -3,7 +3,7 @@
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{div, prelude::*, rems, App, ElementId, ParentElement, SharedString, Styled};
 
-use super::super::selectable_text::SelectableText;
+use super::super::selectable_text::{RunRole, SelectableText};
 use super::super::style::TextStyle;
 use super::paragraph::{selection_styled_text, RunContext};
 
@@ -24,7 +24,7 @@ pub(crate) fn code_block(
     cx: &App,
 ) -> impl IntoElement {
     let theme = cx.theme();
-    let styled = selection_styled_text(text, Vec::new(), &run_cx);
+    let (styled, plain) = selection_styled_text(text, Vec::new(), &run_cx);
 
     div()
         .px(rems(1.0))
@@ -41,6 +41,8 @@ pub(crate) fn code_block(
         .child(SelectableText::new(
             id,
             styled,
+            plain,
+            RunRole::Code,
             run_cx.run,
             run_cx.selection,
         ))

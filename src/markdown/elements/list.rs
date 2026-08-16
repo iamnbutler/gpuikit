@@ -4,6 +4,7 @@ use crate::theme::{ActiveTheme, Themeable};
 use gpui::{div, prelude::*, rems, App, ElementId, ParentElement, Styled};
 
 use super::super::inline_style::{InlinePalette, RichText};
+use super::super::selectable_text::RunRole;
 use super::super::style::TextStyle;
 use super::paragraph::{rich_text_run, RunContext};
 
@@ -58,11 +59,13 @@ pub(crate) fn rich_list_item(
         .line_height(rems(style.size * style.line_height))
         .text_color(text_color)
         .child(div().flex_none().child(marker))
-        .child(
-            div()
-                .flex_1()
-                .child(rich_text_run(id, rich_text, palette, run_cx)),
-        )
+        .child(div().flex_1().child(rich_text_run(
+            id,
+            rich_text,
+            palette,
+            RunRole::ListItem,
+            run_cx,
+        )))
 }
 
 /// Get the marker for an unordered list item.

@@ -7,7 +7,7 @@ use gpui::{
 };
 
 use super::super::inline_style::{InlinePalette, RichText};
-use super::super::selectable_text::SelectableText;
+use super::super::selectable_text::{RunRole, SelectableText};
 use super::super::selection::MarkdownSelection;
 use super::super::style::TextStyle;
 
@@ -37,17 +37,21 @@ pub(crate) struct RunContext {
 /// One rich text run: a `StyledText` carrying the span highlights (plus the
 /// selected range as a background highlight), wrapped in [`SelectableText`]
 /// so it drags as part of the document and its link ranges open on click.
+///
+/// `role` is how the run announces itself — the block it came from is the
+/// only place that knows.
 pub(crate) fn rich_text_run(
     id: impl Into<ElementId>,
     rich_text: &RichText,
     palette: &InlinePalette,
+    role: RunRole,
     run_cx: RunContext,
 ) -> gpui::AnyElement {
     let (text, highlights) = rich_text.to_highlights_with(palette);
     let links = rich_text.link_ranges();
-    let styled = selection_styled_text(text, highlights, &run_cx);
+    let (styled, plain) = selection_styled_text(text, highlights, &run_cx);
 
-    let element = SelectableText::new(id, styled, run_cx.run, run_cx.selection);
+    let element = SelectableText::new(id, styled, plain, role, run_cx.run, run_cx.selection);
     if links.is_empty() {
         return element.into_any_element();
     }
@@ -63,11 +67,14 @@ pub(crate) fn rich_text_run(
 
 /// A `StyledText` with the run's selected range merged in as one more
 /// background highlight — which is all "rendering the selection" is.
+///
+/// The plain text is returned alongside it because `StyledText` does not hand
+/// it back, and the run needs it for its accessibility label.
 pub(crate) fn selection_styled_text(
     text: String,
     highlights: Vec<(std::ops::Range<usize>, HighlightStyle)>,
     run_cx: &RunContext,
-) -> StyledText {
+) -> (StyledText, SharedString) {
     let highlights = match run_cx.selection.range_in_run(run_cx.run, text.len()) {
         Some(range) => combine_highlights(
             highlights,
@@ -83,7 +90,10 @@ pub(crate) fn selection_styled_text(
         None => highlights,
     };
     let text: SharedString = text.into();
-    StyledText::new(text).with_highlights(highlights)
+    (
+        StyledText::new(text.clone()).with_highlights(highlights),
+        text,
+    )
 }
 
 /// Render a paragraph element with rich text (bold, italic, strikethrough,
@@ -104,5 +114,11 @@ pub(crate) fn rich_paragraph(
         .text_size(rems(style.size))
         .line_height(rems(style.size * style.line_height))
         .text_color(text_color)
-        .child(rich_text_run(id, rich_text, palette, run_cx))
+        .child(rich_text_run(
+            id,
+            rich_text,
+            palette,
+            RunRole::Paragraph,
+            run_cx,
+        ))
 }

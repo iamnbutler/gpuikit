@@ -29,7 +29,10 @@ pub fn list_item(
         .line_height(rems(style.size * style.line_height))
         .text_color(text_color)
         .child(div().flex_none().child(marker))
-        .child(div().flex_1().child(text))
+        // Without `min_w_0` the text is a flex item with an automatic minimum
+        // size of one unbroken line, so a long item runs off the edge instead
+        // of wrapping.
+        .child(div().flex_1().min_w_0().child(text))
 }
 
 /// Render a list item element with rich text (bold, italic, strikethrough,
@@ -59,8 +62,11 @@ pub(crate) fn rich_list_item(
         .text_color(text_color)
         .child(div().flex_none().child(marker))
         .child(
+            // As in `list_item`: the flex item's automatic minimum size would
+            // otherwise keep the text on one line.
             div()
                 .flex_1()
+                .min_w_0()
                 .child(rich_text_run(id, rich_text, palette, run_cx)),
         )
 }

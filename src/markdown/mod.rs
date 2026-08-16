@@ -639,6 +639,9 @@ impl MarkdownRenderer {
 
                         div()
                             .flex_1()
+                            // Same shape as a list item: without `min_w_0` the
+                            // cell can't shrink below one unbroken line.
+                            .min_w_0()
                             .px_2()
                             .py_1()
                             .text_size(rems(self.style.body.size))
@@ -657,5 +660,129 @@ impl MarkdownRenderer {
     fn push_divider(&mut self, cx: &App) {
         let element = elements::divider(self.style.rule_color, cx);
         self.elements.push(element.into_any_element());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui::{px, Pixels, Render, TestAppContext};
+
+    /// Narrow enough that every sample text below has to wrap.
+    const WIDTH: Pixels = px(240.);
+
+    /// Long enough to take several lines at that width — and exactly one line
+    /// if whatever contains it refuses to wrap.
+    const LONG: &str = "This one is deliberately long enough that it has to wrap onto several lines inside a narrow container.";
+
+    struct TestView {
+        source: SharedString,
+    }
+
+    impl Render for TestView {
+        fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            // The root element is stretched to the window, so the div we
+            // measure has to be a child of it — inside a column it keeps its
+            // content height, which is the signal these tests read.
+            div().flex().flex_col().child(
+                div()
+                    .w(WIDTH)
+                    .debug_selector(|| "measured".into())
+                    .child(markdown(self.source.clone(), cx)),
+            )
+        }
+    }
+
+    /// Render `source` into a [`WIDTH`]-wide container and report how tall it
+    /// got. Text that will not wrap stays one line tall however long it is.
+    fn height(cx: &mut TestAppContext, source: &str) -> Pixels {
+        cx.update(crate::theme::init);
+
+        let source = SharedString::from(source.to_string());
+        let (_view, cx) = cx.add_window_view(move |_window, _cx| TestView { source });
+
+        cx.debug_bounds("measured")
+            .expect("the measured container was never drawn")
+            .size
+            .height
+    }
+
+    /// The height of a single line of body text.
+    fn line(cx: &mut TestAppContext) -> Pixels {
+        height(cx, "x")
+    }
+
+    /// A list item's text column is narrower than a paragraph's by the marker
+    /// and the gap (and, when nested, the indent), so it is allowed to take a
+    /// couple of lines more than the same text set as a paragraph.
+    #[track_caller]
+    fn assert_wrapped_like_a_paragraph(item: Pixels, paragraph: Pixels, line: Pixels) {
+        assert!(
+            paragraph > line,
+            "the baseline paragraph did not wrap ({paragraph:?}), so this measures nothing"
+        );
+        assert!(
+            item > line,
+            "the text stayed on one line ({item:?}) instead of wrapping"
+        );
+        assert!(
+            item <= paragraph + line * 2.,
+            "{item:?} is much taller than the same text as a paragraph ({paragraph:?})"
+        );
+    }
+
+    #[gpui::test]
+    fn a_long_unordered_list_item_wraps(cx: &mut TestAppContext) {
+        let line = line(cx);
+        let paragraph = height(cx, LONG);
+        let item = height(cx, &format!("- {LONG}"));
+
+        assert_wrapped_like_a_paragraph(item, paragraph, line);
+    }
+
+    #[gpui::test]
+    fn a_long_ordered_list_item_wraps(cx: &mut TestAppContext) {
+        let line = line(cx);
+        let paragraph = height(cx, LONG);
+        let item = height(cx, &format!("1. {LONG}"));
+
+        assert_wrapped_like_a_paragraph(item, paragraph, line);
+    }
+
+    #[gpui::test]
+    fn a_long_list_item_with_inline_styles_wraps(cx: &mut TestAppContext) {
+        // Bold, code and a link put a different element in the same flex
+        // container — the `rich_list_item` path rather than `list_item`.
+        let styled = format!("**Bold** and `code` and a [link](#) — {LONG}");
+
+        let line = line(cx);
+        let paragraph = height(cx, &styled);
+        let item = height(cx, &format!("- {styled}"));
+
+        assert_wrapped_like_a_paragraph(item, paragraph, line);
+    }
+
+    #[gpui::test]
+    fn a_long_nested_list_item_wraps(cx: &mut TestAppContext) {
+        // An indented item, so the row is rendered at `indent_level > 0`.
+        // (Separately, and not fixed here: the parent item's own text is
+        // swallowed by the nested one, so this renders as a single row.)
+        let line = line(cx);
+        let paragraph = height(cx, LONG);
+        let item = height(cx, &format!("- parent\n    - {LONG}"));
+
+        assert_wrapped_like_a_paragraph(item, paragraph, line);
+    }
+
+    #[gpui::test]
+    fn a_long_table_cell_wraps(cx: &mut TestAppContext) {
+        let line = line(cx);
+        let short = height(cx, "| A | B |\n| --- | --- |\n| one | two |");
+        let long = height(cx, &format!("| A | B |\n| --- | --- |\n| {LONG} | two |"));
+
+        assert!(
+            long >= short + line,
+            "the cell stayed one line tall ({long:?} against {short:?}) instead of wrapping"
+        );
     }
 }

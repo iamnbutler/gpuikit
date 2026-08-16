@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- Markdown list items and table cells now wrap. The text beside a list marker,
+  and the text in a table cell, is a flex item, and a flex item's automatic
+  minimum size is one unbroken line — so a long item ran off the edge of the
+  document instead of wrapping the way the same text in a paragraph does
+
 ## [0.7.0] - 2026-08-15
 
 ### Breaking Changes

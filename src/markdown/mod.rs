@@ -28,16 +28,33 @@ mod style;
 pub use elements::*;
 pub use inline_style::*;
 pub use parser::*;
-pub use selectable_text::SelectableText;
+pub use selectable_text::{RunRole, SelectableText};
 pub use selection::{MarkdownSelection, SelectionPosition};
 pub use style::*;
 
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, prelude::*, rems, App, Context, ElementId, Entity, IntoElement, ParentElement,
-    SharedString, Styled, Window,
+    div, prelude::*, rems, App, Context, ElementId, Entity, EntityId, IntoElement, ParentElement,
+    Role, SharedString, Styled, Window,
 };
 use pulldown_cmark::{Alignment, Event, Tag, TagEnd};
+
+/// The id of the element every run of one document hangs under.
+///
+/// gpui hashes an element's *whole* id path into an accessibility node id and
+/// refuses duplicates, so run ids only need to be unique within a document if
+/// the document itself is uniquely identified. Keyed on the entity so it is
+/// also stable across frames: assistive technology reads a changed node id as
+/// a different element.
+fn document_element_id(entity_id: EntityId) -> ElementId {
+    ElementId::NamedInteger("md-doc".into(), entity_id.as_u64())
+}
+
+/// The id of one text run, in document order. Only unique underneath a
+/// [`document_element_id`].
+fn run_element_id(index: usize) -> ElementId {
+    ElementId::NamedInteger("md-run".into(), index as u64)
+}
 
 /// A markdown document that can be rendered as a GPUI element.
 ///
@@ -123,12 +140,18 @@ impl Markdown {
 pub struct MarkdownElement {
     markdown: Entity<Markdown>,
     style: MarkdownStyle,
+    element_id: Option<ElementId>,
 }
 
 /// Create a markdown element from source text.
 ///
 /// This is a convenience function that creates the entity and element in one step.
 /// For more control, use `Markdown::new()` and `MarkdownElement::new()` separately.
+///
+/// Note that this mints a *new* entity on every call. Called from a `render`,
+/// the document gets a new element id every frame, which a screen reader reads
+/// as the whole document being replaced. Hold an `Entity<Markdown>` — which
+/// text selection needs anyway — for anything longer-lived than a one-shot.
 pub fn markdown(source: impl Into<SharedString>, cx: &mut App) -> MarkdownElement {
     let entity = cx.new(|cx| Markdown::new(source, cx));
     MarkdownElement::new(entity)
@@ -140,6 +163,7 @@ impl MarkdownElement {
         Self {
             markdown,
             style: MarkdownStyle::default(),
+            element_id: None,
         }
     }
 
@@ -148,10 +172,31 @@ impl MarkdownElement {
         self.style = style;
         self
     }
+
+    /// Override the element id the document — and therefore all of its text
+    /// runs — is scoped under.
+    ///
+    /// The default is derived from the `Markdown` entity, which is unique and
+    /// stable already. Set this only when the same entity is rendered more
+    /// than once in a frame; each copy then needs its own id. (Note that two
+    /// live copies of one entity still share a single selection.)
+    pub fn id(mut self, id: impl Into<ElementId>) -> Self {
+        self.element_id = Some(id.into());
+        self
+    }
+
+    /// The id this element renders under — the explicit [`Self::id`] if one
+    /// was given, otherwise the entity-derived default.
+    pub fn element_id(&self) -> ElementId {
+        self.element_id
+            .clone()
+            .unwrap_or_else(|| document_element_id(self.markdown.entity_id()))
+    }
 }
 
 impl RenderOnce for MarkdownElement {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let document_id = self.element_id();
         let markdown = self.markdown.read(cx);
         let events = markdown.events.clone();
         let selection = markdown.selection.clone();
@@ -162,7 +207,7 @@ impl RenderOnce for MarkdownElement {
         selection.begin_frame();
 
         let renderer = MarkdownRenderer::new(style, selection);
-        renderer.render_events(&events, cx)
+        renderer.render_events(&events, document_id, cx)
     }
 }
 
@@ -177,9 +222,10 @@ struct MarkdownRenderer {
     in_block_quote: bool,
     in_image: Option<ImageContext>,
     list_stack: Vec<ListContext>,
-    /// Monotonic id source for elements that need one (interactive text).
-    element_counter: usize,
-    /// Document-order index for selectable text runs.
+    /// Document-order index for selectable text runs. A run's index is its
+    /// element id, its selection identity and its slot in the per-frame
+    /// registry all at once, so there is only ever one counter to keep in
+    /// step.
     run_counter: usize,
     /// Shared selection state, handed to every run.
     selection: MarkdownSelection,
@@ -219,7 +265,6 @@ impl MarkdownRenderer {
             in_block_quote: false,
             in_image: None,
             list_stack: Vec::new(),
-            element_counter: 0,
             run_counter: 0,
             in_table: false,
             table_alignments: Vec::new(),
@@ -231,12 +276,24 @@ impl MarkdownRenderer {
         }
     }
 
-    fn render_events(mut self, events: &[MarkdownEvent], cx: &App) -> impl IntoElement {
+    fn render_events(
+        mut self,
+        events: &[MarkdownEvent],
+        document_id: ElementId,
+        cx: &App,
+    ) -> impl IntoElement {
         for event in events {
             self.handle_event(&event.event, cx);
         }
 
+        // The id is what scopes the run ids below it; the role is what puts
+        // the document into the accessibility tree. `.role()` is only
+        // reachable on a div that already has an `.id()`, so the two cannot
+        // drift apart. A bare `.id()` adds no hitbox, so selection
+        // hit-testing and link clicks are untouched.
         div()
+            .id(document_id)
+            .role(Role::Document)
             .w_full()
             .flex()
             .flex_col()
@@ -432,27 +489,23 @@ impl MarkdownRenderer {
         }
     }
 
-    fn next_id(&mut self) -> ElementId {
-        self.element_counter += 1;
-        ElementId::NamedInteger("md-run".into(), self.element_counter as u64)
-    }
-
-    /// Selection context for the next text run, in document order. The
-    /// counter here must tick once per selectable run and nowhere else —
-    /// it is the identity the per-frame registry and the highlights agree
-    /// on.
-    fn next_run_cx(&mut self, cx: &App) -> elements::RunContext {
+    /// Id and selection context for the next text run, in document order.
+    /// The counter must tick once per selectable run and nowhere else — it
+    /// is the identity the element id, the per-frame registry and the
+    /// highlights all agree on.
+    fn next_run(&mut self, cx: &App) -> (ElementId, elements::RunContext) {
         let run = self.run_counter;
         self.run_counter += 1;
         let theme = cx.theme();
-        elements::RunContext {
+        let run_cx = elements::RunContext {
             selection: self.selection.clone(),
             run,
             selection_background: self
                 .style
                 .selection_background
                 .unwrap_or_else(|| theme.accent().opacity(0.25)),
-        }
+        };
+        (run_element_id(run), run_cx)
     }
 
     fn flush_paragraph(&mut self, cx: &App) {
@@ -461,8 +514,8 @@ impl MarkdownRenderer {
         }
 
         let rich_text = std::mem::take(&mut self.current_text);
-        let (id, palette) = (self.next_id(), self.palette(cx));
-        let run_cx = self.next_run_cx(cx);
+        let palette = self.palette(cx);
+        let (id, run_cx) = self.next_run(cx);
         let element =
             elements::rich_paragraph(id, &rich_text, &self.style.body, &palette, run_cx, cx);
         self.elements.push(element.into_any_element());
@@ -484,9 +537,10 @@ impl MarkdownRenderer {
         }
         .clone();
 
-        let (id, palette) = (self.next_id(), self.palette(cx));
-        let run_cx = self.next_run_cx(cx);
-        let element = elements::rich_heading(id, &rich_text, &heading_style, &palette, run_cx, cx);
+        let palette = self.palette(cx);
+        let (id, run_cx) = self.next_run(cx);
+        let element =
+            elements::rich_heading(id, &rich_text, level, &heading_style, &palette, run_cx, cx);
         self.elements.push(element.into_any_element());
     }
 
@@ -496,8 +550,8 @@ impl MarkdownRenderer {
         }
 
         let rich_text = std::mem::take(&mut self.current_text);
-        let (id, palette) = (self.next_id(), self.palette(cx));
-        let run_cx = self.next_run_cx(cx);
+        let palette = self.palette(cx);
+        let (id, run_cx) = self.next_run(cx);
         let element = elements::rich_block_quote(
             id,
             &rich_text,
@@ -519,7 +573,7 @@ impl MarkdownRenderer {
         let text = self.current_text.to_plain_text();
         self.current_text.clear();
 
-        let (id, run_cx) = (self.next_id(), self.next_run_cx(cx));
+        let (id, run_cx) = self.next_run(cx);
         let element = elements::code_block(
             id,
             text,
@@ -554,8 +608,8 @@ impl MarkdownRenderer {
         };
 
         let indent_level = self.list_stack.len().saturating_sub(1);
-        let (id, palette) = (self.next_id(), self.palette(cx));
-        let run_cx = self.next_run_cx(cx);
+        let palette = self.palette(cx);
+        let (id, run_cx) = self.next_run(cx);
         let element = elements::rich_list_item(
             id,
             &rich_text,
@@ -665,8 +719,10 @@ impl MarkdownRenderer {
 
 #[cfg(test)]
 mod tests {
+    use super::selectable_text::recorder::{self, RecordedRun};
     use super::*;
-    use gpui::{px, Pixels, Render, TestAppContext};
+    use gpui::{point, px, size, AnyElement, Pixels, Render, TestAppContext, VisualTestContext};
+    use std::collections::HashSet;
 
     /// Narrow enough that every sample text below has to wrap.
     const WIDTH: Pixels = px(240.);
@@ -731,6 +787,90 @@ mod tests {
         );
     }
 
+    /// One of every kind of run this renderer emits, in this order: heading,
+    /// paragraph, quote, list item, code.
+    const EVERY_RUN_KIND: &str = concat!(
+        "# Title\n",
+        "\n",
+        "A paragraph.\n",
+        "\n",
+        "> A quote.\n",
+        "\n",
+        "- An item\n",
+        "\n",
+        "```\n",
+        "let x = 1;\n",
+        "```\n",
+    );
+
+    /// Draw one frame of whatever `build` produces, and report every run the
+    /// way gpui's accessibility walk would have seen it.
+    fn draw(
+        cx: &mut VisualTestContext,
+        build: impl FnOnce() -> Vec<MarkdownElement>,
+    ) -> Vec<RecordedRun> {
+        recorder::clear();
+        cx.draw(
+            point(px(0.), px(0.)),
+            size(px(800.), px(600.)),
+            |_window, _cx| -> AnyElement { div().children(build()).into_any_element() },
+        );
+        recorder::take()
+    }
+
+    fn document(cx: &mut TestAppContext, source: &'static str) -> Entity<Markdown> {
+        cx.new(|cx| Markdown::new(source, cx))
+    }
+
+    /// The last two segments of a run's id path: the document it belongs to,
+    /// and the run itself.
+    fn doc_and_run(run: &RecordedRun) -> (&str, &str) {
+        match run.id_segments.as_slice() {
+            [.., doc, this] => (doc.as_str(), this.as_str()),
+            other => panic!("a run's id path should have at least two segments: {other:?}"),
+        }
+    }
+
+    fn id_paths(runs: &[RecordedRun]) -> Vec<String> {
+        runs.iter().map(|run| run.id_path.clone()).collect()
+    }
+
+    #[gpui::test]
+    fn two_documents_in_one_frame_get_disjoint_run_ids(cx: &mut TestAppContext) {
+        cx.update(crate::theme::init);
+        let (first, second) = (document(cx, EVERY_RUN_KIND), document(cx, EVERY_RUN_KIND));
+        let cx = cx.add_empty_window();
+
+        let runs = draw(cx, || {
+            vec![
+                MarkdownElement::new(first.clone()),
+                MarkdownElement::new(second.clone()),
+            ]
+        });
+
+        assert_eq!(runs.len(), 10, "five runs per document, twice over");
+
+        // The whole point: gpui hashes the *whole* path into a node id, and
+        // two documents used to mint the same `md-run-N` under the same
+        // ancestors.
+        let paths = id_paths(&runs);
+        let distinct: HashSet<&String> = paths.iter().collect();
+        assert_eq!(distinct.len(), 10, "colliding id paths: {paths:?}");
+
+        let mut documents = HashSet::new();
+        for run in &runs {
+            let (doc, this) = doc_and_run(run);
+            assert!(doc.starts_with("md-doc-"), "unscoped run: {}", run.id_path);
+            assert!(this.starts_with("md-run-"), "odd run id: {}", run.id_path);
+            documents.insert(doc.to_string());
+        }
+        assert_eq!(
+            documents.len(),
+            2,
+            "two documents, two scopes: {documents:?}"
+        );
+    }
+
     #[gpui::test]
     fn a_long_unordered_list_item_wraps(cx: &mut TestAppContext) {
         let line = line(cx);
@@ -784,5 +924,112 @@ mod tests {
             long >= short + line,
             "the cell stayed one line tall ({long:?} against {short:?}) instead of wrapping"
         );
+    }
+
+    #[gpui::test]
+    fn a_document_keeps_its_run_ids_across_frames(cx: &mut TestAppContext) {
+        // Assistive technology reads a changed node id as a different
+        // element, so redrawing an unchanged document must not renumber it.
+        cx.update(crate::theme::init);
+        let doc = document(cx, EVERY_RUN_KIND);
+        let cx = cx.add_empty_window();
+
+        let first = draw(cx, || vec![MarkdownElement::new(doc.clone())]);
+        let second = draw(cx, || vec![MarkdownElement::new(doc.clone())]);
+
+        assert_eq!(id_paths(&first), id_paths(&second));
+        assert!(!first.is_empty());
+    }
+
+    #[gpui::test]
+    fn an_explicit_id_separates_two_elements_over_one_entity(cx: &mut TestAppContext) {
+        cx.update(crate::theme::init);
+        let doc = document(cx, EVERY_RUN_KIND);
+        let cx = cx.add_empty_window();
+
+        let runs = draw(cx, || {
+            vec![
+                MarkdownElement::new(doc.clone()).id("left"),
+                MarkdownElement::new(doc.clone()).id("right"),
+            ]
+        });
+
+        let paths = id_paths(&runs);
+        let distinct: HashSet<&String> = paths.iter().collect();
+        assert_eq!(distinct.len(), 10, "colliding id paths: {paths:?}");
+
+        let documents: HashSet<&str> = runs.iter().map(|run| doc_and_run(run).0).collect();
+        assert_eq!(
+            documents,
+            HashSet::from(["left", "right"]),
+            "the override should replace the entity-derived scope"
+        );
+    }
+
+    #[gpui::test]
+    fn the_default_document_id_follows_the_entity(cx: &mut TestAppContext) {
+        cx.update(crate::theme::init);
+        let doc = document(cx, "Hello.");
+        let expected = document_element_id(doc.entity_id());
+
+        assert_eq!(MarkdownElement::new(doc.clone()).element_id(), expected);
+        assert_eq!(
+            MarkdownElement::new(doc).id("mine").element_id(),
+            ElementId::Name("mine".into())
+        );
+    }
+
+    #[gpui::test]
+    fn every_run_kind_reports_a_role_and_its_text(cx: &mut TestAppContext) {
+        cx.update(crate::theme::init);
+        let doc = document(cx, EVERY_RUN_KIND);
+        let cx = cx.add_empty_window();
+
+        let runs = draw(cx, || vec![MarkdownElement::new(doc.clone())]);
+
+        let reported: Vec<(Option<Role>, Option<&str>, Option<usize>)> = runs
+            .iter()
+            .map(|run| (run.role, run.label.as_deref(), run.level))
+            .collect();
+
+        assert_eq!(
+            reported,
+            vec![
+                (Some(Role::Heading), Some("Title"), Some(1)),
+                (Some(Role::Paragraph), Some("A paragraph."), None),
+                (Some(Role::Blockquote), Some("A quote."), None),
+                (Some(Role::ListItem), Some("An item"), None),
+                (Some(Role::Code), Some("let x = 1;\n"), None),
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn headings_report_their_level(cx: &mut TestAppContext) {
+        cx.update(crate::theme::init);
+        let doc = document(cx, "# One\n\n### Three\n");
+        let cx = cx.add_empty_window();
+
+        let runs = draw(cx, || vec![MarkdownElement::new(doc.clone())]);
+
+        let levels: Vec<_> = runs.iter().map(|run| run.level).collect();
+        assert_eq!(levels, vec![Some(1), Some(3)]);
+    }
+
+    #[test]
+    fn heading_levels_are_numbered_one_through_six() {
+        let levels: Vec<u8> = [
+            HeadingLevel::H1,
+            HeadingLevel::H2,
+            HeadingLevel::H3,
+            HeadingLevel::H4,
+            HeadingLevel::H5,
+            HeadingLevel::H6,
+        ]
+        .into_iter()
+        .map(HeadingLevel::level)
+        .collect();
+
+        assert_eq!(levels, vec![1, 2, 3, 4, 5, 6]);
     }
 }

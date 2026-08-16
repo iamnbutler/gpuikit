@@ -4,6 +4,7 @@ use crate::theme::{ActiveTheme, Themeable};
 use gpui::{div, prelude::*, rems, App, ElementId, ParentElement, Styled};
 
 use super::super::inline_style::{InlinePalette, RichText};
+use super::super::selectable_text::RunRole;
 use super::super::style::TextStyle;
 use super::paragraph::{rich_text_run, RunContext};
 
@@ -64,10 +65,13 @@ pub(crate) fn rich_list_item(
         .child(
             // As in `list_item`: the flex item's automatic minimum size would
             // otherwise keep the text on one line.
-            div()
-                .flex_1()
-                .min_w_0()
-                .child(rich_text_run(id, rich_text, palette, run_cx)),
+            div().flex_1().min_w_0().child(rich_text_run(
+                id,
+                rich_text,
+                palette,
+                RunRole::ListItem,
+                run_cx,
+            )),
         )
 }
 

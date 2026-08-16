@@ -15,15 +15,20 @@
 //! Rendering the selection is not this element's job: the renderer injects
 //! the selected range as one more background highlight before construction,
 //! so painting stays plain `StyledText`.
+//!
+//! Every run also carries a [`RunRole`], which is how it announces itself to
+//! assistive technology. A run is only reported at all when its whole
+//! [`GlobalElementId`] is unique in the frame — see [`crate::markdown`] for
+//! how the document scopes its runs' ids.
 
 use std::mem;
 use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    App, Bounds, CursorStyle, DispatchPhase, Element, ElementId, GlobalElementId, Hitbox,
-    HitboxBehavior, IntoElement, LayoutId, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels,
-    SharedString, StyledText, TextLayout, Window,
+    accesskit, App, Bounds, CursorStyle, DispatchPhase, Element, ElementId, GlobalElementId,
+    Hitbox, HitboxBehavior, IntoElement, LayoutId, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+    Pixels, Role, SharedString, StyledText, TextLayout, Window,
 };
 
 use super::selection::{word_range_at, MarkdownSelection, SelectionPosition};
@@ -49,10 +54,45 @@ impl RegisteredRun {
 
 type ClickListener = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 
+/// What kind of block a run is, and therefore how a screen reader announces
+/// it. Every run has one: a run that has not decided how it is announced
+/// cannot be built.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RunRole {
+    /// Body text.
+    Paragraph,
+    /// A heading at the given level, 1 through 6.
+    Heading(u8),
+    /// A block quote.
+    Quote,
+    /// One item of an ordered or unordered list.
+    ListItem,
+    /// A fenced or indented code block.
+    Code,
+}
+
+impl RunRole {
+    /// The accesskit role this run is reported under.
+    pub fn a11y_role(self) -> Role {
+        match self {
+            RunRole::Paragraph => Role::Paragraph,
+            RunRole::Heading(_) => Role::Heading,
+            RunRole::Quote => Role::Blockquote,
+            RunRole::ListItem => Role::ListItem,
+            RunRole::Code => Role::Code,
+        }
+    }
+}
+
 /// A selectable (and optionally link-bearing) text run.
 pub struct SelectableText {
     element_id: ElementId,
     text: StyledText,
+    /// The run's text without any styling. [`StyledText`] does not hand its
+    /// text back, and the a11y node is built during prepaint — before any
+    /// layout exists to read it off.
+    plain_text: SharedString,
+    role: RunRole,
     /// This run's index in document order — its identity in the selection.
     run: usize,
     selection: MarkdownSelection,
@@ -61,15 +101,25 @@ pub struct SelectableText {
 }
 
 impl SelectableText {
+    /// Build a run. `plain_text` is the same text `text` renders, unstyled —
+    /// it is what assistive technology is told the run says.
+    ///
+    /// `id` must be unique within the frame *including its ancestors*: two
+    /// runs whose full [`GlobalElementId`] collides produce one accessibility
+    /// node id, which gpui refuses (panicking in debug builds).
     pub fn new(
         id: impl Into<ElementId>,
         text: StyledText,
+        plain_text: impl Into<SharedString>,
+        role: RunRole,
         run: usize,
         selection: MarkdownSelection,
     ) -> Self {
         Self {
             element_id: id.into(),
             text,
+            plain_text: plain_text.into(),
+            role,
             run,
             selection,
             clickable_ranges: Vec::new(),
@@ -111,6 +161,20 @@ impl Element for SelectableText {
         None
     }
 
+    fn a11y_role(&self) -> Option<Role> {
+        Some(self.role.a11y_role())
+    }
+
+    fn write_a11y_info(&self, node: &mut accesskit::Node) {
+        // Label, not value: accesskit only names a node from its `value` for
+        // `Role::Label`. Under any of our roles, `value` would leave the node
+        // nameless, and setting both risks a double announcement.
+        node.set_label(self.plain_text.to_string());
+        if let RunRole::Heading(level) = self.role {
+            node.set_level(level as usize);
+        }
+    }
+
     fn request_layout(
         &mut self,
         _id: Option<&GlobalElementId>,
@@ -130,6 +194,9 @@ impl Element for SelectableText {
         window: &mut Window,
         cx: &mut App,
     ) -> Hitbox {
+        #[cfg(test)]
+        recorder::record(self, _global_id);
+
         self.text
             .prepaint(None, inspector_id, bounds, state, window, cx);
         window.insert_hitbox(bounds, HitboxBehavior::Normal)
@@ -269,5 +336,75 @@ impl Element for SelectableText {
 
         self.text
             .paint(None, inspector_id, bounds, &mut (), &mut (), window, cx);
+    }
+}
+
+/// Reconstructs, per prepainted run, exactly what gpui reads when it builds
+/// the accessibility tree: the run's [`GlobalElementId`] — which gpui hashes
+/// into an `accesskit::NodeId`, and which must therefore be unique in the
+/// frame — and the node the element writes into.
+///
+/// This exists because accessibility cannot be switched on in a test. The
+/// active flag is only ever set by a platform adapter's activation callback,
+/// and the test platform has none, so no test can watch gpui's duplicate-node
+/// assert fire. Taking the same inputs at the same point in the frame is the
+/// next best thing.
+#[cfg(test)]
+pub(crate) mod recorder {
+    use super::*;
+    use std::cell::RefCell;
+
+    /// One run, as the accessibility walk would have seen it.
+    #[derive(Clone, Debug)]
+    pub(crate) struct RecordedRun {
+        /// The id path gpui hashes into a node id, printed the way
+        /// [`GlobalElementId`] prints itself: segments joined by `.`.
+        pub id_path: String,
+        /// The same path's segments, outermost first.
+        pub id_segments: Vec<String>,
+        pub role: Option<Role>,
+        pub label: Option<String>,
+        pub level: Option<usize>,
+    }
+
+    thread_local! {
+        static RECORDED: RefCell<Vec<RecordedRun>> = const { RefCell::new(Vec::new()) };
+    }
+
+    pub(crate) fn record(text: &SelectableText, global_id: Option<&GlobalElementId>) {
+        // No global id means no node: gpui only reports elements it can name.
+        let Some(global_id) = global_id else {
+            return;
+        };
+
+        let (role, label, level) = match text.a11y_role() {
+            Some(role) => {
+                let mut node = accesskit::Node::new(role);
+                text.write_a11y_info(&mut node);
+                (Some(role), node.label().map(str::to_owned), node.level())
+            }
+            None => (None, None, None),
+        };
+
+        RECORDED.with(|recorded| {
+            recorded.borrow_mut().push(RecordedRun {
+                id_path: global_id.to_string(),
+                id_segments: global_id.iter().map(|id| id.to_string()).collect(),
+                role,
+                label,
+                level,
+            })
+        });
+    }
+
+    /// Drop everything recorded so far. Call before drawing the frame under
+    /// test, so a previous frame's runs don't leak into the assertions.
+    pub(crate) fn clear() {
+        RECORDED.with(|recorded| recorded.borrow_mut().clear());
+    }
+
+    /// Everything recorded since the last [`clear`], in prepaint order.
+    pub(crate) fn take() -> Vec<RecordedRun> {
+        RECORDED.with(|recorded| std::mem::take(&mut *recorded.borrow_mut()))
     }
 }

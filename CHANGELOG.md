@@ -4,12 +4,40 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- `SelectableText::new` takes two more arguments: the run's plain text, and a
+  `RunRole` saying how the run is announced. A run can no longer be built
+  without deciding what it is. It exists to serve the markdown renderer, so
+  callers outside this crate are unlikely
+
 ### Fixed
 
 - Markdown list items and table cells now wrap. The text beside a list marker,
   and the text in a table cell, is a flex item, and a flex item's automatic
   minimum size is one unbroken line — so a long item ran off the edge of the
   document instead of wrapping the way the same text in a paragraph does
+- Markdown text runs no longer collide across documents. Runs were minting
+  global ids (`md-run-1`, `md-run-2`, …) from a counter that restarted at zero
+  for every document, so two markdown documents in one frame — one `Markdown`
+  entity per chat message, say — produced the same ids. gpui hashes an
+  element's whole id path into an accessibility node id and refuses duplicates:
+  a panic in debug builds, a silently dropped node in release. Each document
+  now renders its runs under its own element, so run ids are unique by
+  construction
+
+### Added
+
+- Markdown documents and their text runs are now in the accessibility tree.
+  The document is a `Role::Document`; each run is a heading, paragraph, list
+  item, block quote or code node, labelled with its text, and headings report
+  their level
+- `MarkdownElement::id`, to override the element id a document — and therefore
+  all of its runs — is scoped under. The default is derived from the `Markdown`
+  entity, so it is unique and stable across frames already; set it when the
+  same entity is rendered more than once in one frame.
+  `MarkdownElement::element_id` reads back whichever applies
+- `RunRole`, and `HeadingLevel::level()`
 
 ## [0.7.0] - 2026-08-15
 

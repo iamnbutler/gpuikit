@@ -18,6 +18,7 @@
 //! )
 //! ```
 
+mod code_highlight;
 mod elements;
 mod inline_style;
 mod parser;
@@ -26,6 +27,12 @@ mod selection;
 mod stitch;
 mod style;
 
+pub use code_highlight::normalize_language;
+#[cfg(feature = "editor")]
+pub use code_highlight::{
+    code_highlight_themes, init_code_highlighting, set_code_highlight_theme, CodeHighlightTheme,
+    DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME,
+};
 pub use elements::*;
 pub use inline_style::*;
 pub use parser::*;
@@ -396,6 +403,9 @@ struct MarkdownRenderer {
     // State tracking
     in_heading: Option<HeadingLevel>,
     in_code_block: bool,
+    /// The language token of the fence currently open, normalized from its
+    /// info string. `None` for an indented block or a bare fence.
+    code_block_language: Option<String>,
     in_block_quote: bool,
     in_image: Option<ImageContext>,
     list_stack: Vec<ListContext>,
@@ -439,6 +449,7 @@ impl MarkdownRenderer {
             elements: Vec::new(),
             in_heading: None,
             in_code_block: false,
+            code_block_language: None,
             in_block_quote: false,
             in_image: None,
             list_stack: Vec::new(),
@@ -510,8 +521,10 @@ impl MarkdownRenderer {
             Tag::BlockQuote(_) => {
                 self.in_block_quote = true;
             }
-            Tag::CodeBlock(_kind) => {
+            Tag::CodeBlock(kind) => {
                 self.in_code_block = true;
+                self.code_block_language =
+                    parser::code_block_language(kind).and_then(code_highlight::normalize_language);
             }
             Tag::List(start) => {
                 self.list_stack.push(ListContext {
@@ -557,11 +570,20 @@ impl MarkdownRenderer {
             Tag::TableCell => {
                 self.current_text.clear();
             }
+            // Listed rather than folded into a `_ => {}` wildcard on purpose:
+            // an exhaustive match is what turns a pulldown-cmark upgrade into a
+            // compile error instead of silently dropped styling.
+            //
+            // Superscript and Subscript are inert because the options that
+            // produce them are off (see `parser::default_options`) *and*
+            // because `InlineStyle` has nowhere to put them.
             Tag::FootnoteDefinition(_)
             | Tag::MetadataBlock(_)
             | Tag::DefinitionList
             | Tag::DefinitionListTitle
             | Tag::DefinitionListDefinition
+            | Tag::Superscript
+            | Tag::Subscript
             | Tag::HtmlBlock => {}
         }
     }
@@ -632,6 +654,8 @@ impl MarkdownRenderer {
             | TagEnd::DefinitionList
             | TagEnd::DefinitionListTitle
             | TagEnd::DefinitionListDefinition
+            | TagEnd::Superscript
+            | TagEnd::Subscript
             | TagEnd::HtmlBlock => {}
         }
     }
@@ -743,6 +767,10 @@ impl MarkdownRenderer {
     }
 
     fn flush_code_block(&mut self, cx: &App) {
+        // Taken before the early return: an empty fence still closes, and its
+        // language must not leak into the next block.
+        let language = self.code_block_language.take();
+
         if self.current_text.is_empty() {
             return;
         }
@@ -754,7 +782,7 @@ impl MarkdownRenderer {
         let element = elements::code_block(
             id,
             text,
-            None,
+            language.as_deref(),
             &self.style.code,
             &self.style.code_font_family,
             self.style.code_block_bg,
@@ -1008,6 +1036,46 @@ mod tests {
 
     fn id_paths(runs: &[RecordedRun]) -> Vec<String> {
         runs.iter().map(|run| run.id_path.clone()).collect()
+    }
+
+    /// The fence's info string used to be dropped at `Tag::CodeBlock` and a
+    /// literal `None` passed on to the element, so fixing the code block
+    /// element alone would have changed nothing.
+    #[gpui::test]
+    fn a_fence_carries_its_language_without_leaking_it(cx: &mut TestAppContext) {
+        use pulldown_cmark::CodeBlockKind;
+
+        cx.update(crate::theme::init);
+        cx.update(|cx| {
+            let mut renderer =
+                MarkdownRenderer::new(MarkdownStyle::default(), MarkdownSelection::new());
+
+            let fence = |info: &'static str| Tag::CodeBlock(CodeBlockKind::Fenced(info.into()));
+
+            renderer.handle_start_tag(&fence("rust,ignore"));
+            assert_eq!(
+                renderer.code_block_language.as_deref(),
+                Some("rust"),
+                "the info string should reach the renderer, normalized"
+            );
+
+            // An empty fence still closes, and must not hand its language to
+            // whatever block comes next.
+            renderer.flush_code_block(cx);
+            assert_eq!(renderer.code_block_language, None);
+
+            for no_language in [
+                fence(""),
+                fence("text"),
+                Tag::CodeBlock(CodeBlockKind::Indented),
+            ] {
+                renderer.handle_start_tag(&no_language);
+                assert_eq!(
+                    renderer.code_block_language, None,
+                    "{no_language:?} names no language"
+                );
+            }
+        });
     }
 
     #[gpui::test]

@@ -3,6 +3,7 @@
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{div, prelude::*, rems, App, ElementId, ParentElement, SharedString, Styled};
 
+use super::super::code_highlight::code_highlights;
 use super::super::selectable_text::{RunRole, SelectableText};
 use super::super::style::TextStyle;
 use super::paragraph::{selection_styled_text, RunContext};
@@ -10,12 +11,16 @@ use super::paragraph::{selection_styled_text, RunContext};
 /// Render a code block element. The text inside is a selectable run — code
 /// is the thing people copy most.
 ///
-/// TODO: Replace with gpuikit-editor readonly view for syntax highlighting.
+/// `language` is the fence's normalized language token. It buys syntax
+/// highlighting only when the `editor` feature is on *and* the app called
+/// [`init_code_highlighting`](super::super::code_highlight); otherwise, and
+/// for a language syntect has no grammar for, the block renders plain
+/// monospace exactly as before.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn code_block(
     id: impl Into<ElementId>,
     text: String,
-    _language: Option<&str>,
+    language: Option<&str>,
     style: &TextStyle,
     font_family: &SharedString,
     bg: Option<gpui::Hsla>,
@@ -24,13 +29,19 @@ pub(crate) fn code_block(
     cx: &App,
 ) -> impl IntoElement {
     let theme = cx.theme();
-    let (styled, plain) = selection_styled_text(text, Vec::new(), &run_cx);
+    // Resolved once, and handed to the highlighter as well as to the div, so
+    // the light/dark decision follows the surface the highlights are painted
+    // on rather than the window at large.
+    let background = bg.unwrap_or(theme.surface());
+
+    let highlights = code_highlights(&text, language, background, cx);
+    let (styled, plain) = selection_styled_text(text, highlights, &run_cx);
 
     div()
         .px(rems(1.0))
         .py(rems(0.75))
         .rounded(rems(0.375))
-        .bg(bg.unwrap_or(theme.surface()))
+        .bg(background)
         .border_1()
         .border_color(border.unwrap_or(theme.border()))
         .text_size(rems(style.size))

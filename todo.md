@@ -31,8 +31,6 @@
 - Scroll Area
 - Select
 - Separator
-- Skeleton
-- Grain
 - Slider
 - Switch
 - Tabs
@@ -42,6 +40,27 @@
 - Toggle Group
 - Tooltip
 - Typography
+
+## Removed — disabled pending performance work
+
+Both were removed in [#121](https://github.com/iamnbutler/gpuikit/pull/121) and
+shipped removed in 0.5.0. They are listed here rather than deleted so that
+whoever revives one does not rebuild the same problem.
+
+- **Skeleton** — the pulse ran through `Animation::new(1500ms).repeat()`. A gpui
+  `AnimationElement` asks for another frame for as long as its animation is
+  live, and `.repeat()` is never done, so a single skeleton pinned its window at
+  the display refresh rate and everything else on that window re-laid-out and
+  repainted at that rate too. (`Skeleton::animated(false)` did not help: the
+  animation was attached unconditionally and the callback merely returned the
+  element unchanged, so the repaint loop ran with the pulse "off".) To bring it
+  back it has to stop requesting frames — drive the pulse off a timer or one
+  shared animation entity — not merely animate more cheaply.
+- **Grain** — paints one quad per 4px cell inside a `canvas`, roughly 60k quads
+  for a 1200×800 area. Tolerable on an idle window; it was what made the
+  skeleton's forced repaint read as "a ton of lag" in the old single-scroll
+  showcase, where several of each were mounted at once. Needs to become a
+  shader or a tiled texture before it comes back.
 
 ## Not Yet Implemented
 

@@ -10,6 +10,12 @@ All notable changes to this project will be documented in this file.
   `RunRole` saying how the run is announced. A run can no longer be built
   without deciding what it is. It exists to serve the markdown renderer, so
   callers outside this crate are unlikely
+- pulldown-cmark 0.12 → 0.13.4. gpuikit's own rendering is unchanged, but
+  pulldown-cmark types are part of gpuikit's public surface — `MarkdownEvent`
+  hands out a `pulldown_cmark::Event<'static>`, and `CodeBlockKind`,
+  `LinkType`, `Options` and `Parser` are re-exported — so a downstream crate
+  with its own `pulldown-cmark = "0.12"` dependency will end up with two
+  non-unifying copies of `Event` until it bumps too
 
 ### Changed
 
@@ -64,6 +70,29 @@ All notable changes to this project will be documented in this file.
   same entity is rendered more than once in one frame.
   `MarkdownElement::element_id` reads back whichever applies
 - `RunRole`, and `HeadingLevel::level()`
+- Fenced code blocks are syntax highlighted from their info string. The
+  language was parsed and then thrown away; it now reaches the element and is
+  highlighted by the `editor` feature's syntect-backed `SyntaxHighlighter`.
+  **Opt in per app** with `markdown::init_code_highlighting(cx)` after
+  `gpuikit::init` — loading syntect's syntax and theme sets costs tens of
+  milliseconds and a few megabytes, which a document containing no code should
+  not pay. Requires the `editor` feature; without it, without the init call,
+  without an info string, or for a language syntect has no grammar for, blocks
+  render as the plain monospace they did before. Highlights are cached per
+  block on (text, language, theme). The syntect theme follows the block's
+  background — `base16-ocean.dark` on a dark surface, `InspiredGitHub` on a
+  light one — or can be pinned with
+  `markdown::set_code_highlight_theme(cx, CodeHighlightTheme::Pinned(..))`;
+  `markdown::code_highlight_themes(cx)` lists the names it accepts
+- `markdown::normalize_language`, the fence-info-string-to-language-token rule
+  (leading word only, so ` ```rust,ignore ` is `rust`; a small alias table;
+  `text`/`plaintext`/`plain`/`none` mean no language)
+- `SyntaxHighlighter::highlight_block`, which highlights a whole block in one
+  stateless pass and returns `HighlightStyle`s, plus
+  `SyntaxHighlighter::resolve_language` and `SyntaxHighlighter::current_theme`.
+  Unlike `highlight_line`, `highlight_block` keeps its parse state local to the
+  call, so two blocks of one language cannot contaminate each other by both
+  starting at line 0
 
 ## [0.7.0] - 2026-08-15
 
@@ -116,6 +145,31 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - Input content text now defaults to the theme foreground color; it previously inherited the window text style, which bottoms out at gpui's default black — invisible on dark themes. An explicit `.text_color()` on the element still wins
+
+## [0.5.0] - 2026-08-11
+
+Recorded retroactively. Both removals below shipped in 0.5.0 but were never
+written down — they rode along in an otherwise unrelated showcase PR
+([#121](https://github.com/iamnbutler/gpuikit/pull/121)), so anyone upgrading
+from 0.4.x met an `unresolved import` with no explanation. See
+[#120](https://github.com/iamnbutler/gpuikit/issues/120).
+
+### Breaking Changes
+
+- **Removed the Skeleton component** (`gpuikit::elements::skeleton`), pending a
+  rewrite that does not lag. Its pulse used `Animation::new(1500ms).repeat()`,
+  and a gpui `AnimationElement` requests another frame for as long as its
+  animation is live — which for a repeating animation is forever. One skeleton
+  therefore pinned its whole window at the display refresh rate, re-laying-out
+  and repainting every other element on it. `Skeleton::animated(false)` was not
+  an escape hatch: the animation was attached unconditionally and the callback
+  simply returned the element unchanged. For a static placeholder in the
+  meantime, a plain `div().bg(cx.theme().surface_secondary())` sized to the
+  content is the direct replacement
+- **Removed the Grain component** (`gpuikit::elements::grain`). It paints one
+  quad per 4px cell inside a `canvas` — on the order of 60k quads for a
+  1200×800 overlay — which is affordable only on a window that never repaints.
+  It comes back as a shader or a tiled texture, not as quads
 
 ## [0.4.0] - 2026-04-05
 

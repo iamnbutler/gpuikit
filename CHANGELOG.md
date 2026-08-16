@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `Markdown::append`, for content that arrives a piece at a time (an LLM reply,
+  a log tail). It extends the source instead of making the caller rebuild and
+  re-set the whole document, and unlike `set_source` it keeps the selection —
+  selection positions are `(run, byte offset)`, so text arriving at the end
+  cannot disturb a selection made earlier
+- Optional `stitch` feature: closes the syntax a partially streamed document
+  leaves open (`**bold` with no closer, `[label](htt`) before parsing, so
+  streaming text does not flicker between literal markers and styled text.
+  Off by default — [mdstitch](https://docs.rs/mdstitch) requires a newer
+  compiler than this crate declares. `markdown::preprocessing_available()`
+  reports which build you got, and `Markdown::set_preprocess_partial` turns it
+  off per document
+- `examples/markdown_streaming.rs`, a reply dripping in through `append`
+
+### Changed
+
+- Markdown parses off the UI thread. `set_source` and `append` schedule a
+  parse on the background executor and the previously parsed events keep
+  rendering until it lands, so the view never blanks; deltas arriving during a
+  parse coalesce into one follow-up parse rather than one each.
+  `Markdown::new` still parses synchronously, so a document is never empty on
+  its first frame. **This is a behaviour change**: `events()` read in the same
+  turn as `set_source` now reports the previous parse. `parsed_source()` says
+  which source the current events came from and `is_parsing()` whether one is
+  in flight
+- `set_source` with the source the document already has does nothing
+
 ### Fixed
 
 - Markdown list items and table cells now wrap. The text beside a list marker,

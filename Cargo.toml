@@ -21,6 +21,10 @@ name = "markdown_selection"
 path = "examples/markdown_selection.rs"
 
 [[example]]
+name = "markdown_streaming"
+path = "examples/markdown_streaming.rs"
+
+[[example]]
 name = "showcase"
 path = "examples/showcase.rs"
 
@@ -58,6 +62,10 @@ smol = "2.0"
 # Markdown parsing
 pulldown-cmark = { version = "0.12", default-features = false, features = ["simd"] }
 
+# Closes syntax a partially streamed markdown document leaves open, so a
+# half-written `**bold` does not flash as literal asterisks (optional)
+mdstitch = { version = "0.1", optional = true }
+
 # Editor dependencies (optional)
 syntect = { version = "5.3.0", optional = true }
 gpui_util = { package = "gpui-util-gpui-unofficial", version = "1.14.2", optional = true }
@@ -77,6 +85,10 @@ schema = ["dep:schemars"]
 # Compile Metal shaders at runtime instead of at build time (no Xcode Metal
 # toolchain required).
 runtime_shaders = ["gpui_platform/runtime_shaders"]
+# Close unterminated markdown syntax before parsing, so a streaming document
+# does not flicker between literal markers and styled text. Off by default:
+# mdstitch declares rust-version 1.95, above this crate's declared floor.
+stitch = ["dep:mdstitch"]
 
 # Lints
 [lints.rust]

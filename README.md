@@ -14,7 +14,27 @@ gpuikit = "0.7"
 
 # OR to enable the text editor component:
 # gpuikit = { version = "0.7", features = ["editor"] }
+
+# OR, for streaming markdown, to close the syntax a half-written document
+# leaves open before parsing it (needs Rust 1.95+):
+# gpuikit = { version = "0.7", features = ["stitch"] }
 ```
+
+## Streaming markdown
+
+Markdown parses off the UI thread, and content that arrives a piece at a time
+goes in through `Markdown::append`:
+
+```rust,ignore
+markdown.update(cx, |markdown, cx| markdown.append(&delta, cx));
+```
+
+The previous parse keeps rendering until the new one lands, so the document
+never blanks, and deltas arriving during a parse coalesce into a single
+follow-up parse. The `stitch` feature additionally closes unterminated syntax
+(`**bold`, `[label](htt`) before parsing, which is what stops a streaming
+document flickering between literal markers and styled text. See
+`examples/markdown_streaming.rs`.
 
 ## License
 

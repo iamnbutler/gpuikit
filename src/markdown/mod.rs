@@ -23,6 +23,7 @@ mod inline_style;
 mod parser;
 mod selectable_text;
 mod selection;
+mod stitch;
 mod style;
 
 pub use elements::*;
@@ -30,12 +31,13 @@ pub use inline_style::*;
 pub use parser::*;
 pub use selectable_text::{RunRole, SelectableText};
 pub use selection::{MarkdownSelection, SelectionPosition};
+pub use stitch::preprocessing_available;
 pub use style::*;
 
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
     div, prelude::*, rems, App, Context, ElementId, Entity, EntityId, IntoElement, ParentElement,
-    Role, SharedString, Styled, Window,
+    Role, SharedString, Styled, Task, Window,
 };
 use pulldown_cmark::{Alignment, Event, Tag, TagEnd};
 
@@ -59,44 +61,152 @@ fn run_element_id(index: usize) -> ElementId {
 /// A markdown document that can be rendered as a GPUI element.
 ///
 /// This entity parses and holds markdown content, ready for rendering.
+///
+/// # Streaming
+///
+/// Content arriving a piece at a time — an LLM reply, a log tail — goes in
+/// through [`append`](Self::append), which extends the source and re-parses on
+/// a background thread. The previously parsed events keep rendering until the
+/// new parse lands, so the document never blanks, and deltas arriving during a
+/// parse coalesce into a single follow-up parse rather than one each.
+///
+/// ```ignore
+/// markdown.update(cx, |markdown, cx| markdown.append(&delta, cx));
+/// ```
 pub struct Markdown {
     source: SharedString,
+    /// The source the current [`events`](Self::events) were parsed from. Lags
+    /// [`source`](Self::source) while a parse is in flight.
+    parsed_source: SharedString,
     events: Vec<MarkdownEvent>,
     /// Document-wide text selection, shared with every rendered run.
     selection: MarkdownSelection,
+    parse_state: ParseState,
+    /// Handle to the running parse loop. Held here so that dropping the
+    /// document cancels a parse in flight.
+    parse_task: Option<Task<()>>,
+    preprocess_partial: bool,
+}
+
+/// Whether a background parse is running, and whether the source changed again
+/// while it ran.
+///
+/// This pair is the whole coalescing rule: a request that arrives mid-parse
+/// sets `dirty` instead of spawning a second parse, and the running loop
+/// re-runs once against the newest source when it lands.
+enum ParseState {
+    Idle,
+    Parsing { dirty: bool },
 }
 
 /// Parsed markdown event with source range information.
 #[derive(Clone, Debug)]
 pub struct MarkdownEvent {
+    /// The pulldown-cmark event.
     pub event: Event<'static>,
+    /// Where the event came from in the text handed to the parser.
+    ///
+    /// With [partial-syntax preprocessing](Markdown::preprocess_partial) on
+    /// and something to close, that text is the *preprocessed* source, so
+    /// offsets past the first insertion do not line up with
+    /// [`Markdown::source`]. Rendering does not read this field.
     pub source_range: std::ops::Range<usize>,
 }
 
 impl Markdown {
     /// Create a new Markdown instance from source text.
+    ///
+    /// This first parse is synchronous, so a document is never empty on its
+    /// first frame; later ones go to a background thread.
     pub fn new(source: impl Into<SharedString>, _cx: &mut Context<Self>) -> Self {
         let source: SharedString = source.into();
-        let events = Self::parse(&source);
+        let preprocess_partial = true;
+        let events = Self::parse(&source, preprocess_partial);
         Self {
+            parsed_source: source.clone(),
             source,
             events,
             selection: MarkdownSelection::new(),
+            parse_state: ParseState::Idle,
+            parse_task: None,
+            preprocess_partial,
         }
     }
 
     /// Get the source text.
+    ///
+    /// While a parse is in flight this is ahead of what is rendered — see
+    /// [`parsed_source`](Self::parsed_source).
     pub fn source(&self) -> &str {
         &self.source
     }
 
-    /// Update the markdown content. Drops any selection — its offsets
+    /// The source the currently rendered events came from.
+    ///
+    /// Equal to [`source`](Self::source) once the latest parse has landed.
+    pub fn parsed_source(&self) -> &str {
+        &self.parsed_source
+    }
+
+    /// Update the markdown content. Drops any selection — its positions
     /// belong to the old text.
+    ///
+    /// The re-parse happens on a background thread: the previous events keep
+    /// rendering until it lands, so [`events`](Self::events) still reports the
+    /// old parse when read in the same turn. Setting the source it already has
+    /// does nothing at all.
     pub fn set_source(&mut self, source: impl Into<SharedString>, cx: &mut Context<Self>) {
-        self.source = source.into();
-        self.events = Self::parse(&self.source);
+        let source = source.into();
+        if source == self.source {
+            return;
+        }
+
+        self.source = source;
         self.selection.clear();
-        cx.notify();
+        self.request_parse(cx);
+    }
+
+    /// Append to the markdown content — one delta of a streaming document.
+    ///
+    /// Unlike [`set_source`](Self::set_source) this keeps the selection: a
+    /// selection is a pair of `(run, byte offset)` positions, so text arriving
+    /// at the end of the document cannot disturb one made earlier in it.
+    ///
+    /// Appending nothing does nothing.
+    pub fn append(&mut self, text: &str, cx: &mut Context<Self>) {
+        if text.is_empty() {
+            return;
+        }
+
+        let mut source = String::with_capacity(self.source.len() + text.len());
+        source.push_str(&self.source);
+        source.push_str(text);
+        self.source = source.into();
+        self.request_parse(cx);
+    }
+
+    /// Whether a background parse is in flight — i.e. whether what is rendered
+    /// is still one source behind.
+    pub fn is_parsing(&self) -> bool {
+        matches!(self.parse_state, ParseState::Parsing { .. })
+    }
+
+    /// Whether syntax a partial document leaves open is closed before parsing.
+    /// On by default, and inert unless the crate was built with the `stitch`
+    /// feature — see [`preprocessing_available`].
+    pub fn preprocess_partial(&self) -> bool {
+        self.preprocess_partial
+    }
+
+    /// Turn [partial-syntax preprocessing](Self::preprocess_partial) on or
+    /// off. Re-parses the current source unless nothing changed.
+    pub fn set_preprocess_partial(&mut self, preprocess_partial: bool, cx: &mut Context<Self>) {
+        if self.preprocess_partial == preprocess_partial {
+            return;
+        }
+
+        self.preprocess_partial = preprocess_partial;
+        self.request_parse(cx);
     }
 
     /// The document's selection handle — for clearing it from outside (e.g.
@@ -111,14 +221,78 @@ impl Markdown {
         self.selection.selected_text()
     }
 
-    fn parse(source: &str) -> Vec<MarkdownEvent> {
-        let options = Options::ENABLE_TABLES
-            | Options::ENABLE_FOOTNOTES
-            | Options::ENABLE_STRIKETHROUGH
-            | Options::ENABLE_TASKLISTS
-            | Options::ENABLE_GFM;
+    /// Re-parse the current source in the background.
+    ///
+    /// While a parse is running this only marks the document dirty — the
+    /// running loop picks the newest source up when it lands. Ten deltas
+    /// during one parse therefore cost one extra parse, not ten.
+    fn request_parse(&mut self, cx: &mut Context<Self>) {
+        if let ParseState::Parsing { dirty } = &mut self.parse_state {
+            *dirty = true;
+            return;
+        }
 
-        let parser = Parser::new_ext(source, options);
+        self.parse_state = ParseState::Parsing { dirty: false };
+
+        let mut pending = (self.source.clone(), self.preprocess_partial);
+        // One task looping, rather than a task that re-spawns itself: the
+        // handle lives on the entity, so a task assigning `parse_task` from
+        // inside itself would drop the very task doing the assigning.
+        self.parse_task = Some(cx.spawn(async move |this, cx| {
+            loop {
+                let (source, preprocess_partial) = pending;
+                let parse = {
+                    let source = source.clone();
+                    cx.background_executor()
+                        .spawn(async move { Self::parse(&source, preprocess_partial) })
+                };
+                let events = parse.await;
+
+                match this.update(cx, |this, cx| this.parse_landed(source, events, cx)) {
+                    Ok(Some(next)) => pending = next,
+                    // Nothing more to parse, or the document is gone.
+                    Ok(None) | Err(_) => break,
+                }
+            }
+        }));
+    }
+
+    /// Publish a finished parse and decide whether to run another.
+    ///
+    /// Publishing and deciding happen in this one update, so a delta arriving
+    /// around it cannot be lost: it either set `dirty` before this ran and is
+    /// picked up here, or it lands afterwards, finds [`ParseState::Idle`], and
+    /// starts a parse of its own.
+    fn parse_landed(
+        &mut self,
+        parsed_source: SharedString,
+        events: Vec<MarkdownEvent>,
+        cx: &mut Context<Self>,
+    ) -> Option<(SharedString, bool)> {
+        self.events = events;
+        self.parsed_source = parsed_source;
+        cx.notify();
+
+        match self.parse_state {
+            ParseState::Parsing { dirty: true } => {
+                self.parse_state = ParseState::Parsing { dirty: false };
+                Some((self.source.clone(), self.preprocess_partial))
+            }
+            _ => {
+                self.parse_state = ParseState::Idle;
+                None
+            }
+        }
+    }
+
+    fn parse(source: &str, preprocess_partial: bool) -> Vec<MarkdownEvent> {
+        let source = if preprocess_partial {
+            stitch::close_open_syntax(source)
+        } else {
+            std::borrow::Cow::Borrowed(source)
+        };
+
+        let parser = Parser::new_ext(&source, parser::default_options());
 
         parser
             .into_offset_iter()
@@ -130,6 +304,9 @@ impl Markdown {
     }
 
     /// Get the parsed events.
+    ///
+    /// These are the events of [`parsed_source`](Self::parsed_source), which
+    /// is one source behind while a parse is in flight.
     pub fn events(&self) -> &[MarkdownEvent] {
         &self.events
     }
@@ -722,7 +899,9 @@ mod tests {
     use super::selectable_text::recorder::{self, RecordedRun};
     use super::*;
     use gpui::{point, px, size, AnyElement, Pixels, Render, TestAppContext, VisualTestContext};
+    use std::cell::Cell;
     use std::collections::HashSet;
+    use std::rc::Rc;
 
     /// Narrow enough that every sample text below has to wrap.
     const WIDTH: Pixels = px(240.);
@@ -816,10 +995,6 @@ mod tests {
             |_window, _cx| -> AnyElement { div().children(build()).into_any_element() },
         );
         recorder::take()
-    }
-
-    fn document(cx: &mut TestAppContext, source: &'static str) -> Entity<Markdown> {
-        cx.new(|cx| Markdown::new(source, cx))
     }
 
     /// The last two segments of a run's id path: the document it belongs to,
@@ -966,6 +1141,191 @@ mod tests {
         );
     }
 
+    // --- streaming ---
+
+    /// Everything the parse produced as text, so a test can say what the
+    /// document currently reads as without spelling out an event list.
+    fn rendered_text(markdown: &Markdown) -> String {
+        markdown
+            .events()
+            .iter()
+            .filter_map(|event| match &event.event {
+                Event::Text(text) | Event::Code(text) => Some(text.to_string()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn document(cx: &mut TestAppContext, source: &str) -> Entity<Markdown> {
+        let source = source.to_string();
+        cx.new(|cx| Markdown::new(source, cx))
+    }
+
+    /// Count parses by counting notifications: a landed parse is the only
+    /// thing this entity notifies for.
+    fn count_parses(cx: &mut TestAppContext, markdown: &Entity<Markdown>) -> Rc<Cell<usize>> {
+        let parses = Rc::new(Cell::new(0));
+        let counter = parses.clone();
+        cx.update(|cx| {
+            cx.observe(markdown, move |_, _| counter.set(counter.get() + 1))
+                .detach()
+        });
+        parses
+    }
+
+    #[gpui::test]
+    fn the_first_parse_is_synchronous(cx: &mut TestAppContext) {
+        // A document must not be empty on its first frame, so `new` parses
+        // before it returns rather than scheduling like every later parse.
+        let markdown = document(cx, "# Hello");
+
+        markdown.read_with(cx, |markdown, _| {
+            assert_eq!(rendered_text(markdown), "Hello");
+            assert_eq!(markdown.parsed_source(), "# Hello");
+            assert!(!markdown.is_parsing());
+        });
+    }
+
+    #[gpui::test]
+    fn append_extends_the_document(cx: &mut TestAppContext) {
+        let markdown = document(cx, "Hello");
+        markdown.update(cx, |markdown, cx| markdown.append(", world", cx));
+        cx.run_until_parked();
+
+        markdown.read_with(cx, |markdown, _| {
+            assert_eq!(markdown.source(), "Hello, world");
+            assert_eq!(markdown.parsed_source(), "Hello, world");
+            assert_eq!(rendered_text(markdown), "Hello, world");
+        });
+    }
+
+    #[gpui::test]
+    fn appending_nothing_is_inert(cx: &mut TestAppContext) {
+        let markdown = document(cx, "Hello");
+        let parses = count_parses(cx, &markdown);
+
+        markdown.update(cx, |markdown, cx| markdown.append("", cx));
+        cx.run_until_parked();
+
+        assert_eq!(parses.get(), 0, "an empty delta scheduled a parse");
+        markdown.read_with(cx, |markdown, _| assert_eq!(markdown.source(), "Hello"));
+    }
+
+    #[gpui::test]
+    fn the_old_parse_keeps_rendering_until_the_new_one_lands(cx: &mut TestAppContext) {
+        // The point of parsing off the UI thread is that the view never goes
+        // blank: the previous events stay up while the new parse runs.
+        let markdown = document(cx, "before");
+        markdown.update(cx, |markdown, cx| markdown.append(" and after", cx));
+
+        markdown.read_with(cx, |markdown, _| {
+            assert!(markdown.is_parsing());
+            assert_eq!(markdown.source(), "before and after");
+            assert_eq!(markdown.parsed_source(), "before");
+            assert_eq!(rendered_text(markdown), "before");
+        });
+
+        cx.run_until_parked();
+
+        markdown.read_with(cx, |markdown, _| {
+            assert!(!markdown.is_parsing());
+            assert_eq!(rendered_text(markdown), "before and after");
+        });
+    }
+
+    #[gpui::test]
+    fn deltas_arriving_during_a_parse_coalesce(cx: &mut TestAppContext) {
+        let markdown = document(cx, "one");
+        let parses = count_parses(cx, &markdown);
+
+        // Five deltas with no chance for the executor to run in between: the
+        // first schedules a parse, the other four only mark it dirty.
+        markdown.update(cx, |markdown, cx| {
+            for delta in [" two", " three", " four", " five", " six"] {
+                markdown.append(delta, cx);
+            }
+        });
+        cx.run_until_parked();
+
+        assert_eq!(
+            parses.get(),
+            2,
+            "five deltas during one parse should cost one extra parse, not four"
+        );
+        markdown.read_with(cx, |markdown, _| {
+            assert_eq!(rendered_text(markdown), "one two three four five six")
+        });
+    }
+
+    #[gpui::test]
+    fn a_long_stream_lands_on_the_final_source(cx: &mut TestAppContext) {
+        let markdown = document(cx, "");
+        let mut expected = String::new();
+
+        for i in 0..200 {
+            let delta = format!("{i} ");
+            expected.push_str(&delta);
+            markdown.update(cx, |markdown, cx| markdown.append(&delta, cx));
+            // Let some deltas land mid-parse and others find the document idle.
+            if i % 7 == 0 {
+                cx.run_until_parked();
+            }
+        }
+        cx.run_until_parked();
+
+        markdown.read_with(cx, |markdown, _| {
+            assert_eq!(markdown.source(), expected);
+            assert_eq!(markdown.parsed_source(), expected);
+            assert!(!markdown.is_parsing());
+            assert_eq!(rendered_text(markdown), expected.trim_end());
+        });
+    }
+
+    #[gpui::test]
+    fn setting_the_same_source_does_not_reparse(cx: &mut TestAppContext) {
+        let markdown = document(cx, "# Same");
+        let parses = count_parses(cx, &markdown);
+
+        markdown.update(cx, |markdown, cx| markdown.set_source("# Same", cx));
+        cx.run_until_parked();
+        assert_eq!(parses.get(), 0, "an unchanged source scheduled a parse");
+
+        markdown.update(cx, |markdown, cx| markdown.set_source("# Different", cx));
+        cx.run_until_parked();
+        assert_eq!(parses.get(), 1);
+    }
+
+    #[gpui::test]
+    fn append_keeps_the_selection(cx: &mut TestAppContext) {
+        // Selection positions are `(run, byte offset within the run)`, so text
+        // arriving at the end of the document cannot disturb one made earlier.
+        let markdown = document(cx, "First block\n\nSecond block");
+        let selection = markdown.read_with(cx, |markdown, _| markdown.selection());
+        selection.select_in_run(0, 0..5);
+
+        markdown.update(cx, |markdown, cx| markdown.append("\n\nThird block", cx));
+        cx.run_until_parked();
+
+        assert!(!selection.is_empty(), "append dropped the selection");
+        let (start, end) = selection.range().expect("the selection went away");
+        assert_eq!((start.run, start.offset), (0, 0));
+        assert_eq!((end.run, end.offset), (0, 5));
+    }
+
+    #[gpui::test]
+    fn set_source_drops_the_selection(cx: &mut TestAppContext) {
+        let markdown = document(cx, "First block\n\nSecond block");
+        let selection = markdown.read_with(cx, |markdown, _| markdown.selection());
+        selection.select_in_run(0, 0..5);
+
+        markdown.update(cx, |markdown, cx| markdown.set_source("Something else", cx));
+
+        assert!(
+            selection.is_empty(),
+            "the selection survived a source it no longer indexes"
+        );
+    }
+
     #[gpui::test]
     fn the_default_document_id_follows_the_entity(cx: &mut TestAppContext) {
         cx.update(crate::theme::init);
@@ -1031,5 +1391,84 @@ mod tests {
         .collect();
 
         assert_eq!(levels, vec![1, 2, 3, 4, 5, 6]);
+    }
+
+    #[gpui::test]
+    fn dropping_the_document_mid_parse_is_harmless(cx: &mut TestAppContext) {
+        let markdown = document(cx, "start");
+        markdown.update(cx, |markdown, cx| markdown.append(" more", cx));
+        drop(markdown);
+
+        // The parse task is owned by the entity, so this drives an in-flight
+        // parse whose document is already gone.
+        cx.run_until_parked();
+    }
+
+    #[cfg(feature = "stitch")]
+    #[gpui::test]
+    fn partial_emphasis_renders_as_emphasis(cx: &mut TestAppContext) {
+        // Mid-stream `**bold` has no closer yet. Parsed as-is it draws literal
+        // asterisks that turn into bold one delta later — the flicker.
+        let markdown = document(cx, "A **partially written");
+
+        markdown.read_with(cx, |markdown, _| {
+            assert_eq!(rendered_text(markdown), "A partially written");
+            assert!(markdown
+                .events()
+                .iter()
+                .any(|event| matches!(event.event, Event::Start(Tag::Strong))));
+        });
+    }
+
+    #[gpui::test]
+    #[cfg(feature = "stitch")]
+    fn a_partial_link_is_not_a_link_yet(cx: &mut TestAppContext) {
+        // The label reads as plain text until the URL completes — a live link
+        // to a placeholder URL would be worse than no link.
+        let markdown = document(cx, "See [the docs](htt");
+
+        markdown.read_with(cx, |markdown, _| {
+            assert_eq!(rendered_text(markdown), "See the docs");
+            assert!(
+                !markdown
+                    .events()
+                    .iter()
+                    .any(|event| matches!(event.event, Event::Start(Tag::Link { .. }))),
+                "an incomplete URL became a clickable link"
+            );
+        });
+    }
+
+    #[cfg(feature = "stitch")]
+    #[gpui::test]
+    fn a_complete_document_parses_the_same_either_way(cx: &mut TestAppContext) {
+        let source = "# Title\n\nA **bold** word, `code`, and a [link](https://example.com).\n";
+        let markdown = document(cx, source);
+        let with_preprocessing = markdown.read_with(cx, |markdown, _| rendered_text(markdown));
+
+        markdown.update(cx, |markdown, cx| {
+            markdown.set_preprocess_partial(false, cx)
+        });
+        cx.run_until_parked();
+
+        markdown.read_with(cx, |markdown, _| {
+            assert_eq!(rendered_text(markdown), with_preprocessing)
+        });
+    }
+
+    #[cfg(feature = "stitch")]
+    #[gpui::test]
+    fn preprocessing_can_be_turned_off(cx: &mut TestAppContext) {
+        let markdown = document(cx, "A **partially written");
+        markdown.update(cx, |markdown, cx| {
+            assert!(markdown.preprocess_partial());
+            markdown.set_preprocess_partial(false, cx);
+        });
+        cx.run_until_parked();
+
+        markdown.read_with(cx, |markdown, _| {
+            assert!(!markdown.preprocess_partial());
+            assert_eq!(rendered_text(markdown), "A **partially written");
+        });
     }
 }

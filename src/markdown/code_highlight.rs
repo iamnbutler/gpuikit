@@ -162,6 +162,19 @@ mod editor_bridge {
     /// (text, resolved syntax name, syntect theme) → that block's highlights.
     /// All three matter: the same text under a different theme is a different
     /// answer, which is what makes an app theme toggle re-highlight for free.
+    ///
+    /// **Keying on the whole text means a streaming block never hits.** A fence
+    /// arriving through `Markdown::append` is a different key on every delta,
+    /// so it costs a full syntect pass over the whole block-so-far each time —
+    /// quadratic in the block's final length, on the render path. Worse, those
+    /// prefixes are all distinct entries, so one long streamed block can fill
+    /// [`MAX_CACHED_BLOCKS`] by itself and take every other block's entry with
+    /// it when the cache clears. [`MAX_HIGHLIGHT_BYTES`] bounds the individual
+    /// pass and is deliberately checked before the key is built, so an
+    /// oversized block never lands here at all — but it does not bound the
+    /// repetition. Fixing that means an incremental highlighter or a key that
+    /// is a prefix rather than an identity; neither is worth doing before
+    /// there is a profile that says so.
     type CacheKey = (String, String, String);
 
     type Highlights = Vec<(Range<usize>, HighlightStyle)>;

@@ -64,6 +64,18 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- The editor and the markdown code-fence highlighter are on one newline
+  convention. The crate parses against `SyntaxSet::load_defaults_newlines()`,
+  whose grammars anchor rules to end of line, but the editor stripped the `\n`
+  before feeding a line to syntect while `highlight_block` kept it. A
+  JavaScript or C `//` comment therefore never closed and painted the following
+  line as comment, and a Python string left unterminated at end of line ran on
+  into the next. `GapBuffer::to_lines_with_endings()` is the accessor the
+  highlighting path now uses; `Editor::highlight_line` parses the line with the
+  separator the buffer says follows it and trims the runs back to the painted
+  bytes, so its external contract — runs summing to exactly the display line
+  `shape_line` is given — is unchanged. The editor-level test from the
+  double-parse fix now asserts against `highlight_block` per byte
 - A `LoadingIndicator` no longer pins its window at the display refresh rate.
   It animated through `Animation::new(..).repeat()`, and a gpui
   `AnimationElement` asks for another frame for as long as its animation is

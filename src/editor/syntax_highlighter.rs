@@ -231,6 +231,21 @@ impl SyntaxHighlighter {
         inner.highlight_states.clear();
     }
 
+    /// Highlight one line, continuing from the state cached for the line
+    /// before it.
+    ///
+    /// `line` is expected to carry its `\n`, the same convention
+    /// [`highlight_block`](Self::highlight_block) gets from `LinesWithEndings`
+    /// — the syntax set is `load_defaults_newlines`, whose grammars anchor
+    /// rules to end of line. The one exception is a final line of text that
+    /// does not end in one. [`GapBuffer::to_lines_with_endings`] produces
+    /// exactly this shape; `to_lines` does not.
+    ///
+    /// The returned runs sum to `line.len()` — including the newline, so a
+    /// caller shaping the line without it must trim them back (see
+    /// [`Editor::highlight_line`](crate::editor::Editor::highlight_line)).
+    ///
+    /// [`GapBuffer::to_lines_with_endings`]: crate::editor::GapBuffer::to_lines_with_endings
     pub fn highlight_line(
         &mut self,
         line: &str,
@@ -466,7 +481,17 @@ impl SyntaxHighlighter {
         text_runs
     }
 
-    /// Ensure parse states exist up to a given line by parsing from the beginning if needed
+    /// Ensure parse states exist up to a given line by parsing from the
+    /// beginning if needed.
+    ///
+    /// `lines` must be on the same newline convention as
+    /// [`highlight_line`](Self::highlight_line): every line carries its `\n`,
+    /// except a final line of text that does not end in one. Feed it
+    /// [`GapBuffer::to_lines_with_endings`], not `to_lines` — a state built
+    /// from separator-less lines is the state of a *different* document, and
+    /// the two disagree wherever a grammar rule is anchored to end of line.
+    ///
+    /// [`GapBuffer::to_lines_with_endings`]: crate::editor::GapBuffer::to_lines_with_endings
     pub fn ensure_parse_states(&mut self, language: &str, up_to_line: usize, lines: &[String]) {
         let mut inner = self.inner.borrow_mut();
 

@@ -112,6 +112,9 @@ jobs:
 
           echo "Version verified: $ACTUAL"
 
+      # --all-features pulls in `stitch`, and therefore mdstitch, which declares
+      # rust-version 1.95.0 — above this crate's own 1.85 floor. The runner's
+      # `stable` above must stay at or beyond that (it is 1.97 today).
       - name: Run cargo check
         run: cargo check --all-features
 

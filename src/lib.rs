@@ -21,7 +21,33 @@
 //!
 //! # Feature Flags
 //!
-//! - `editor` - Enables the editor component with syntax highlighting support
+//! All features are off by default.
+//!
+//! - `editor` — the editor component, and the syntect-backed syntax
+//!   highlighting markdown code fences use once an app calls
+//!   `markdown::init_code_highlighting` (itself gated on this feature)
+//! - `stitch` — closes the syntax a partially streamed markdown document leaves
+//!   open (`**bold`, `[label](htt`) before parsing, so streaming text does not
+//!   flicker between literal markers and styled text. Pulls in
+//!   [mdstitch](https://docs.rs/mdstitch), which **requires Rust 1.95**;
+//!   [`markdown::preprocessing_available`] reports which build you got
+//! - `runtime_shaders` — compiles Metal shaders at runtime rather than at build
+//!   time, so a macOS build needs no Xcode Metal toolchain
+//! - `schema` — adds the `schemars` dependency. Nothing here derives
+//!   `JsonSchema` yet, so today this only affects your dependency graph
+//!
+//! # Minimum Rust version
+//!
+//! This crate declares `rust-version = "1.85"`, which is a statement about its
+//! own source — async closures, and gpui's edition 2024 — rather than a
+//! guarantee about a whole build. gpuikit is edition 2021, so cargo's v2
+//! feature resolver does not hold dependencies back to that floor, and several
+//! already declare more (cosmic-text and smol_str 1.89, oo7 1.92 on Linux); on
+//! a toolchain near 1.85 you will most likely meet one of theirs first. A
+//! recent stable is the practical answer.
+//!
+//! The `stitch` feature raises gpuikit's own floor to **1.95**. It is the only
+//! one that does.
 
 use gpui::App;
 use rust_embed::RustEmbed;

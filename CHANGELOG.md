@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.8.0] - 2026-08-17
+
+The release that makes streaming markdown depend on a published version rather
+than a git rev. `Markdown::append`, the off-thread parser and the optional
+`stitch` feature have all been on `main` since 0.7.0 with nothing to name them
+by. Also corrects `rust-version`, which claimed 1.75 and has not been true for
+some time.
 
 ### Breaking Changes
 
@@ -163,6 +169,66 @@ All notable changes to this project will be documented in this file.
   against what belongs in its own example binary (interactions and
   integrations), and the build commands
 
+
+- `Markdown::append`, for content that arrives a piece at a time (an LLM reply,
+  a log tail). It extends the source instead of making the caller rebuild and
+  re-set the whole document, and unlike `set_source` it keeps the selection —
+  selection positions are `(run, byte offset)`, so text arriving at the end
+  cannot disturb a selection made earlier
+- Optional `stitch` feature: closes the syntax a partially streamed document
+  leaves open (`**bold` with no closer, `[label](htt`) before parsing, so
+  streaming text does not flicker between literal markers and styled text.
+  Off by default — [mdstitch](https://docs.rs/mdstitch) declares
+  `rust-version = "1.95.0"`, above this crate's 1.85, so turning it on raises
+  the toolchain your build needs. `markdown::preprocessing_available()`
+  reports which build you got, and `Markdown::set_preprocess_partial` turns it
+  off per document
+- `examples/markdown_streaming.rs`, a reply dripping in through `append`
+- Markdown documents and their text runs are now in the accessibility tree.
+  The document is a `Role::Document`; each run is a heading, paragraph, list
+  item, block quote or code node, labelled with its text, and headings report
+  their level
+- `MarkdownElement::id`, to override the element id a document — and therefore
+  all of its runs — is scoped under. The default is derived from the `Markdown`
+  entity, so it is unique and stable across frames already; set it when the
+  same entity is rendered more than once in one frame.
+  `MarkdownElement::element_id` reads back whichever applies
+- `RunRole`, and `HeadingLevel::level()`
+- `element_id`, the rule for minting element ids written down once, with the
+  two helpers that implement it — `element_id::for_entity(name, entity_id)` for
+  an element backed by an entity and `element_id::scoped(&parent_id, part)` for
+  a named part of one — and a note on what does and does not scope an id in
+  gpui (an `Entity<V: Render>` child does, a `RenderOnce` struct does not,
+  `deferred()` neither scopes nor unscopes). A test scans this crate's own
+  source and fails on any element that mints a constant id
+- `Textarea::id`, to override the element id a textarea renders under, and
+  `Textarea::element_id` to read back whichever applies. The default is derived
+  from the `InputState` entity; set it when one state is rendered by more than
+  one textarea in a frame
+- Fenced code blocks are syntax highlighted from their info string. The
+  language was parsed and then thrown away; it now reaches the element and is
+  highlighted by the `editor` feature's syntect-backed `SyntaxHighlighter`.
+  **Opt in per app** with `markdown::init_code_highlighting(cx)` after
+  `gpuikit::init` — loading syntect's syntax and theme sets costs tens of
+  milliseconds and a few megabytes, which a document containing no code should
+  not pay. Requires the `editor` feature; without it, without the init call,
+  without an info string, or for a language syntect has no grammar for, blocks
+  render as the plain monospace they did before. Highlights are cached per
+  block on (text, language, theme). The syntect theme follows the block's
+  background — `base16-ocean.dark` on a dark surface, `InspiredGitHub` on a
+  light one — or can be pinned with
+  `markdown::set_code_highlight_theme(cx, CodeHighlightTheme::Pinned(..))`;
+  `markdown::code_highlight_themes(cx)` lists the names it accepts
+- `markdown::normalize_language`, the fence-info-string-to-language-token rule
+  (leading word only, so ` ```rust,ignore ` is `rust`; a small alias table;
+  `text`/`plaintext`/`plain`/`none` mean no language)
+- `SyntaxHighlighter::highlight_block`, which highlights a whole block in one
+  stateless pass and returns `HighlightStyle`s, plus
+  `SyntaxHighlighter::resolve_language` and `SyntaxHighlighter::current_theme`.
+  Unlike `highlight_line`, `highlight_block` keeps its parse state local to the
+  call, so two blocks of one language cannot contaminate each other by both
+  starting at line 0
+
 ### Changed
 
 - The showcase's Markdown page demonstrates what the renderer can do rather
@@ -186,6 +252,17 @@ All notable changes to this project will be documented in this file.
   which source the current events came from and `is_parsing()` whether one is
   in flight
 - `set_source` with the source the document already has does nothing
+- `rust-version` is `1.85`, correcting a declared `1.75` that was never kept —
+  the crate uses async closures and gpui is edition 2024, both of which need
+  1.85. Nothing about what compiles changes; the manifest now says what was
+  already true. It remains a statement about this crate's own source: cargo does
+  not hold dependencies back to it, and several already declare more
+  (cosmic-text and smol_str 1.89, oo7 1.92 on Linux)
+- The `stitch` feature's toolchain requirement is written down rather than met
+  in a build log: it needs **Rust 1.95**, against this crate's 1.85, because
+  mdstitch declares `rust-version = "1.95.0"`. The README gains a feature table
+  and a minimum-Rust-version section, and the crate docs docs.rs renders list
+  all four features instead of only `editor`
 
 ### Fixed
 
@@ -342,66 +419,6 @@ All notable changes to this project will be documented in this file.
   node in release, so each of these was one `a11y_role` away from a crash. Ids
   are now derived from the entity backing the element, or from the id its
   caller gave it
-
-### Added
-
-- `Markdown::append`, for content that arrives a piece at a time (an LLM reply,
-  a log tail). It extends the source instead of making the caller rebuild and
-  re-set the whole document, and unlike `set_source` it keeps the selection —
-  selection positions are `(run, byte offset)`, so text arriving at the end
-  cannot disturb a selection made earlier
-- Optional `stitch` feature: closes the syntax a partially streamed document
-  leaves open (`**bold` with no closer, `[label](htt`) before parsing, so
-  streaming text does not flicker between literal markers and styled text.
-  Off by default — [mdstitch](https://docs.rs/mdstitch) requires a newer
-  compiler than this crate declares. `markdown::preprocessing_available()`
-  reports which build you got, and `Markdown::set_preprocess_partial` turns it
-  off per document
-- `examples/markdown_streaming.rs`, a reply dripping in through `append`
-- Markdown documents and their text runs are now in the accessibility tree.
-  The document is a `Role::Document`; each run is a heading, paragraph, list
-  item, block quote or code node, labelled with its text, and headings report
-  their level
-- `MarkdownElement::id`, to override the element id a document — and therefore
-  all of its runs — is scoped under. The default is derived from the `Markdown`
-  entity, so it is unique and stable across frames already; set it when the
-  same entity is rendered more than once in one frame.
-  `MarkdownElement::element_id` reads back whichever applies
-- `RunRole`, and `HeadingLevel::level()`
-- `element_id`, the rule for minting element ids written down once, with the
-  two helpers that implement it — `element_id::for_entity(name, entity_id)` for
-  an element backed by an entity and `element_id::scoped(&parent_id, part)` for
-  a named part of one — and a note on what does and does not scope an id in
-  gpui (an `Entity<V: Render>` child does, a `RenderOnce` struct does not,
-  `deferred()` neither scopes nor unscopes). A test scans this crate's own
-  source and fails on any element that mints a constant id
-- `Textarea::id`, to override the element id a textarea renders under, and
-  `Textarea::element_id` to read back whichever applies. The default is derived
-  from the `InputState` entity; set it when one state is rendered by more than
-  one textarea in a frame
-- Fenced code blocks are syntax highlighted from their info string. The
-  language was parsed and then thrown away; it now reaches the element and is
-  highlighted by the `editor` feature's syntect-backed `SyntaxHighlighter`.
-  **Opt in per app** with `markdown::init_code_highlighting(cx)` after
-  `gpuikit::init` — loading syntect's syntax and theme sets costs tens of
-  milliseconds and a few megabytes, which a document containing no code should
-  not pay. Requires the `editor` feature; without it, without the init call,
-  without an info string, or for a language syntect has no grammar for, blocks
-  render as the plain monospace they did before. Highlights are cached per
-  block on (text, language, theme). The syntect theme follows the block's
-  background — `base16-ocean.dark` on a dark surface, `InspiredGitHub` on a
-  light one — or can be pinned with
-  `markdown::set_code_highlight_theme(cx, CodeHighlightTheme::Pinned(..))`;
-  `markdown::code_highlight_themes(cx)` lists the names it accepts
-- `markdown::normalize_language`, the fence-info-string-to-language-token rule
-  (leading word only, so ` ```rust,ignore ` is `rust`; a small alias table;
-  `text`/`plaintext`/`plain`/`none` mean no language)
-- `SyntaxHighlighter::highlight_block`, which highlights a whole block in one
-  stateless pass and returns `HighlightStyle`s, plus
-  `SyntaxHighlighter::resolve_language` and `SyntaxHighlighter::current_theme`.
-  Unlike `highlight_line`, `highlight_block` keeps its parse state local to the
-  call, so two blocks of one language cannot contaminate each other by both
-  starting at line 0
 
 ## [0.7.0] - 2026-08-15
 

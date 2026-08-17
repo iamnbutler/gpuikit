@@ -1,6 +1,6 @@
 [package]
 name = "gpuikit"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 authors = ["Nate Butler <iamnbutler@gmail.com>"]
 license = "MIT OR Apache-2.0"
@@ -10,7 +10,11 @@ description = "A UI toolkit for GPUI applications"
 readme = "README.md"
 keywords = ["gpui", "ui", "components", "toolkit", "gui"]
 categories = ["gui", "graphics"]
-rust-version = "1.75"
+# This crate's own floor, not a promise about the whole dependency tree: it uses
+# async closures (stable in 1.85), and gpui is edition 2024, which needs the same
+# 1.85. The declared 1.75 was never true. Dependencies declare their own, higher
+# numbers and cargo does not hold them back — see README's "Minimum Rust version".
+rust-version = "1.85"
 
 [lib]
 name = "gpuikit"
@@ -87,7 +91,9 @@ schema = ["dep:schemars"]
 runtime_shaders = ["gpui_platform/runtime_shaders"]
 # Close unterminated markdown syntax before parsing, so a streaming document
 # does not flicker between literal markers and styled text. Off by default:
-# mdstitch declares rust-version 1.95, above this crate's declared floor.
+# mdstitch declares rust-version 1.95.0, above this crate's own 1.85 floor, so
+# enabling it raises the toolchain a consumer needs. Keep the README's feature
+# table in step with these numbers.
 stitch = ["dep:mdstitch"]
 
 # Lints

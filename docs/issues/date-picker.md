@@ -47,8 +47,14 @@ the popup, with the expanded state reported. accesskit has `DateInput`.
 
 ### Accessibility
 
-No element in `src/elements/` reports a role today — `grep -rn '\.role(' src/elements/`
-returns nothing, and the crate's only accessibility work is in `src/markdown/`.
+`src/elements/sidebar.rs` is the only element in `src/elements/` that reports a
+role — it had to, because its own issue's Accessibility section required one,
+and it went ahead of the convention rather than shipping a landmark with no
+role. It is the accidental worked example: read it, and note that `.role()`
+lives on `StatefulInteractiveElement` and is reachable on any `div().id(…)`, so
+a `RenderOnce` does not have to become a real `Element` to report one. Beyond
+that file the crate's accessibility work is all in `src/markdown/`.
+
 gpui builds an `accesskit` node for an element that has *both* an id and an
 `Element::a11y_role`, and it hashes the element's whole id path into the node
 id, so a duplicate id is a `debug_assert!` in debug and a silently missing node

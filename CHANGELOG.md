@@ -62,6 +62,27 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `Sidebar` (`gpuikit::elements::sidebar`): a panel docked to the left or right
+  edge of the window, with a caller-owned width and expanded/collapsed state.
+  Collapsed is a **rail** of icon controls rather than a `when(open, …)`, which
+  is what makes it more than a conditional; and once the window is narrower
+  than a breakpoint (640px by default, `overlay_below`/`never_overlay` to move
+  or disable it) an expanded panel becomes a dismissible drawer with a scrim,
+  leaving a rail-width gutter behind so the content does not reflow. It ships
+  **no** menu/group/header/footer sub-components — `List` (with
+  `ListEntry::header`), `Separator` and `Button` are the contents, and both the
+  new showcase page and the showcase's own navigation are composed exactly that
+  way, replacing the hand-rolled `div`-with-a-border the showcase used to draw.
+  The one sub-component, `SidebarTrigger`, exists for an accessibility reason:
+  the panel reports `Role::Complementary` with an accessible name, and
+  `aria-expanded` belongs on the control that changes the state. These are the
+  first elements in `src/elements/` to report a role at all — ahead of
+  `docs/issues/element-roles-convention.md`, which could not be honoured
+  without shipping a landmark with no role; that issue now records what this
+  found, and this file is the first thing to migrate if the convention chooses
+  differently. `SidebarLayout::resolve` is a pure function and is where to
+  argue about the push-versus-overlay behaviour. No resizable edge — the width
+  is the caller's and never changes itself
 - `InputState` learns read-only: `read_only(bool)` (builder),
   `set_read_only(bool, cx)` and `is_read_only()`. It closes every *user* path
   into the content — typing, IME composition, paste, cut's removal, the delete

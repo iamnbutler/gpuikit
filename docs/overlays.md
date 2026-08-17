@@ -99,6 +99,7 @@ grep. Every `with_priority` in `src/elements/` must be a rung named here, and
 | Priority | Layer |
 | --- | --- |
 | 1 | Popups anchored to a trigger — dropdown, select, popover, context menu |
+| 2 | Sidebar's drawer and its scrim — above a popup, because a drawer covers the page a popup was opened on |
 | 10 | Dialog, and its scrim |
 | 15 | Toast — above a dialog, because a toast reports the result of what the dialog did |
 
@@ -113,10 +114,11 @@ grep. Every `with_priority` in `src/elements/` must be a rung named here, and
 | `select` | The same `DropdownMenu`, below the same trigger shape |
 | `popover` | A caller-built panel, offset from its trigger by a caller-supplied `Point<Pixels>` |
 | `context_menu` | A menu at the pointer, `snap_to_window_with_margin(8px)` |
+| `sidebar` | A drawer over the whole viewport, `position((0, 0))` + `snap_to_window()`, in place of the in-flow panel once the window is narrower than the breakpoint. Anchored to the *window*, not to a trigger, which is why it positions rather than flips |
 | `toast` | A stack in a window corner. Anchored to nothing |
 
-Two of the six are not anchored to anything, and should not be made to look as
-though they are. `src/elements/tooltip.rs` is deliberately absent: a `Tooltip`
+Two of these are not anchored to anything, and should not be made to look as
+though they are; `sidebar` is anchored to the window rather than to a trigger. `src/elements/tooltip.rs` is deliberately absent: a `Tooltip`
 is a view handed to gpui's `.tooltip()`, and gpui positions it — which is why
 `portal.rs`'s one named use case, `PortalPosition::tooltip()`, was the one
 overlay it could never have been used for.

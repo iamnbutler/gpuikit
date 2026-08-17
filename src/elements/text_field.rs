@@ -442,7 +442,7 @@ mod tests {
     /// The check that the harness bites.
     #[gpui::test]
     fn an_editable_field_takes_a_keystroke(cx: &mut TestAppContext) {
-        let after = type_into(cx, |state, cx| text_field(state, cx), "kept", "x");
+        let after = type_into(cx, text_field, "kept", "x");
 
         assert_eq!(after, "xkept");
     }

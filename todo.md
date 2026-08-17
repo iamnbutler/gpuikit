@@ -30,6 +30,7 @@
 - Scroll Area
 - Select
 - Separator
+- Sidebar
 - Slider
 - Switch
 - Table (sorting, filtering and selection are one element — see
@@ -73,9 +74,10 @@ whoever revives one does not rebuild the same problem.
 Every component that was on the old "Deferred" and "Future — Data & Complex"
 lists has been re-triaged against the crate as it stands: see
 [docs/component-triage.md](docs/component-triage.md) for a decision per
-component. Ten have shipped — eight already had when the triage was taken, and
-`Table` and `Data Table` have since been built as one module — eleven are
-rejected with a reason and a named revisit trigger, and eight have a
+component. Eleven have shipped — eight already had when the triage was taken,
+`Table` and `Data Table` have since been built as one module, and `Sidebar` has
+shipped as `src/elements/sidebar.rs` — eleven are rejected with a reason and a
+named revisit trigger, and seven have a
 ready-to-file issue body under `docs/issues/` — along with three prerequisites
 the triage surfaced (an element role convention, a menu-vs-listbox naming
 decision, and adopt-or-delete for `src/traits/portal.rs`). The last is settled:

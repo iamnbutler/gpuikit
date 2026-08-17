@@ -81,7 +81,7 @@ that now exists.
 | Keyboard dispatch | Resolved | `src/keymap/`, `src/input/bindings.rs`, and `ContextMenu`'s arrow-key navigation with its own tests |
 | Scrollable/virtualised lists | Resolved | `src/elements/scroll_area.rs`, `src/elements/list.rs` |
 | A shared control size scale | Resolved **by this change** | `src/theme/control.rs` and `src/traits/control_sized.rs`. #59-era components could not state their own metrics; they can now |
-| Accessibility roles | **Not resolved** | `grep -rn '\.role(' src/elements/` returns nothing. The crate's only a11y is in `src/markdown/`. See `docs/issues/element-roles-convention.md` |
+| Accessibility roles | **Not resolved** | `grep -rn '\.role(' src/elements/` returns exactly one module, `sidebar.rs`, which shipped ahead of the convention because its own issue required a landmark. Everything else is in `src/markdown/`. See `docs/issues/element-roles-convention.md` |
 
 The two unresolved rows are why this triage produces thirteen issue files for
 what is now eight surviving components: three of them are prerequisites rather
@@ -132,7 +132,7 @@ source and read it, not trust a name in a table.
 | Table | Shipped | `src/elements/table.rs` |
 | Data Table | Shipped | `src/elements/table.rs` |
 | Resizable | Issue | `docs/issues/resizable.md` |
-| Sidebar | Issue | `docs/issues/sidebar.md` |
+| Sidebar | Shipped | `src/elements/sidebar.rs` |
 | Calendar | Issue | `docs/issues/calendar.md` |
 | Date Picker | Issue | `docs/issues/date-picker.md` |
 | Alert Dialog | Issue | `docs/issues/confirmation-dialog.md` |
@@ -271,12 +271,16 @@ component issues would otherwise each have to invent an answer to. Two are
 still issue bodies under `docs/issues/`; the third has been settled, and its
 answer is now a document in `docs/`.
 
-- **`docs/issues/element-roles-convention.md`** — no element in `src/elements/` reports an
-  accessibility role. #146 makes the a11y answer a precondition for every new
-  component, so each issue would otherwise pick a different mechanism. Decide
-  it once. Should land before the first component issue that reports a role —
-  `src/elements/table.rs` shipped without roles rather than invent one, and its
-  module docs record the two findings this decision has to cover.
+- **`docs/issues/element-roles-convention.md`** — still open, and now one
+  element ahead of itself. #146 makes the a11y answer a precondition for every
+  new component, so each issue would otherwise pick a different mechanism.
+  Decide it once. `src/elements/table.rs` shipped without roles rather than
+  invent one, and its module docs record the two findings this decision has to
+  cover; `src/elements/sidebar.rs` could not do the same — its own issue's
+  Accessibility section required a `Complementary` landmark — so it shipped
+  with a role and the convention issue has been updated with what that found.
+  If the convention chooses differently, `sidebar.rs` is the first thing to
+  migrate, and it is small.
 - **`docs/issues/menu-vs-listbox-naming.md`** — `Select` is built on `Dropdown`'s
   internals (`select.rs` imports `DropdownMenu` and `DropdownOption` from
   `dropdown.rs`) and `ELEMENT_COVERAGE` maps both modules to one showcase page.
@@ -313,7 +317,7 @@ document's other tables are not mistaken for it — and fails the build when the
 document stops describing the crate:
 
 - the table has one row per #59 entry, and the verdict split matches the
-  10 Shipped / 8 Issue / 11 Rejected stated in prose here;
+  11 Shipped / 7 Issue / 11 Rejected stated in prose here;
 - every Shipped row names a `src/elements/<module>.rs` that is really declared;
 - every Issue row names a file under `docs/issues/` that exists and is not a
   stub;

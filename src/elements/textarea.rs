@@ -391,7 +391,7 @@ mod tests {
     /// offset 0, so the typed character lands in front.
     #[gpui::test]
     fn an_editable_textarea_takes_a_keystroke(cx: &mut TestAppContext) {
-        let after = type_into(cx, |state, cx| textarea(state, cx), "kept", "x");
+        let after = type_into(cx, textarea, "kept", "x");
 
         assert_eq!(after, "xkept");
     }

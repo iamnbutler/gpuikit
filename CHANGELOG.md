@@ -17,8 +17,35 @@ All notable changes to this project will be documented in this file.
   with its own `pulldown-cmark = "0.12"` dependency will end up with two
   non-unifying copies of `Event` until it bumps too
 
+### Added
+
+- Showcase pages for the four elements that had none: Slider, Typography and
+  Empty get their own nav entries, and Toggle — which is a pressed/unpressed
+  button, distinct from Switch — joins Checkbox and Switch on the Toggle page.
+  An Editor page renders a live buffer with `--features editor` and a
+  placeholder saying how to get one without it
+- A Coverage page listing every module in `src/elements/` against the page that
+  shows it. Two tests in `src/elements.rs` cross-check that table against the
+  crate: an element module with no row fails the build, and a row naming a page
+  the nav cannot reach fails too. An element that should not have a page is
+  spelled `("name", "none: <reason>")`
+- `examples/README.md`, recording what belongs in the showcase (components)
+  against what belongs in its own example binary (interactions and
+  integrations), and the build commands
+
 ### Changed
 
+- The showcase's Markdown page demonstrates what the renderer can do rather
+  than only that it renders: it says which build you are running (highlighted
+  code fences or not, partial-syntax closing or not), notes the accessibility
+  roles every block reports, has a Selection section with a live readout and a
+  "Copy selection" button, and streams a reply through `Markdown::append` — each
+  section naming the standalone example that goes further. `SAMPLE_MARKDOWN`
+  now carries the nested, nested-ordered and loose list shapes that broke this
+  week, so a renderer regression is visible to anyone who opens the showcase
+- The showcase calls `markdown::init_code_highlighting` when built with
+  `--features editor`, so its ` ```rust ` fence is actually highlighted. It was
+  silently inactive
 - Markdown parses off the UI thread. `set_source` and `append` schedule a
   parse on the background executor and the previously parsed events keep
   rendering until it lands, so the view never blanks; deltas arriving during a

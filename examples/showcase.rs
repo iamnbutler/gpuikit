@@ -1,12 +1,13 @@
 #![allow(missing_docs)]
 use gpui::{
-    div, px, size, App, AppContext, Application, Bounds, Context, Entity, FocusHandle, FontWeight,
-    Hsla, InteractiveElement, IntoElement, Menu, ParentElement, Render, Rgba, SharedString,
-    StatefulInteractiveElement, Styled, TitlebarOptions, Window, WindowBounds, WindowOptions,
+    div, px, size, App, AppContext, Application, Bounds, ClipboardItem, Context, Entity,
+    FocusHandle, FontWeight, Hsla, InteractiveElement, IntoElement, Menu, ParentElement, Render,
+    Rgba, SharedString, StatefulInteractiveElement, Styled, TitlebarOptions, Window, WindowBounds,
+    WindowOptions,
 };
 use gpui_platform;
 use gpuikit::input::InputState;
-use gpuikit::markdown::{Markdown, MarkdownElement};
+use gpuikit::markdown::{preprocessing_available, Markdown, MarkdownElement};
 use gpuikit::theme::{ActiveTheme, GlobalTheme, Theme, Themeable};
 use gpuikit::{
     elements::{
@@ -24,6 +25,7 @@ use gpuikit::{
         context_menu::{context_menu, menu_item},
         dialog::{dialog, DialogState},
         dropdown::{dropdown, DropdownState},
+        empty::empty,
         field::{field, LabelPosition},
         icon_button::icon_button,
         input_group::{input_group, InputAddon},
@@ -37,12 +39,15 @@ use gpuikit::{
         scroll_area::scroll_area,
         select::{select, SelectState},
         separator::separator,
+        slider::{slider, Slider},
         switch::{switch, Switch},
         tabs::{tab, tabs, Tabs},
         textarea::textarea,
         toast::ToastExt,
+        toggle::{toggle, Toggle},
         toggle_group::{toggle_group, toggle_option, ToggleGroup, ToggleGroupMode},
         tooltip::tooltip,
+        typography::{blockquote, h1, h2, h3, h4, lead, p, small, text},
     },
     layout::{h_stack, v_stack},
     traits::disableable::Disableable,
@@ -53,7 +58,11 @@ use gpuikit::{
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Duration;
 
+/// The Markdown page's document. It doubles as a regression surface: every
+/// shape that has broken here recently is in it, so a renderer regression is
+/// visible to anyone who opens the showcase rather than only to `cargo test`.
 const SAMPLE_MARKDOWN: &str = r#"# Markdown Showcase
 
 This is a **bold** statement and this is *italic*.
@@ -63,6 +72,27 @@ This is a **bold** statement and this is *italic*.
 - Bullet lists
 - **Bold** and *italic* text
 - `inline code`
+
+### Nested Lists
+
+- A parent item keeps its own row…
+    - …and a nested item is indented under it
+        - three levels deep
+- Ordered lists nested in bullets renumber from one:
+    1. first
+    2. second
+
+### Loose Lists
+
+A list whose items are separated by a blank line is *loose* — CommonMark wraps
+each item's content in a paragraph, and it still has to render as a list:
+
+- The first loose item
+
+- The second one, which keeps its marker
+
+  A second block of the same item lines up under the first, and draws no
+  second marker.
 
 ### Code Blocks
 
@@ -92,6 +122,85 @@ Visit [GPUI](https://zed.dev) for more info.
 | Cell A   | Cell B   |
 | Cell C   | Cell D   |
 "#;
+
+/// The reply the Markdown page streams, a few characters at a time — the
+/// shape an LLM answer has. `examples/markdown_streaming.rs` goes further.
+const STREAMED_REPLY: &str = "\
+## A streamed reply
+
+Every delta goes in through `Markdown::append`, which extends the source and
+re-parses **off the UI thread**. The previous parse keeps rendering until the
+new one lands, so the document never blanks.
+
+- Deltas arriving during a parse coalesce into one follow-up parse
+- Build with `--features stitch` to close syntax a half-written document
+  leaves open, so `**bold` does not flash as literal asterisks
+";
+
+/// Characters per delta, and the gap between them.
+const STREAM_CHUNK: usize = 3;
+const STREAM_INTERVAL: Duration = Duration::from_millis(24);
+
+/// The buffer the Editor page shows. Only built with the `editor` feature —
+/// without it the page renders a placeholder instead.
+#[cfg(feature = "editor")]
+const EDITOR_SAMPLE: &str = r#"// The editor renders a gutter, line numbers and an active line.
+fn main() {
+    let greeting = "Hello, GPUI!";
+    for word in greeting.split(' ') {
+        println!("{word}");
+    }
+}
+"#;
+
+/// Every module in `src/elements/`, and the nav page that shows it.
+///
+/// Rendered by the Coverage page, so this is live code rather than a constant
+/// only a test reads — the list is in front of anyone who opens the showcase.
+/// Two tests in `src/elements.rs` cross-check it against the crate: every
+/// element module needs a row here, and every page named here has to be one
+/// the nav can actually reach. An element that genuinely should not have a
+/// page is spelled `("name", "none: <reason>")`.
+const ELEMENT_COVERAGE: &[(&str, &str)] = &[
+    ("accordion", "collapsible"),
+    ("alert", "alert"),
+    ("aspect_ratio", "aspect-ratio"),
+    ("avatar", "avatar"),
+    ("badge", "badge"),
+    ("breadcrumb", "breadcrumb"),
+    ("button", "button"),
+    ("button_group", "button"),
+    ("card", "card"),
+    ("checkbox", "toggle"),
+    ("collapsible", "collapsible"),
+    ("context_menu", "context-menu"),
+    ("dialog", "dialog"),
+    ("dropdown", "dropdown"),
+    ("empty", "empty"),
+    ("field", "text"),
+    ("icon_button", "button"),
+    ("input", "text"),
+    ("input_group", "text"),
+    ("kbd", "badge"),
+    ("label", "badge"),
+    ("list", "list"),
+    ("loading_indicator", "loading"),
+    ("popover", "popover"),
+    ("progress", "loading"),
+    ("radio_group", "selection"),
+    ("scroll_area", "scroll-area"),
+    ("select", "dropdown"),
+    ("separator", "separator"),
+    ("slider", "slider"),
+    ("switch", "toggle"),
+    ("tabs", "tabs"),
+    ("textarea", "text"),
+    ("toast", "toast"),
+    ("toggle", "toggle"),
+    ("toggle_group", "selection"),
+    ("tooltip", "tooltip"),
+    ("typography", "typography"),
+];
 
 #[derive(Clone, PartialEq, Debug)]
 enum Size {
@@ -157,7 +266,21 @@ struct Showcase {
     priority_dropdown: Entity<DropdownState<Priority>>,
     theme_dropdown: Entity<DropdownState<ThemeChoice>>,
     country_select: Entity<SelectState<Country>>,
+    /// Retained, not minted per frame: selection state lives on the entity,
+    /// so `markdown()` — which creates a fresh one per call — cannot hold it.
     markdown: Entity<Markdown>,
+    /// The document the Streaming section feeds with `append`.
+    markdown_stream: Entity<Markdown>,
+    /// Bumped on each restart, so a stream still running does not feed a
+    /// document that has already been reset.
+    stream_generation: usize,
+    markdown_copy_status: SharedString,
+    slider_volume: Entity<Slider>,
+    slider_brightness: Entity<Slider>,
+    slider_disabled: Entity<Slider>,
+    toggle_bold: Entity<Toggle>,
+    toggle_pinned: Entity<Toggle>,
+    toggle_disabled: Entity<Toggle>,
     checkbox_agree: Entity<Checkbox>,
     checkbox_newsletter: Entity<Checkbox>,
     radio_notifications: Entity<RadioGroup<NotificationPreference>>,
@@ -254,6 +377,31 @@ impl Showcase {
         });
 
         let markdown = cx.new(|cx| Markdown::new(SAMPLE_MARKDOWN, cx));
+        let markdown_stream = cx.new(|cx| Markdown::new("", cx));
+
+        let slider_volume = cx.new(|_cx| {
+            slider("volume-slider", 0.6, 0.0..=1.0)
+                .label("Volume")
+                .step(0.05)
+        });
+        let slider_brightness = cx.new(|_cx| {
+            slider("brightness-slider", 40.0, 0.0..=100.0)
+                .label("Brightness")
+                .step(1.0)
+        });
+        let slider_disabled = cx.new(|_cx| {
+            slider("disabled-slider", 0.25, 0.0..=1.0)
+                .label("Disabled")
+                .disabled(true)
+        });
+
+        let toggle_bold = cx.new(|_cx| toggle("toggle-bold", true).label("Bold"));
+        let toggle_pinned = cx.new(|_cx| toggle("toggle-pinned", false).label("Pinned"));
+        let toggle_disabled = cx.new(|_cx| {
+            toggle("toggle-disabled", false)
+                .label("Disabled")
+                .disabled(true)
+        });
 
         let checkbox_agree =
             cx.new(|_cx| checkbox("agree-terms", false).label("I agree to the terms"));
@@ -430,6 +578,15 @@ impl Showcase {
             theme_dropdown,
             country_select,
             markdown,
+            markdown_stream,
+            stream_generation: 0,
+            markdown_copy_status: "Nothing copied yet.".into(),
+            slider_volume,
+            slider_brightness,
+            slider_disabled,
+            toggle_bold,
+            toggle_pinned,
+            toggle_disabled,
             checkbox_agree,
             checkbox_newsletter,
             radio_notifications,
@@ -678,6 +835,31 @@ impl Showcase {
             )
     }
 
+    fn render_toggle_page(&self, cx: &Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+        v_stack()
+            .gap_2()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .child("Toggle"),
+            )
+            .child(
+                div().text_sm().text_color(theme.fg_muted()).child(
+                    "A button that stays pressed — distinct from Switch, which is a setting.",
+                ),
+            )
+            .child(
+                h_stack()
+                    .gap_2()
+                    .child(self.toggle_bold.clone())
+                    .child(self.toggle_pinned.clone())
+                    .child(self.toggle_disabled.clone()),
+            )
+    }
+
     fn render_radio_group_page(&self, cx: &Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         v_stack()
@@ -732,6 +914,33 @@ impl Showcase {
                             )
                             .child(self.toggle_group_text_style.clone()),
                     ),
+            )
+    }
+
+    fn render_slider_page(&self, cx: &Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+        v_stack()
+            .gap_4()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .child("Slider"),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(theme.fg_muted())
+                    .child("Drag the handle, or click anywhere on the track."),
+            )
+            .child(
+                v_stack()
+                    .gap_4()
+                    .max_w(px(360.))
+                    .child(self.slider_volume.clone())
+                    .child(self.slider_brightness.clone())
+                    .child(self.slider_disabled.clone()),
             )
     }
 
@@ -1743,8 +1952,391 @@ impl Showcase {
             )
     }
 
-    fn render_markdown_page(&self, _cx: &Context<Self>) -> impl IntoElement {
-        MarkdownElement::new(self.markdown.clone())
+    fn render_typography_page(&self, cx: &Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+        v_stack()
+            .gap_4()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .child("Typography"),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(theme.fg_muted())
+                    .child("Prose primitives for text a component owns. For a whole document, use Markdown."),
+            )
+            .child(
+                v_stack()
+                    .gap_3()
+                    .max_w(px(520.))
+                    .child(h1("Heading one"))
+                    .child(h2("Heading two"))
+                    .child(h3("Heading three"))
+                    .child(h4("Heading four"))
+                    .child(lead(
+                        "A lead paragraph introduces the section it opens, one size up from body text.",
+                    ))
+                    .child(p(
+                        "A paragraph of body text. It wraps, it takes the theme's foreground colour, and it is the default for prose.",
+                    ))
+                    .child(p("A muted paragraph, for secondary detail.").muted())
+                    .child(p("A destructive paragraph, for something that went wrong.").destructive())
+                    .child(blockquote("A block quote, set off by a rule down its left side."))
+                    .child(
+                        h_stack()
+                            .gap_2()
+                            .items_center()
+                            .child(text("Inline text,"))
+                            .child(text("bold,").bold())
+                            .child(text("code,").code())
+                            .child(text("accent.").accent()),
+                    )
+                    .child(small("Small print, for a footnote or a caption.")),
+            )
+    }
+
+    fn render_empty_page(&self, cx: &Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+        v_stack()
+            .gap_4()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .child("Empty"),
+            )
+            .child(div().text_sm().text_color(theme.fg_muted()).child(
+                "The placeholder a list, table or search result shows when it has nothing in it.",
+            ))
+            .child(
+                v_stack()
+                    .gap_4()
+                    .child(
+                        div()
+                            .border_1()
+                            .border_color(theme.border())
+                            .rounded_md()
+                            .child(
+                                empty()
+                                    .icon(DefaultIcons::magnifying_glass())
+                                    .title("No results")
+                                    .description(
+                                        "Nothing matched that search. Try a shorter query.",
+                                    )
+                                    .action(button("empty-clear", "Clear search")),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .border_1()
+                            .border_color(theme.border())
+                            .rounded_md()
+                            .child(empty().title("Nothing here yet")),
+                    ),
+            )
+    }
+
+    /// Restart the Streaming section's document, feeding it one delta at a
+    /// time on a background timer — the same `append` path a real stream uses.
+    fn stream_reply(&mut self, cx: &mut Context<Self>) {
+        self.stream_generation = self.stream_generation.wrapping_add(1);
+        let generation = self.stream_generation;
+        self.markdown_stream
+            .update(cx, |markdown, cx| markdown.set_source("", cx));
+
+        cx.spawn(async move |this, cx| {
+            let mut sent = 0;
+            while sent < STREAMED_REPLY.len() {
+                cx.background_executor().timer(STREAM_INTERVAL).await;
+
+                let mut end = (sent + STREAM_CHUNK).min(STREAMED_REPLY.len());
+                while !STREAMED_REPLY.is_char_boundary(end) {
+                    end += 1;
+                }
+                let delta = &STREAMED_REPLY[sent..end];
+                sent = end;
+
+                let still_current = this.update(cx, |this: &mut Self, cx| {
+                    if this.stream_generation != generation {
+                        return false;
+                    }
+                    this.markdown_stream
+                        .update(cx, |markdown, cx| markdown.append(delta, cx));
+                    true
+                });
+
+                match still_current {
+                    Ok(true) => {}
+                    // Restarted, or the showcase is gone.
+                    Ok(false) | Err(_) => break,
+                }
+            }
+        })
+        .detach();
+
+        cx.notify();
+    }
+
+    fn render_markdown_page(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme().clone();
+
+        // `init_code_highlighting` is itself feature-gated, so the default
+        // build's ```rust fence is plain monospace by design. Say which build
+        // this is, so that is not read as a bug.
+        let highlighting = if cfg!(feature = "editor") {
+            "Code fences are syntax highlighted (built with --features editor)."
+        } else {
+            "Code fences are plain monospace — rebuild with --features editor to highlight them."
+        };
+        let stitching = if preprocessing_available() {
+            "Partial syntax is closed before parsing (built with --features stitch)."
+        } else {
+            "Partial syntax is left as written — build with --features stitch to close it."
+        };
+
+        let selected = self.markdown.read(cx).selected_text();
+        let selection_readout = match &selected {
+            Some(text) => {
+                let mut summary: String = text.chars().take(80).collect();
+                if text.chars().count() > 80 {
+                    summary.push('…');
+                }
+                format!("Selected {} characters: {summary}", text.len())
+            }
+            None => "Nothing selected — drag across the document above.".to_string(),
+        };
+
+        let note = |label: &str, body: String| {
+            v_stack()
+                .gap_1()
+                .child(
+                    div()
+                        .text_sm()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child(label.to_string()),
+                )
+                .child(div().text_xs().text_color(theme.fg_muted()).child(body))
+        };
+
+        v_stack()
+            .gap_6()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .child("Markdown"),
+            )
+            .child(
+                v_stack()
+                    .gap_2()
+                    .child(note("This build", format!("{highlighting} {stitching}")))
+                    .child(note(
+                        "Accessibility",
+                        "Every block is announced with a role — heading (with its level), \
+                         paragraph, quote, list item, code — under one document node."
+                            .to_string(),
+                    )),
+            )
+            .child(
+                div()
+                    .border_1()
+                    .border_color(theme.border())
+                    .rounded_md()
+                    .p_4()
+                    .child(MarkdownElement::new(self.markdown.clone())),
+            )
+            .child(separator())
+            .child(
+                v_stack()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_base()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child("Selection"),
+                    )
+                    .child(div().text_xs().text_color(theme.fg_muted()).child(
+                        "Drag across the blocks above — the selection flows between them. \
+                                 Double-click a word, triple-click a block. \
+                                 examples/markdown_selection.rs binds this to cmd-c.",
+                    ))
+                    .child(
+                        h_stack()
+                            .gap_2()
+                            .items_center()
+                            .child(
+                                button("markdown-copy", "Copy selection").on_click(cx.listener(
+                                    |this, _, _window, cx| {
+                                        this.markdown_copy_status =
+                                            match this.markdown.read(cx).selected_text() {
+                                                Some(text) => {
+                                                    let len = text.len();
+                                                    cx.write_to_clipboard(
+                                                        ClipboardItem::new_string(text),
+                                                    );
+                                                    format!(
+                                                        "Copied {len} characters to the clipboard."
+                                                    )
+                                                    .into()
+                                                }
+                                                None => "Nothing selected to copy.".into(),
+                                            };
+                                        cx.notify();
+                                    },
+                                )),
+                            )
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(theme.fg_muted())
+                                    .child(self.markdown_copy_status.clone()),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(theme.fg_muted())
+                            .child(selection_readout),
+                    ),
+            )
+            .child(separator())
+            .child(
+                v_stack()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_base()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child("Streaming"),
+                    )
+                    .child(div().text_xs().text_color(theme.fg_muted()).child(
+                        "`Markdown::append` extends the source and re-parses off the UI \
+                             thread, so the previous parse keeps rendering until the new one \
+                             lands. examples/markdown_streaming.rs streams at frame rate.",
+                    ))
+                    .child(
+                        button("markdown-stream", "Stream a reply")
+                            .on_click(cx.listener(|this, _, _window, cx| this.stream_reply(cx))),
+                    )
+                    .child(
+                        div()
+                            .min_h(px(120.))
+                            .border_1()
+                            .border_color(theme.border())
+                            .rounded_md()
+                            .p_4()
+                            .child(MarkdownElement::new(self.markdown_stream.clone())),
+                    ),
+            )
+    }
+
+    fn render_editor_page(&self, cx: &Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+
+        // The page exists in both builds: requiring `--features editor` for
+        // the showcase would make every other page pay for syntect, and
+        // dropping the page is what let the editor go undemonstrated.
+        #[cfg(feature = "editor")]
+        let demo = {
+            use gpuikit::editor::{Editor, EditorElement};
+
+            let lines: Vec<String> = EDITOR_SAMPLE.lines().map(str::to_string).collect();
+            let mut editor = Editor::new("showcase-editor", lines);
+            editor.set_language("rust".to_string());
+
+            div()
+                .h(px(220.))
+                .border_1()
+                .border_color(theme.border())
+                .rounded_md()
+                .overflow_hidden()
+                .child(EditorElement::new(editor))
+                .into_any_element()
+        };
+        #[cfg(not(feature = "editor"))]
+        let demo = empty()
+            .title("Built without the editor feature")
+            .description("Run `cargo run --example showcase --features editor` for a live buffer.")
+            .into_any_element();
+
+        v_stack()
+            .gap_4()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .child("Editor"),
+            )
+            .child(div().text_sm().text_color(theme.fg_muted()).child(
+                "A gutter, line numbers, an active line and syntect highlighting. \
+                     Display only here: `EditorElement` has no keyboard handling of its own, \
+                     so an interactive page waits on an `EditorView`.",
+            ))
+            .child(demo)
+    }
+
+    fn render_coverage_page(&self, cx: &Context<Self>) -> impl IntoElement {
+        let theme = cx.theme().clone();
+
+        let mut table = v_stack().gap_0().child(
+            h_stack()
+                .gap_4()
+                .py_1()
+                .border_b_1()
+                .border_color(theme.border())
+                .child(
+                    div()
+                        .w(px(220.))
+                        .text_sm()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child("src/elements/"),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child("Shown on"),
+                ),
+        );
+
+        for (module, page) in ELEMENT_COVERAGE {
+            table = table.child(
+                h_stack()
+                    .gap_4()
+                    .py_1()
+                    .child(div().w(px(220.)).text_sm().child(format!("{module}.rs")))
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(theme.fg_muted())
+                            .child(page.to_string()),
+                    ),
+            );
+        }
+
+        v_stack()
+            .gap_4()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .child("Coverage"),
+            )
+            .child(div().text_sm().text_color(theme.fg_muted()).child(format!(
+                "{} element modules, each mapped to the page that shows it. Two tests in \
+                     src/elements.rs fail the build if a module gains no page, or if a page \
+                     named here is not reachable from the nav.",
+                ELEMENT_COVERAGE.len()
+            )))
+            .child(table)
     }
 
     fn render_theme_page(&self, cx: &Context<Self>) -> impl IntoElement {
@@ -1917,6 +2509,7 @@ impl Render for Showcase {
                     ("toggle", "Toggle"),
                     ("selection", "Selection"),
                     ("dropdown", "Dropdown"),
+                    ("slider", "Slider"),
                     ("text", "Text"),
                     ("tabs", "Tabs"),
                 ],
@@ -1926,11 +2519,13 @@ impl Render for Showcase {
                 vec![
                     ("avatar", "Avatar"),
                     ("badge", "Badge"),
+                    ("typography", "Typography"),
                     ("loading", "Loading"),
                     ("alert", "Alert"),
                     ("tooltip", "Tooltip"),
                     ("card", "Card"),
                     ("aspect-ratio", "Aspect Ratio"),
+                    ("empty", "Empty"),
                 ],
             ),
             (
@@ -1952,8 +2547,11 @@ impl Render for Showcase {
                     ("toast", "Toast"),
                 ],
             ),
-            ("Content", vec![("markdown", "Markdown")]),
-            ("System", vec![("theme", "Theme")]),
+            (
+                "Content",
+                vec![("markdown", "Markdown"), ("editor", "Editor")],
+            ),
+            ("System", vec![("theme", "Theme"), ("coverage", "Coverage")]),
         ];
 
         let mut entries: Vec<ListEntry> = Vec::new();
@@ -2003,6 +2601,7 @@ impl Render for Showcase {
                 .gap_8()
                 .child(self.render_checkbox_page(cx))
                 .child(self.render_switch_page(cx))
+                .child(self.render_toggle_page(cx))
                 .into_any_element(),
             "selection" => v_stack()
                 .gap_8()
@@ -2020,8 +2619,11 @@ impl Render for Showcase {
                 .child(self.render_input_group_page(cx))
                 .child(self.render_textarea_page(cx))
                 .into_any_element(),
+            "slider" => self.render_slider_page(cx).into_any_element(),
             "tabs" => self.render_tabs_page(cx).into_any_element(),
             "avatar" => self.render_avatar_page(cx).into_any_element(),
+            "typography" => self.render_typography_page(cx).into_any_element(),
+            "empty" => self.render_empty_page(cx).into_any_element(),
             "badge" => v_stack()
                 .gap_8()
                 .child(self.render_badge_page(cx))
@@ -2051,7 +2653,9 @@ impl Render for Showcase {
             "context-menu" => self.render_context_menu_page(cx).into_any_element(),
             "toast" => self.render_toast_page(window, cx).into_any_element(),
             "markdown" => self.render_markdown_page(cx).into_any_element(),
+            "editor" => self.render_editor_page(cx).into_any_element(),
             "theme" => self.render_theme_page(cx).into_any_element(),
+            "coverage" => self.render_coverage_page(cx).into_any_element(),
             _ => div().child("Unknown page").into_any_element(),
         };
 
@@ -2080,6 +2684,12 @@ fn main() {
         .with_assets(gpuikit::assets())
         .run(|cx: &mut App| {
             gpuikit::init(cx);
+
+            // Syntax highlighting for the Markdown page's ```rust fence.
+            // Opt-in, and itself gated on the feature that pulls in syntect,
+            // so this cannot be called unconditionally.
+            #[cfg(feature = "editor")]
+            gpuikit::markdown::init_code_highlighting(cx);
 
             cx.set_menus(vec![Menu {
                 name: "GPUIKit Showcase".into(),

@@ -19,6 +19,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `LoadingIndicator::playing(bool)`. A paused indicator renders its first frame
+  and subscribes to nothing, so it costs its window no redraws at all;
+  `App::reduce_motion` has the same effect regardless of the setting. The
+  showcase's Loading page has a Pause/Play button for it, which is the quickest
+  way to tell the cost of the indicators apart from the cost of the page
 - Showcase pages for the four elements that had none: Slider, Typography and
   Empty get their own nav entries, and Toggle — which is a pressed/unpressed
   button, distinct from Switch — joins Checkbox and Switch on the Toggle page.
@@ -59,6 +64,32 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- A `LoadingIndicator` no longer pins its window at the display refresh rate.
+  It animated through `Animation::new(..).repeat()`, and a gpui
+  `AnimationElement` asks for another frame for as long as its animation is
+  unfinished — `.repeat()` never is. `Window::request_animation_frame` is
+  `on_next_frame(|_, cx| cx.notify(current_view))`, so one spinner re-armed a
+  notify of the *enclosing view* forever and everything else on that window —
+  sidebar, scroll area and all — re-laid-out and repainted 60–120 times a
+  second whether or not the spinner's glyph had changed. Indicators now share
+  one clock that wakes at the union of the frame boundaries its subscribers
+  asked for, 2–10 times a second, and notifies exactly the views showing an
+  indicator; when the last one goes away it stops entirely and costs nothing
+  until one is rendered again. The showcase's Loading page kept all seven
+  variants, and now redraws about 39 times a second instead of 120 — a
+  realistic app with one spinner goes from 120 to 8. **Behaviour change**:
+  indicators share an epoch, so one mounted mid-cycle starts at the shared
+  timeline's current frame rather than at frame 0 — two braille spinners on a
+  page now spin in step
+- The showcase's dev profile compiles dependencies with `opt-level = 2`. gpui
+  is compiled once and then only linked, so this costs nothing on an
+  incremental build of this crate; `[profile.dev]` itself stays at
+  `opt-level = 0`, so iterating here compiles exactly as fast as before
+- The showcase rebuilt its whole sidebar on every frame — 24 `format!`s, some
+  seventy `SharedString`s and 48 boxed closures — to change which one row was
+  highlighted. The rows are built once in `Showcase::new` from a new
+  `NAV_SECTIONS` constant, and a frame clones them (`ListEntry` is `Rc`-backed)
+  and stamps `selected`
 - The editor's syntax highlighter parses each line once instead of twice, so a
   multi-line construct no longer corrupts the line after it. `highlight_line`
   advanced the same `ParseState` over the line a second time "to update state",

@@ -55,7 +55,11 @@ whoever revives one does not rebuild the same problem.
   animation was attached unconditionally and the callback merely returned the
   element unchanged, so the repaint loop ran with the pulse "off".) To bring it
   back it has to stop requesting frames — drive the pulse off a timer or one
-  shared animation entity — not merely animate more cheaply.
+  shared animation entity — not merely animate more cheaply. That timer now
+  exists: `src/elements/loading_indicator.rs` has a process-wide clock that
+  wakes only when a frame actually changes and notifies only the views showing
+  one. A revived Skeleton should subscribe to it rather than reach for
+  `with_animation`.
 - **Grain** — paints one quad per 4px cell inside a `canvas`, roughly 60k quads
   for a 1200×800 area. Tolerable on an idle window; it was what made the
   skeleton's forced repaint read as "a ton of lag" in the old single-scroll

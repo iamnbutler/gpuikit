@@ -441,7 +441,7 @@ struct MarkdownRenderer {
 #[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ListRow {
-    marker: String,
+    marker: elements::ItemMarker,
     indent_level: usize,
     text: String,
 }
@@ -456,6 +456,20 @@ struct ImageContext {
 struct ListContext {
     ordered: bool,
     current_index: u64,
+    /// The item of *this* list that is currently open, if any. Only the
+    /// innermost list may be asked: a nested list opens while its parent's
+    /// item is still open, so a child's blocks would otherwise be attributed
+    /// to the parent's item.
+    item: Option<ItemContext>,
+}
+
+/// One open list item.
+#[derive(Clone, Debug, Default)]
+struct ItemContext {
+    /// The marker this item's first block drew, once it has drawn one. Every
+    /// later block of the same item reserves the width of this same marker
+    /// without painting it, so their text lines up under the first block's.
+    marker: Option<String>,
 }
 
 impl MarkdownRenderer {
@@ -566,9 +580,18 @@ impl MarkdownRenderer {
                 self.list_stack.push(ListContext {
                     ordered: start.is_some(),
                     current_index: start.unwrap_or(1),
+                    item: None,
                 });
             }
-            Tag::Item => {}
+            Tag::Item => {
+                // Opened on the innermost list, which is the one this item
+                // belongs to. A loose item's blocks each end with
+                // `End(Paragraph)`, and this is what tells that ending it is
+                // inside an item rather than in body text.
+                if let Some(list_ctx) = self.list_stack.last_mut() {
+                    list_ctx.item = Some(ItemContext::default());
+                }
+            }
             Tag::Emphasis => {
                 self.active_style.italic = true;
             }
@@ -629,6 +652,12 @@ impl MarkdownRenderer {
             TagEnd::Paragraph => {
                 if self.in_block_quote {
                     self.flush_block_quote(cx);
+                } else if self.in_list_item() {
+                    // A loose list wraps each item's content in a paragraph.
+                    // Flushed as body text it would lose its marker, its
+                    // indent and its number, and the item's `End(Item)` would
+                    // then find an empty buffer and emit nothing at all.
+                    self.flush_list_item(cx);
                 } else {
                     self.flush_paragraph(cx);
                 }
@@ -649,7 +678,13 @@ impl MarkdownRenderer {
                 self.list_stack.pop();
             }
             TagEnd::Item => {
+                // Flushed *before* the item closes: a tight item's text is
+                // still buffered here, and closing first would leave it with
+                // no item to take its marker from.
                 self.flush_list_item(cx);
+                if let Some(list_ctx) = self.list_stack.last_mut() {
+                    list_ctx.item = None;
+                }
             }
             TagEnd::Emphasis => {
                 self.active_style.italic = false;
@@ -829,25 +864,56 @@ impl MarkdownRenderer {
         self.elements.push(element.into_any_element());
     }
 
+    /// Whether the innermost list has an item open — i.e. whether a block
+    /// ending right now is one of that item's blocks.
+    ///
+    /// Only the innermost is asked. A nested list opens while its parent's
+    /// item is still open, so "any item on the stack" would route a child's
+    /// blocks against the parent's context.
+    fn in_list_item(&self) -> bool {
+        self.list_stack
+            .last()
+            .is_some_and(|list_ctx| list_ctx.item.is_some())
+    }
+
+    /// The marker the row about to be emitted draws.
+    ///
+    /// An item's first block takes the list's next ordinal and remembers what
+    /// it drew; every later block of the same item redraws that marker
+    /// hidden, advancing nothing — an ordinal belongs to an item, not to a
+    /// flush, so `1. a` with a second paragraph must not leave the next item
+    /// at `3.`.
+    fn take_item_marker(&mut self) -> elements::ItemMarker {
+        let Some(list_ctx) = self.list_stack.last_mut() else {
+            return elements::ItemMarker::Shown(elements::unordered_marker());
+        };
+
+        if let Some(marker) = list_ctx.item.as_ref().and_then(|item| item.marker.clone()) {
+            return elements::ItemMarker::Hidden(marker);
+        }
+
+        let marker = if list_ctx.ordered {
+            let marker = elements::ordered_marker(list_ctx.current_index);
+            list_ctx.current_index += 1;
+            marker
+        } else {
+            elements::unordered_marker()
+        };
+
+        if let Some(item) = list_ctx.item.as_mut() {
+            item.marker = Some(marker.clone());
+        }
+
+        elements::ItemMarker::Shown(marker)
+    }
+
     fn flush_list_item(&mut self, cx: &App) {
         if self.current_text.is_empty() {
             return;
         }
 
         let rich_text = std::mem::take(&mut self.current_text);
-
-        let marker = if let Some(list_ctx) = self.list_stack.last_mut() {
-            if list_ctx.ordered {
-                let marker = elements::ordered_marker(list_ctx.current_index);
-                list_ctx.current_index += 1;
-                marker
-            } else {
-                elements::unordered_marker()
-            }
-        } else {
-            elements::unordered_marker()
-        };
-
+        let marker = self.take_item_marker();
         let indent_level = self.list_stack.len().saturating_sub(1);
 
         #[cfg(test)]
@@ -1207,7 +1273,7 @@ mod tests {
     /// Drive the renderer over `source` and report the list rows it emitted,
     /// as `(marker, indent level, text)` in document order. No window is
     /// needed: this reads what `flush_list_item` built, not what it laid out.
-    fn list_rows(cx: &mut TestAppContext, source: &str) -> Vec<(String, usize, String)> {
+    fn emitted_rows(cx: &mut TestAppContext, source: &str) -> Vec<(ItemMarker, usize, String)> {
         cx.update(crate::theme::init);
         let events = Markdown::parse(source, false);
 
@@ -1223,6 +1289,35 @@ mod tests {
                 .map(|row| (row.marker.clone(), row.indent_level, row.text.clone()))
                 .collect()
         })
+    }
+
+    /// The same rows, carrying only the marker a reader actually sees: a
+    /// continuation block of a multi-block item draws none, so it reads as
+    /// empty here.
+    fn list_rows(cx: &mut TestAppContext, source: &str) -> Vec<(String, usize, String)> {
+        emitted_rows(cx, source)
+            .into_iter()
+            .map(|(marker, indent_level, text)| {
+                let marker = match marker {
+                    ItemMarker::Shown(marker) => marker,
+                    ItemMarker::Hidden(_) => String::new(),
+                };
+                (marker, indent_level, text)
+            })
+            .collect()
+    }
+
+    /// Draw `source` and report the role each of its runs announced, in
+    /// document order — what a screen reader would be told the document is.
+    fn run_roles(cx: &mut TestAppContext, source: &str) -> Vec<Option<Role>> {
+        cx.update(crate::theme::init);
+        let doc = document(cx, source);
+        let cx = cx.add_empty_window();
+
+        draw(cx, || vec![MarkdownElement::new(doc.clone())])
+            .iter()
+            .map(|run| run.role)
+            .collect()
     }
 
     /// A nested document and the same items un-indented must lay out to the
@@ -1364,6 +1459,185 @@ mod tests {
             cx,
             "1. a\n    - b\n        - c\n2. d",
             "1. a\n- b\n- c\n2. d",
+        );
+    }
+
+    // --- loose lists ---
+
+    /// A list whose items are separated by a blank line, and the same list
+    /// without them. CommonMark calls the first *loose* and wraps each item's
+    /// content in a paragraph; both must render as the same list.
+    #[track_caller]
+    fn assert_loose_matches_tight(cx: &mut TestAppContext, loose: &str, tight: &str) {
+        let loose_rows = list_rows(cx, loose);
+        let tight_rows = list_rows(cx, tight);
+
+        assert!(
+            !tight_rows.is_empty(),
+            "{tight:?} emitted no rows at all, so this measures nothing"
+        );
+        assert_eq!(
+            loose_rows, tight_rows,
+            "{loose:?} emitted {loose_rows:?}, but the same items tight ({tight:?}) \
+             emitted {tight_rows:?}"
+        );
+    }
+
+    #[gpui::test]
+    fn a_loose_list_keeps_its_markers(cx: &mut TestAppContext) {
+        // The whole bug: the blank line makes each item's content a paragraph,
+        // which was flushed as body text — no marker, no indent, no number —
+        // and the item's `End(Item)` then found an empty buffer.
+        assert_eq!(
+            list_rows(cx, "- one\n\n- two\n"),
+            vec![
+                ("•".to_string(), 0, "one".to_string()),
+                ("•".to_string(), 0, "two".to_string()),
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn a_loose_ordered_list_keeps_its_numbers(cx: &mut TestAppContext) {
+        assert_eq!(
+            list_rows(cx, "1. one\n\n2. two\n\n3. three\n"),
+            vec![
+                ("1.".to_string(), 0, "one".to_string()),
+                ("2.".to_string(), 0, "two".to_string()),
+                ("3.".to_string(), 0, "three".to_string()),
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn loose_and_tight_lists_emit_the_same_rows(cx: &mut TestAppContext) {
+        for (loose, tight) in [
+            ("- one\n\n- two\n", "- one\n- two\n"),
+            ("1. one\n\n2. two\n", "1. one\n2. two\n"),
+            (
+                "- **bold** and `code` and a [link](#)\n\n- plain\n",
+                "- **bold** and `code` and a [link](#)\n- plain\n",
+            ),
+            ("- [ ] todo\n\n- [x] done\n", "- [ ] todo\n- [x] done\n"),
+            // Looseness is per list: the outer list here is loose and the
+            // inner one tight, and both routes have to agree.
+            ("- parent\n\n    - child\n", "- parent\n    - child\n"),
+        ] {
+            assert_loose_matches_tight(cx, loose, tight);
+        }
+    }
+
+    #[gpui::test]
+    fn a_nested_loose_list_still_indents(cx: &mut TestAppContext) {
+        assert_eq!(
+            list_rows(cx, "- parent\n\n    - child\n"),
+            vec![
+                ("•".to_string(), 0, "parent".to_string()),
+                ("•".to_string(), 1, "child".to_string()),
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn a_loose_item_is_announced_as_a_list_item(cx: &mut TestAppContext) {
+        assert_eq!(
+            run_roles(cx, "- one\n\n- two\n"),
+            vec![Some(Role::ListItem), Some(Role::ListItem)],
+            "a loose list used to be announced as a sequence of paragraphs"
+        );
+    }
+
+    #[gpui::test]
+    fn an_item_with_two_blocks_draws_one_marker(cx: &mut TestAppContext) {
+        assert_eq!(
+            emitted_rows(cx, "- first block\n\n  second block\n"),
+            vec![
+                (
+                    ItemMarker::Shown("•".to_string()),
+                    0,
+                    "first block".to_string()
+                ),
+                (
+                    ItemMarker::Hidden("•".to_string()),
+                    0,
+                    "second block".to_string()
+                ),
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn an_items_second_paragraph_does_not_burn_a_number(cx: &mut TestAppContext) {
+        // The ordinal belongs to the item, not to the flush: taken per flush,
+        // `still one` would have eaten `2.` and left the next item at `3.`.
+        assert_eq!(
+            list_rows(cx, "1. one\n\n   still one\n\n2. two\n"),
+            vec![
+                ("1.".to_string(), 0, "one".to_string()),
+                (String::new(), 0, "still one".to_string()),
+                ("2.".to_string(), 0, "two".to_string()),
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn a_continuation_block_is_announced_as_a_paragraph(cx: &mut TestAppContext) {
+        // The runs are a flat list, so a second `ListItem` here would tell a
+        // screen reader this one-item list has two items.
+        assert_eq!(
+            run_roles(cx, "- first block\n\n  second block\n"),
+            vec![Some(Role::ListItem), Some(Role::Paragraph)]
+        );
+    }
+
+    #[gpui::test]
+    fn a_paragraph_after_a_list_is_still_a_paragraph(cx: &mut TestAppContext) {
+        assert_eq!(
+            run_roles(cx, "- one\n\n- two\n\nAfter the list.\n"),
+            vec![
+                Some(Role::ListItem),
+                Some(Role::ListItem),
+                Some(Role::Paragraph)
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn a_block_after_a_nested_list_belongs_to_the_item_that_held_it(cx: &mut TestAppContext) {
+        // The inner `End(List)` arrives first, so this block lands back at the
+        // parent's indent under a hidden marker — which is what alignment with
+        // the parent's own text demands.
+        assert_eq!(
+            emitted_rows(cx, "- parent\n\n    - child\n\n  after the child\n"),
+            vec![
+                (ItemMarker::Shown("•".to_string()), 0, "parent".to_string()),
+                (ItemMarker::Shown("•".to_string()), 1, "child".to_string()),
+                (
+                    ItemMarker::Hidden("•".to_string()),
+                    0,
+                    "after the child".to_string()
+                ),
+            ]
+        );
+    }
+
+    #[gpui::test]
+    fn a_loose_list_lays_out_like_a_tight_one(cx: &mut TestAppContext) {
+        assert_eq!(height(cx, "- one\n\n- two\n"), height(cx, "- one\n- two\n"));
+    }
+
+    #[gpui::test]
+    fn a_continuation_block_starts_in_the_items_text_column(cx: &mut TestAppContext) {
+        // A hidden marker still takes up its width, so an item's second block
+        // wraps exactly like a second item would. Drop that width and the
+        // block gets a wider column and comes out shorter.
+        let two_blocks = height(cx, &format!("- {LONG}\n\n  {LONG}"));
+        let two_items = height(cx, &format!("- {LONG}\n- {LONG}"));
+
+        assert_eq!(
+            two_blocks, two_items,
+            "an item's second block ({two_blocks:?}) did not wrap like a second \
+             item ({two_items:?})"
         );
     }
 

@@ -9,9 +9,18 @@ struct SyntaxHighlighterInner {
     syntax_set: SyntaxSet,
     theme_set: ThemeSet,
     current_theme: String,
-    // Map of (language, line_number) -> ParseState
-    // We store the parse state AFTER parsing that line
+    /// Map of (language, line_number) -> the [`ParseState`] *after* parsing
+    /// that line, i.e. the state the next line starts from.
+    ///
+    /// Two known limitations, neither fixed here: the key carries no document
+    /// identity, so two documents in the same language overwrite each other's
+    /// line 0 (this is why [`SyntaxHighlighter::highlight_block`] keeps its
+    /// state local instead of reusing [`SyntaxHighlighter::highlight_line`]);
+    /// and the map is only ever pruned by `reset_state` /
+    /// `clear_state_from_line`, so it grows with the largest file highlighted.
     parse_states: HashMap<(String, usize), ParseState>,
+    /// Map of (language, line_number) -> the [`HighlightState`] after that
+    /// line. Same two limitations as `parse_states`.
     highlight_states: HashMap<(String, usize), HighlightState>,
 }
 
@@ -127,10 +136,10 @@ impl SyntaxHighlighter {
         let mut offset = 0usize;
 
         for line in LinesWithEndings::from(text) {
-            // Parse once and highlight from that same op list. `highlight_line`
-            // parses a second time "to update state", which makes every line
-            // look like it occurred twice; doing it once here is what keeps
-            // the cross-line state honest.
+            // Parse once and highlight from that same op list. Parsing a line
+            // twice would make it look to `parse_state` like it occurred twice
+            // and corrupt every following line; doing it once is what keeps the
+            // cross-line state honest.
             let ops = parse_state
                 .parse_line(line, &inner.syntax_set)
                 .unwrap_or_default();
@@ -320,6 +329,30 @@ impl SyntaxHighlighter {
             }
         };
 
+        // Parse this line exactly once: the ops rendered below and the state
+        // cached for the next line come out of the same call. Parsing a second
+        // time "to update state" made the cached state the state after seeing
+        // the line twice, so every multi-line construct handed the following
+        // line a corrupt scope stack.
+        //
+        // This block sits above the theme lookup for a borrow reason, not a
+        // stylistic one: `Highlighter::new(theme)` holds an immutable borrow of
+        // `inner` across the rest of the function, so inserting into
+        // `inner.parse_states` below it would need a `ParseState::clone` per
+        // line to compile. Keep the parse and the insert adjacent and up here.
+        let parse_result = parse_state.parse_line(line, &inner.syntax_set);
+        let ops = match parse_result {
+            Ok(ops) => {
+                inner
+                    .parse_states
+                    .insert((language.to_string(), line_number), parse_state);
+                ops
+            }
+            // A failed parse is not trusted: render nothing from it and leave
+            // the cache untouched, as before.
+            Err(_) => Vec::new(),
+        };
+
         // Get the theme, with fallback to default colors if theme not found
         let theme = inner
             .theme_set
@@ -347,10 +380,6 @@ impl SyntaxHighlighter {
 
         let theme = theme.expect("theme should exist after check above");
         let highlighter = Highlighter::new(theme);
-
-        let ops = parse_state
-            .parse_line(line, &inner.syntax_set)
-            .unwrap_or_default();
 
         let mut highlight_state = if line_number == 0 {
             HighlightState::new(&highlighter, ScopeStack::new())
@@ -427,15 +456,6 @@ impl SyntaxHighlighter {
                 underline: None,
                 strikethrough: None,
             });
-        }
-
-        // Parse the current line to update state
-        let parse_result = parse_state.parse_line(line, &inner.syntax_set);
-        if parse_result.is_ok() {
-            // Store this line's parse state for use by the next line
-            inner
-                .parse_states
-                .insert((language.to_string(), line_number), parse_state);
         }
 
         // Store highlight state for this line
@@ -677,6 +697,201 @@ fn get_font_style(style: Style) -> (FontWeight, FontStyle) {
 impl Default for SyntaxHighlighter {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syntect::util::LinesWithEndings;
+
+    /// The colour each byte of a line ends up rendered in.
+    fn run_colors(runs: &[TextRun]) -> Vec<Option<Hsla>> {
+        runs.iter()
+            .flat_map(|run| std::iter::repeat(Some(run.color)).take(run.len))
+            .collect()
+    }
+
+    /// The colour each byte of `text` gets from the stateless block pass, which
+    /// parses every line exactly once. This is the oracle: it is the same
+    /// grammar, the same theme and the same [`HighlightIterator`], differing
+    /// only in how the cross-line state is carried.
+    fn block_colors(
+        highlighter: &SyntaxHighlighter,
+        text: &str,
+        language: &str,
+    ) -> Vec<Option<Hsla>> {
+        let mut colors = vec![None; text.len()];
+        for (range, style) in highlighter.highlight_block(text, language) {
+            for slot in &mut colors[range] {
+                *slot = style.color;
+            }
+        }
+        colors
+    }
+
+    /// The colour each byte of `text` gets from feeding it to
+    /// [`SyntaxHighlighter::highlight_line`] one line at a time, exactly as the
+    /// editor's paint loop does. Lines keep their newline: the syntax set is
+    /// `load_defaults_newlines`.
+    fn line_by_line_colors(text: &str, language: &str) -> Vec<Option<Hsla>> {
+        let mut highlighter = SyntaxHighlighter::new();
+        LinesWithEndings::from(text)
+            .enumerate()
+            .flat_map(|(index, line)| {
+                let runs = highlighter.highlight_line(line, language, index, "test".into(), 14.0);
+                run_colors(&runs)
+            })
+            .collect()
+    }
+
+    /// Where the two passes first disagree, as a message a human can act on.
+    fn describe_mismatch(text: &str, expected: &[Option<Hsla>], actual: &[Option<Hsla>]) -> String {
+        let at = expected
+            .iter()
+            .zip(actual)
+            .position(|(a, b)| a != b)
+            .unwrap_or_else(|| expected.len().min(actual.len()));
+        let line = text[..at.min(text.len())].lines().count();
+        format!(
+            "first difference at byte {at} (line {line}), \
+             block pass says {:?} but line-by-line says {:?}",
+            expected.get(at),
+            actual.get(at),
+        )
+    }
+
+    /// The regression from #135, in the language the issue named. A block
+    /// comment opens on one line, carries across another and closes; the code
+    /// after it must be highlighted as code.
+    ///
+    /// The doubled parse did *not* leave the trailing line comment-coloured —
+    /// it flattened it to one plain colour — so "is not comment-coloured" is
+    /// not a sufficient assertion on its own. The distinct-colour count is what
+    /// actually discriminates.
+    #[test]
+    fn block_comment_opens_carries_and_closes() {
+        let text = "const before = 1;\n\
+                    /* opening a block comment\n\
+                    still inside the comment */\n\
+                    function after() { return 2; }\n";
+
+        let colors = line_by_line_colors(text, "JavaScript");
+        let per_line: Vec<Vec<Option<Hsla>>> = text
+            .lines()
+            .zip(offsets_by_line(text))
+            .map(|(line, start)| colors[start..start + line.len()].to_vec())
+            .collect();
+
+        // Line 1 opens the comment, line 2 closes it, line 3 is code again.
+        let comment_color = per_line[1][0];
+        let code = &per_line[3];
+        assert!(
+            code.iter().all(|color| *color != comment_color),
+            "the line after `*/` is still painted in the comment colour"
+        );
+
+        let distinct: std::collections::HashSet<_> =
+            code.iter().map(|color| format!("{color:?}")).collect();
+        assert!(
+            distinct.len() >= 2,
+            "the line after `*/` collapsed to {} colour(s); `function` and \
+             `after` should not share the plain-text colour",
+            distinct.len()
+        );
+    }
+
+    /// Byte offset of the start of each line of `text`.
+    fn offsets_by_line(text: &str) -> Vec<usize> {
+        let mut offsets = Vec::new();
+        let mut offset = 0;
+        for line in LinesWithEndings::from(text) {
+            offsets.push(offset);
+            offset += line.len();
+        }
+        offsets
+    }
+
+    /// The general form of the bug: highlighting a document line by line must
+    /// agree, byte for byte, with highlighting it in one stateless pass.
+    ///
+    /// The fixtures are not interchangeable. A plain Rust `/* … */` does *not*
+    /// diverge: Rust's block comments nest, so the doubled parse just doubles
+    /// the depth, and a balanced comment still returns to depth zero on the
+    /// same line the honest parse does. The Rust fixture below is deliberately
+    /// *unbalanced* — two opens and one close on one line — which is what makes
+    /// the doubled depth outlive the closing `*/`. Each fixture here was
+    /// checked to diverge (or, for the last two, to keep agreeing) with the
+    /// second parse temporarily put back.
+    #[test]
+    fn line_by_line_matches_the_stateless_block_pass() {
+        let fixtures: &[(&str, &str)] = &[
+            (
+                "JavaScript",
+                "const before = 1;\n/* comment\nstill comment */\nfunction after() {}\n",
+            ),
+            (
+                "Rust",
+                "fn before() {}\n/* a /* b */\nstill commented */ fn after() {}\n",
+            ),
+            (
+                "Rust",
+                "fn main() {\n    let s = r#\"a raw\nstring across lines\"#;\n    let n = 1;\n}\n",
+            ),
+            (
+                "Python",
+                "x = 1\ndoc = '''a triple\nquoted string'''\ny = 2\n",
+            ),
+            // Single-line-only fixtures: these agreed before the fix and must
+            // keep agreeing after it.
+            ("Rust", "// just a line comment\nfn after() {}\n"),
+            ("C", "int before = 1;\nint after = 2;\n"),
+        ];
+
+        let highlighter = SyntaxHighlighter::new();
+        let mut disagreements = Vec::new();
+        for (language, text) in fixtures {
+            let expected = block_colors(&highlighter, text, language);
+            let actual = line_by_line_colors(text, language);
+            if actual != expected {
+                disagreements.push(format!(
+                    "{language} fixture {text:?}: {}",
+                    describe_mismatch(text, &expected, &actual)
+                ));
+            }
+        }
+
+        assert!(
+            disagreements.is_empty(),
+            "line-by-line highlighting diverged from the block pass:\n{}",
+            disagreements.join("\n")
+        );
+    }
+
+    /// Rendering a single line on its own is unchanged by the fix — the ops the
+    /// runs are built from come from the first parse either way.
+    #[test]
+    fn a_lone_line_is_unaffected() {
+        let text = "fn main() { let x = 42; }\n";
+        let highlighter = SyntaxHighlighter::new();
+        assert_eq!(
+            line_by_line_colors(text, "Rust"),
+            block_colors(&highlighter, text, "Rust")
+        );
+    }
+
+    /// The early return above the parse: an unknown language renders one plain
+    /// run and caches nothing.
+    #[test]
+    fn unknown_language_falls_back_to_plain_text() {
+        let mut highlighter = SyntaxHighlighter::new();
+        let line = "some text in no language at all\n";
+        let runs = highlighter.highlight_line(line, "Nonexistent Language", 0, "test".into(), 14.0);
+
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].len, line.len());
+        assert_eq!(runs[0].color, gpui::rgb(0xcccccc).into());
+        assert!(highlighter.inner.borrow().parse_states.is_empty());
     }
 }
 

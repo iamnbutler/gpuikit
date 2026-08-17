@@ -42,7 +42,7 @@ the popup, with the expanded state reported. accesskit has `DateInput`.
 
 - `docs/issues/calendar.md` — **hard block**, and the date-type decision inside
   it especially: this component's whole public API is dates.
-- `docs/issues/portal-adopt-or-delete.md`.
+- Nothing else for the popup: it follows `docs/overlays.md`.
 - `docs/issues/element-roles-convention.md`.
 
 ### Accessibility

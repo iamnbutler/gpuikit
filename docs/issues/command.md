@@ -39,8 +39,9 @@ component name deliberately.
   one is worse than none.
 - **The overlay.** `Dialog` centres and scrims; a command palette usually wants
   to sit near the top of the window. Whether that is a `Dialog` option or a new
-  placement depends on `docs/issues/portal-adopt-or-delete.md`; do not add a
-  seventh hand-rolled `anchored()`/`deferred()` pair.
+  placement depends on nothing outstanding — follow `docs/overlays.md`, which
+  is the crate's overlay convention, and put the gap on `anchored().offset(…)`
+  rather than on the anchored child.
 - **The keyboard contract is the component.** Focus stays in the query field
   while up/down move the list selection; enter runs the selection; escape
   dismisses. `ContextMenu` already implements a version of this
@@ -59,7 +60,8 @@ there is no platform excuse. See the shared note below.
 ## Blocked on
 
 - `docs/issues/element-roles-convention.md` — before it reports a role.
-- `docs/issues/portal-adopt-or-delete.md` — before it places an overlay.
+- Nothing else. The overlay question is settled: `docs/overlays.md` is the
+  convention to follow when it places one.
 
 ### Accessibility
 

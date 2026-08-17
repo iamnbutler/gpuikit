@@ -52,7 +52,10 @@ them.
 
 - `docs/issues/menu-vs-listbox-naming.md` — **hard block**.
 - `docs/issues/element-roles-convention.md`.
-- `docs/issues/portal-adopt-or-delete.md`.
+- Nothing else. Its popup follows `docs/overlays.md`. Note that matching the
+  trigger's width — which a combobox wants — is the one thing that document
+  names as unbuilt, and as the trigger that would reopen the abstraction
+  question; this component will want it first.
 
 ### Accessibility
 

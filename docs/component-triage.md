@@ -70,11 +70,13 @@ The two partial entries:
 ## The blocker table, corrected
 
 #146 lists the infrastructure #59's entries were blocked on and marks it
-resolved. One row of that table does not hold.
+resolved. One row of that table still does not hold — accessibility roles. The
+overlay row held all along; what was missing was a written convention, and
+that now exists.
 
 | #59's blocker | Status | Evidence |
 |---|---|---|
-| Overlay/popup rendering | **Resolved in practice, not in one place** | Six elements (`dialog`, `dropdown`, `select`, `popover`, `context_menu`, `toast`) each hand-roll `anchored()`/`deferred()`. `src/traits/portal.rs` — 486 lines of positioning math — has **zero callers, zero implementors and zero tests**. See `docs/issues/portal-adopt-or-delete.md` |
+| Overlay/popup rendering | Resolved, and now written down | Six elements (`dialog`, `dropdown`, `select`, `popover`, `context_menu`, `toast`) each place their own `anchored()`/`deferred()`, which is the right amount of sharing — `gpui::anchored()` is the abstraction. `src/traits/portal.rs` (486 lines of positioning math, zero callers) was read against all six and **deleted**; the convention, the fit-mode choice and the draw-priority ladder are in `docs/overlays.md`, checked by `overlay_coverage` in `src/elements.rs` |
 | Focus management | Resolved | `FocusHandle` throughout; `src/traits/visual_focus.rs`; `Textarea`, `TextField`, `DropdownMenu` and `ContextMenu` all track focus |
 | Keyboard dispatch | Resolved | `src/keymap/`, `src/input/bindings.rs`, and `ContextMenu`'s arrow-key navigation with its own tests |
 | Scrollable/virtualised lists | Resolved | `src/elements/scroll_area.rs`, `src/elements/list.rs` |
@@ -264,8 +266,10 @@ exactly this to be recorded when the table landed.
 
 ## Prerequisites
 
-Three issue bodies under `docs/issues/` are not components. They are decisions
-that the component issues would otherwise each have to invent an answer to.
+Three of the triage's outputs are not components. They are decisions that the
+component issues would otherwise each have to invent an answer to. Two are
+still issue bodies under `docs/issues/`; the third has been settled, and its
+answer is now a document in `docs/`.
 
 - **`docs/issues/element-roles-convention.md`** — no element in `src/elements/` reports an
   accessibility role. #146 makes the a11y answer a precondition for every new
@@ -278,18 +282,22 @@ that the component issues would otherwise each have to invent an answer to.
   `dropdown.rs`) and `ELEMENT_COVERAGE` maps both modules to one showcase page.
   A chooser and a command list are different things with different roles and
   different keyboard models. Hard-blocks Combobox.
-- **`docs/issues/portal-adopt-or-delete.md`** — `src/traits/portal.rs` is unused
-  positioning math and the six existing overlays each hand-roll their own.
-  Three of the surviving components are anchored overlays. Settle this before
-  a seventh hand-rolled placement.
+- **`docs/overlays.md`** — **settled.** `src/traits/portal.rs` was unused
+  positioning math, and the answer to "what would it have saved" was nothing at
+  all six overlay call sites: `gpui::anchored()` already does every one of its
+  jobs, and does them in `prepaint`, where the measured sizes it demanded from
+  its callers actually exist. Deleted, and replaced by a written convention
+  with tests. The three components below that were blocked on it now follow
+  that document instead.
 
 ## The dependency graph
 
 - `docs/issues/element-roles-convention.md` shapes every component issue, and
   is what the shipped `Table` is still waiting on for its roles.
 - `docs/issues/menu-vs-listbox-naming.md` hard-blocks `combobox.md`.
-- `docs/issues/portal-adopt-or-delete.md` should be settled before `command.md`,
-  `combobox.md` or `date-picker.md`.
+- `docs/overlays.md` is the convention `command.md`, `combobox.md` and
+  `date-picker.md` follow when they place an overlay. **Discharged** — it was
+  `docs/issues/portal-adopt-or-delete.md`, now settled by deleting the trait.
 - `docs/issues/table.md` hard-blocked `data-table.md`. **Discharged**: both are
   built, as one module — see "Two rows, one module" above.
 - `docs/issues/calendar.md`, and the date-type decision in it, hard-blocks `date-picker.md`.
@@ -313,6 +321,12 @@ document stops describing the crate:
 - every Rejected row is argued in the section above, not just asserted in a
   cell.
 
+A sibling `overlay_coverage` module does the same for
+[`docs/overlays.md`](overlays.md): every `src/elements/` module that calls
+`deferred(` has a row in its overlay table and vice versa, every
+`with_priority(n)` literal is a rung of the ladder it states, and the deleted
+`src/traits/portal.rs` has not come back.
+
 The counts are stated in two places on purpose: editing the table without
 editing the prose fails. If a verdict legitimately changes, both move together.
 If a component ships, its row moves to Shipped and must then name its module —
@@ -329,7 +343,8 @@ Ready to paste:
 > and 8 have a ready-to-file issue body under `docs/issues/` (plus three
 > prerequisites the triage surfaced — an element role convention, a
 > menu-vs-listbox naming decision, and adopt-or-delete for
-> `src/traits/portal.rs`).
+> `src/traits/portal.rs`, since settled by deleting it in favour of
+> [`docs/overlays.md`](../docs/overlays.md)).
 >
 > This list was shadcn/ui's roster rather than a decision, and it went stale
 > because nothing connected it to the crate. The replacement is checked by

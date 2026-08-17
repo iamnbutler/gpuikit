@@ -78,8 +78,10 @@ component. Ten have shipped — eight already had when the triage was taken, and
 rejected with a reason and a named revisit trigger, and eight have a
 ready-to-file issue body under `docs/issues/` — along with three prerequisites
 the triage surfaced (an element role convention, a menu-vs-listbox naming
-decision, and adopt-or-delete for `src/traits/portal.rs`). The role convention
-is still open, and is why `Table` reports no accessibility roles.
+decision, and adopt-or-delete for `src/traits/portal.rs`). The last is settled:
+the trait is deleted and the convention that replaces it is
+[docs/overlays.md](docs/overlays.md). The role convention is still open, and is
+why `Table` reports no accessibility roles.
 
 The lists that used to live here are gone deliberately. Restating a roster in a
 second, uncheckable place is how the old one stayed alive for a year after the

@@ -35,11 +35,11 @@ use crate::theme::{ActiveTheme, ControlSize, Themeable};
 use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use gpui::{
-    anchored, deferred, div, prelude::*, App, Context, DismissEvent, ElementId, Entity,
+    anchored, deferred, div, point, prelude::*, px, App, Context, DismissEvent, ElementId, Entity,
     EventEmitter, IntoElement, ParentElement, Render, SharedString, Styled, Window,
 };
 
-use crate::elements::dropdown::{DropdownMenu, DropdownOption};
+use crate::elements::dropdown::{DropdownMenu, DropdownOption, MENU_GAP};
 use crate::icons::Icons;
 use std::rc::Rc;
 
@@ -299,7 +299,7 @@ impl<T: Clone + PartialEq + 'static> SelectState<T> {
         cx.notify();
     }
 
-    pub fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    pub fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let is_open = self.menu.is_some();
         let (label, is_placeholder) = self.display_label();
         let full_width = self.full_width;
@@ -365,8 +365,18 @@ impl<T: Clone + PartialEq + 'static> SelectState<T> {
                     ),
             )
             .when_some(self.menu.clone(), |this, menu| {
+                // The gap goes on the anchored element, not on its child: gpui
+                // fits the union of the child's *layout bounds* to the window,
+                // and a margin is outside it. See `MENU_GAP`.
+                let gap = MENU_GAP.to_pixels(window.rem_size());
+
                 this.child(
-                    deferred(anchored().child(div().occlude().mt_1().child(menu))).with_priority(1),
+                    deferred(
+                        anchored()
+                            .offset(point(px(0.), gap))
+                            .child(div().occlude().child(menu)),
+                    )
+                    .with_priority(1),
                 )
             })
     }

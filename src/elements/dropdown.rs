@@ -33,7 +33,7 @@ use crate::theme::{ActiveTheme, ControlSize, Themeable};
 use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use gpui::{
-    anchored, deferred, div, prelude::*, px, App, Context, DismissEvent, ElementId, Entity,
+    anchored, deferred, div, point, prelude::*, px, App, Context, DismissEvent, ElementId, Entity,
     EventEmitter, FocusHandle, Focusable, IntoElement, ParentElement, Rems, Render, SharedString,
     Styled, Window,
 };
@@ -44,6 +44,18 @@ use std::rc::Rc;
 /// The width a trigger will not shrink below, so a short label still gives the
 /// chevron somewhere to sit.
 const MIN_TRIGGER_WIDTH: Rems = Rems(6.25);
+
+/// The gap between a trigger and the popup that drops out of it.
+///
+/// Applied through `anchored().offset(…)` and never as a margin on the
+/// anchored child: `Anchored::prepaint` fits the *union of its children's
+/// layout bounds* to the window, and a margin sits outside that union, so a
+/// popup at the bottom of the window would be clamped correctly and then
+/// pushed straight back out by its own margin. See `docs/overlays.md`.
+///
+/// Shared with `select.rs`, which drops the same `DropdownMenu` out of the
+/// same trigger shape.
+pub(crate) const MENU_GAP: Rems = Rems(0.25);
 
 /// Event emitted when the dropdown selection changes.
 pub struct DropdownChanged;
@@ -400,7 +412,7 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
         cx.notify();
     }
 
-    pub fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    pub fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let is_open = self.menu.is_some();
         let label = self.selected_label();
         let full_width = self.full_width;
@@ -416,54 +428,70 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
             theme.input_border()
         };
 
+        let trigger = div()
+            .id(self.id.clone())
+            .flex()
+            .items_center()
+            .justify_between()
+            // A declared height. The trigger used to be padding plus a
+            // line box, which is why it could not line up with
+            // anything.
+            .h(metrics.height)
+            .gap(metrics.gap)
+            .px(metrics.padding_x)
+            .min_w(MIN_TRIGGER_WIDTH)
+            .when(full_width, |this| this.w_full())
+            .bg(theme.input_bg())
+            .border_1()
+            .border_color(border_color)
+            .rounded(metrics.radius)
+            .text_size(metrics.text_size)
+            .line_height(metrics.line_height)
+            .text_color(if disabled {
+                theme.fg_disabled()
+            } else {
+                theme.fg()
+            })
+            .when(disabled, |this| this.cursor_not_allowed().opacity(0.65))
+            .when(!disabled, |this| {
+                this.cursor_pointer()
+                    .hover(|style| style.border_color(theme.input_border_hover()))
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.toggle_menu(window, cx);
+                    }))
+            })
+            .child(label)
+            .child(
+                div().flex().items_center().justify_center().child(
+                    Icons::chevron_down()
+                        .size(metrics.text_size)
+                        .text_color(theme.fg_muted()),
+                ),
+            );
+
+        // Lets a test read where the trigger and its popup were actually laid
+        // out, rather than hardcoding either one's metrics. A no-op outside a
+        // test build — the same shape `context_menu.rs` uses.
+        #[cfg(test)]
+        let trigger = trigger.debug_selector(|| "gpuikit-dropdown-trigger".into());
+
+        // The gap goes on the anchored element, not on its child: gpui fits
+        // the union of the child's *layout bounds* to the window, and a margin
+        // is outside it. See `MENU_GAP`.
+        let gap = MENU_GAP.to_pixels(window.rem_size());
+
         div()
             .relative()
             .when(full_width, |this| this.w_full())
-            .child(
-                div()
-                    .id(self.id.clone())
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    // A declared height. The trigger used to be padding plus a
-                    // line box, which is why it could not line up with
-                    // anything.
-                    .h(metrics.height)
-                    .gap(metrics.gap)
-                    .px(metrics.padding_x)
-                    .min_w(MIN_TRIGGER_WIDTH)
-                    .when(full_width, |this| this.w_full())
-                    .bg(theme.input_bg())
-                    .border_1()
-                    .border_color(border_color)
-                    .rounded(metrics.radius)
-                    .text_size(metrics.text_size)
-                    .line_height(metrics.line_height)
-                    .text_color(if disabled {
-                        theme.fg_disabled()
-                    } else {
-                        theme.fg()
-                    })
-                    .when(disabled, |this| this.cursor_not_allowed().opacity(0.65))
-                    .when(!disabled, |this| {
-                        this.cursor_pointer()
-                            .hover(|style| style.border_color(theme.input_border_hover()))
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.toggle_menu(window, cx);
-                            }))
-                    })
-                    .child(label)
-                    .child(
-                        div().flex().items_center().justify_center().child(
-                            Icons::chevron_down()
-                                .size(metrics.text_size)
-                                .text_color(theme.fg_muted()),
-                        ),
-                    ),
-            )
+            .child(trigger)
             .when_some(self.menu.clone(), |this, menu| {
+                let popup = div().occlude().child(menu);
+
+                #[cfg(test)]
+                let popup = popup.debug_selector(|| "gpuikit-dropdown-popup".into());
+
                 this.child(
-                    deferred(anchored().child(div().occlude().mt_1().child(menu))).with_priority(1),
+                    deferred(anchored().offset(point(px(0.), gap)).child(popup)).with_priority(1),
                 )
             })
     }
@@ -472,5 +500,125 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
 impl<T: Clone + PartialEq + 'static> Render for DropdownState<T> {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.render(window, cx)
+    }
+}
+
+/// The one property `docs/overlays.md` claims and nothing else could check:
+/// that a popup placed with `anchored()` really does stay inside the window,
+/// *and* really does keep its gap from the trigger. Those two pulled against
+/// each other while the gap was a margin on the anchored child — gpui fits the
+/// union of the child's layout bounds to the window, and a margin is outside
+/// it, so the popup was clamped correctly and then pushed back out by the gap.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui::{px, size, Bounds, Pixels, Render, TestAppContext, VisualTestContext};
+    use std::ops::Deref;
+
+    struct TestView {
+        dropdown: Entity<DropdownState<usize>>,
+        /// Dead space above the trigger, so a test can put it wherever in the
+        /// window it needs it.
+        top: Pixels,
+    }
+
+    impl Render for TestView {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .flex()
+                .flex_col()
+                .size_full()
+                .child(div().h(self.top).flex_shrink_0())
+                .child(self.dropdown.clone())
+        }
+    }
+
+    /// Open a dropdown `top` pixels down a window of `window_size`, and report
+    /// where the trigger and the popup were laid out.
+    ///
+    /// `options` is how many rows the menu has, which is how tall it is —
+    /// enough of them and it fits neither below the trigger nor above it, so
+    /// gpui refuses to flip and falls back to clamping into the window. That
+    /// is the path the margin bug lived on.
+    fn open_dropdown(
+        cx: &mut TestAppContext,
+        window_size: gpui::Size<Pixels>,
+        top: Pixels,
+        options: usize,
+    ) -> (Bounds<Pixels>, Bounds<Pixels>) {
+        cx.update(crate::theme::init);
+
+        let window = cx.open_window(window_size, |_window, cx| {
+            let dropdown = cx.new(|_cx| {
+                let options: Vec<(usize, SharedString)> = (0..options)
+                    .map(|index| (index, SharedString::from(format!("Option {index}"))))
+                    .collect();
+                DropdownState::new(dropdown("test-dropdown", options, 0usize))
+            });
+            TestView { dropdown, top }
+        });
+
+        let cx = VisualTestContext::from_window(*window.deref(), cx).into_mut();
+        cx.run_until_parked();
+
+        let trigger = cx
+            .debug_bounds("gpuikit-dropdown-trigger")
+            .expect("the trigger should have been laid out");
+        cx.simulate_click(trigger.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+
+        let popup = cx
+            .debug_bounds("gpuikit-dropdown-popup")
+            .expect("the popup should have been laid out");
+
+        (trigger, popup)
+    }
+
+    #[gpui::test]
+    fn a_popup_opened_at_the_bottom_of_the_window_stays_inside_it(cx: &mut TestAppContext) {
+        // Eight rows in a 240px window: the menu fits in the window but
+        // neither below the trigger nor above it, so gpui declines to flip and
+        // clamps into the window instead. That is the path the margin bug
+        // lived on — the clamp was right and the margin then undid it.
+        let window = size(px(320.), px(240.));
+        let (_trigger, popup) = open_dropdown(cx, window, px(120.), 8);
+
+        assert!(
+            popup.size.height < window.height,
+            "the popup is {:?} tall in a {:?}-tall window, so it could not fit however it was \
+             placed and this test measures nothing",
+            popup.size.height,
+            window.height,
+        );
+
+        assert!(
+            popup.bottom() <= window.height,
+            "the popup spans {:?} to {:?} in a {:?}-tall window",
+            popup.top(),
+            popup.bottom(),
+            window.height,
+        );
+        assert!(
+            popup.top() >= px(0.),
+            "the popup starts {:?} above the window",
+            -popup.top()
+        );
+    }
+
+    #[gpui::test]
+    fn a_popup_hangs_one_gap_below_its_trigger(cx: &mut TestAppContext) {
+        // Tall enough that nothing is clamped, so this measures the gap and
+        // not the fit.
+        let (trigger, popup) = open_dropdown(cx, size(px(320.), px(800.)), px(40.), 3);
+
+        let gap = popup.top() - trigger.bottom();
+        // One rem at the test window's default rem size. Read from the
+        // constant rather than restated, so the two cannot drift.
+        let expected = MENU_GAP.to_pixels(px(16.));
+
+        assert!(
+            (gap - expected).abs() <= px(1.),
+            "the popup hangs {gap:?} below the trigger, expected {expected:?}"
+        );
     }
 }

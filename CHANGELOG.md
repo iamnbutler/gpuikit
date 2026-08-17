@@ -6,6 +6,19 @@ All notable changes to this project will be documented in this file.
 
 ### Breaking Changes
 
+- `gpuikit::traits::portal` is gone — `Portal`, `PortalPosition`,
+  `AnchorCorner`, `AnchorEdge` and `FitMode` with it. 486 lines of positioning
+  math with zero callers, zero implementors and zero tests, read against all
+  six of this crate's overlay call sites and adopted at none of them:
+  `gpui::anchored()` offers every corner, fit mode and offset `PortalPosition`
+  did — plus edge-centre anchors and `.position()` — and computes them in
+  `prepaint`, where the overlay's measured size and the viewport size exist.
+  Those are exactly the two arguments `calculate_position` demanded from its
+  callers, and no `render()` body has either. Migration: `.offset(point)`
+  becomes `anchored().offset(point)`, and `FitMode::SnapToViewport` becomes
+  `anchored().snap_to_window_with_margin(margin)` — the two calls `Portal`
+  stood in for. The convention that replaces the trait is `docs/overlays.md`,
+  checked by `overlay_coverage` in `src/elements.rs`
 - `InputGroup` is gone, replaced by `TextField`
   (`gpuikit::elements::text_field`). The group drew an addon cell, a stripped
   input and another addon cell as three sibling boxes and spent most of its
@@ -143,6 +156,15 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- `Dropdown`, `Select` and `Popover` popups no longer hang out of the window by
+  their own gap. Each put its distance from the trigger on the *child* of
+  `anchored()` as a margin, and `Anchored::prepaint` fits the union of its
+  children's **layout** bounds to the window — a margin is outside that union,
+  so gpui clamped each popup into the window correctly and the margin then
+  pushed it straight back out. The gap moves to `anchored().offset(…)`, which
+  is inside what gpui measures. Measured, not theorised: the new test in
+  `dropdown.rs` reported a popup spanning 0px to 244px in a 240px-tall window
+  before the fix
 - **Visible behaviour change.** A markdown code block whose fence has not
   closed yet is drawn as plain monospace, and gains its syntax colors the
   moment the closing fence arrives. The highlight cache is keyed on the whole

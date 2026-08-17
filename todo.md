@@ -80,10 +80,14 @@ shipped as `src/elements/sidebar.rs` — eleven are rejected with a reason and a
 named revisit trigger, and seven have a
 ready-to-file issue body under `docs/issues/` — along with three prerequisites
 the triage surfaced (an element role convention, a menu-vs-listbox naming
-decision, and adopt-or-delete for `src/traits/portal.rs`). The last is settled:
-the trait is deleted and the convention that replaces it is
-[docs/overlays.md](docs/overlays.md). The role convention is still open, and is
-why `Table` reports no accessibility roles.
+decision, and adopt-or-delete for `src/traits/portal.rs`). Two are settled: the
+portal trait is deleted and the convention that replaces it is
+[docs/overlays.md](docs/overlays.md), and the role convention is `src/a11y.rs`
+— an element implements `traits::accessible::Accessible` and applies the `A11y`
+it returns with `.announce(a11y)`, with `Button` as the worked example. `Table`
+still reports no accessibility roles, but now for its own reason rather than a
+missing decision: its cells need derived ids before they can carry one. Only
+the menu-vs-listbox naming decision is still open.
 
 The lists that used to live here are gone deliberately. Restating a roster in a
 second, uncheckable place is how the old one stayed alive for a year after the

@@ -48,20 +48,28 @@
 //!
 //! # Accessibility
 //!
-//! No roles are reported, because `docs/issues/element-roles-convention.md`
-//! has not landed and this element must not invent a mechanism. When it does,
-//! this element needs `Grid` with row and column counts, `Row` with
-//! `aria_selected`, `ColumnHeader` with its sort direction, and `Cell`. Two
-//! findings for that issue to decide about, both discovered here:
+//! No roles are reported yet, but the mechanism now exists: [`crate::a11y`]
+//! settled `docs/issues/element-roles-convention.md`, so this element no
+//! longer has to invent one — it implements
+//! [`Accessible`](crate::traits::accessible::Accessible) and applies the
+//! [`A11y`](crate::a11y::A11y) it returns with `.announce(a11y)`. What it
+//! needs is `Grid` with row and column counts, `Row` with `aria_selected`,
+//! `ColumnHeader` with its sort direction, and `Cell`. Both findings recorded
+//! here have been answered, and neither is closed by that convention:
 //!
 //! - **gpui has no `aria_sort`.** `accesskit::Node::set_sort_direction`
 //!   exists, but `div`'s builders stop at `aria_selected` / `aria_row_index` /
 //!   `aria_column_count`, so a sorted `ColumnHeader` cannot report its
-//!   direction without a hand-written `Element`.
-//! - **A role needs an id.** `role()` lives on `StatefulInteractiveElement`,
-//!   so reporting one turns body cells — which have no id today — into
-//!   id-minting sites, which puts them inside `src/element_id.rs`'s duplicate
-//!   id trap. Read that module before adding a role to anything here.
+//!   direction without a hand-written `Element`. The convention records this
+//!   as an upstream ask rather than modelling a field that would silently do
+//!   nothing; when gpui grows the builder, `A11y` grows the field and this
+//!   element uses it.
+//! - **A role needs an id.** `.announce()` is only reachable on an element
+//!   that has one — that is the property the convention is built on — so
+//!   reporting roles turns body cells, which have no id today, into
+//!   id-minting sites, and that puts them inside `src/element_id.rs`'s
+//!   duplicate id trap. Deriving those ids is the work that has to come first,
+//!   and it is why `Table` is last in the rollout order rather than blocked.
 //!
 //! # Not built, deliberately
 //!

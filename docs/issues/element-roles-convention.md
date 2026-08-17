@@ -1,5 +1,15 @@
 # Prerequisite: decide once how an element reports an accessibility role
 
+> **Settled.** The decision is `src/a11y.rs`, whose module docs are the
+> decision record — one numbered section per question below, kept next to the
+> code that implements it. `Button` is the worked example, `Sidebar` has been
+> migrated onto it, and two tests hold the line: the `debug_assert!` in
+> `Announce::announce`, and
+> `a11y::tests::no_element_calls_gpuis_a11y_builders_directly`, which fails the
+> build if anything under `src/` calls gpui's `.role()` / `.aria_*()` builders
+> outside that module. What follows is the issue as it was written, with the
+> answers appended.
+
 ## The problem
 
 **Almost no element in `src/elements/` reports an accessibility role.**
@@ -83,6 +93,64 @@ Several issues are waiting on it, `src/traits/visual_focus.rs` already shows
 the crate is willing to have a cross-cutting convention live in a trait, and
 there is now one element in `src/elements/` doing this by hand — which is
 exactly the situation this issue exists to stop happening ten times.
+
+## The decision, as taken
+
+An element declares what it announces by implementing
+`traits::accessible::Accessible`, returning an `A11y` value; it applies that
+value to the root element it was already building with one method,
+`.announce(a11y)`. Answering the five questions in order:
+
+1. **Where a role is declared.** On the element the element was already
+   building. `Announce` is an extension trait blanket-implemented for gpui's
+   `StatefulInteractiveElement` and nothing else, so **"no id, no role" is
+   enforced by the type system** for every element in this crate. No element
+   has to become a hand-written `Element`. The one escape hatch is `Img`, which
+   gpui makes stateful unconditionally — and which then reports nothing at all,
+   because `Img::a11y_role` never returns the role it was given. An image that
+   needs a role needs a `div().id(…)` around it.
+2. **How an element is named.** Required, not optional, for every role in
+   `a11y::role_requires_a_name` — a nameless `Role::Button` is a
+   `debug_assert!`. The name comes from the element's own visible text where it
+   has any (`Button`'s label *is* its name, so there is no second string to
+   keep in step), and from a constructor argument where it has none
+   (`IconButton`, which is therefore a breaking API change and the first item
+   of the rollout). **Never from the tooltip**: it is optional, and in this
+   crate it is an `AnyView` with no string in it to read.
+3. **How state is reported.** As fields of `A11y` — `toggled`, `selected`,
+   `expanded`, `value`, `orientation`, `level`, `position_in_set` — applied by
+   `announce`. `sidebar.rs`'s data point is upheld rather than inverted:
+   **state goes on the element that changes it**, which is why `aria-expanded`
+   stays on `SidebarTrigger`. Two properties the convention deliberately
+   cannot express, because gpui cannot: **`disabled`** (accesskit has
+   `set_disabled`; gpui's `AriaProperties` has no field for it, and the only
+   public workaround burns the element's single synthetic-children slot and
+   cannot be tested) and **`sort_direction`**, the finding `table.rs` recorded.
+   Both are upstream asks. A disabled control is distinguishable only by the
+   `Click` action its node does not offer.
+4. **How it is tested.** By rendering a component and calling the two `Element`
+   methods gpui itself calls — `a11y_role` and `write_a11y_info` — on the
+   element that comes back, which is the only way to read a node back given
+   that accessibility cannot be switched on in a test (`A11y::is_active()` is
+   set only by a platform adapter's activation callback, and the test platform
+   has none). `a11y::test_support::announced` does that and hands back the real
+   `accesskit::Node`; note that it calls `render`, not `into_element`, because
+   `#[derive(IntoElement)]`'s `Component<C>` reports no role of its own. The
+   second half is the source scan named in the banner above.
+5. **The rollout order.** `Button` first, as the worked example; `Sidebar`
+   migrated with it, as this issue said it would have to be. Then `IconButton`
+   (which forces the constructor-argument half of decision 2), `Checkbox` /
+   `Switch` / `Toggle`, `Slider` / `Progress`, `Tabs` / `List`, `Accordion` /
+   `Collapsible`, the overlays, and `Table` last, since it needs derived cell
+   ids first.
+
+Two things this deliberately did **not** do. It did not sweep the crate: the
+state fields are proven against a bare `div` in `src/a11y.rs`'s tests rather
+than by touching thirty elements. And it did not make `Button` focusable — it
+has no `track_focus`, so its node offers no `Focus` action and it is not
+keyboard-reachable. That is a real gap, but it is keyboard focus rather than
+roles, and it is the natural companion issue rather than something to smuggle
+in here.
 
 ---
 

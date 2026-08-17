@@ -41,6 +41,7 @@ pub use selection::{MarkdownSelection, SelectionPosition};
 pub use stitch::preprocessing_available;
 pub use style::*;
 
+use crate::a11y::{A11y, Announce};
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
     div, prelude::*, rems, App, Context, ElementId, Entity, EntityId, IntoElement, ParentElement,
@@ -586,13 +587,15 @@ impl MarkdownRenderer {
         }
 
         // The id is what scopes the run ids below it; the role is what puts
-        // the document into the accessibility tree. `.role()` is only
+        // the document into the accessibility tree. `.announce()` is only
         // reachable on a div that already has an `.id()`, so the two cannot
         // drift apart. A bare `.id()` adds no hitbox, so selection
-        // hit-testing and link clicks are untouched.
+        // hit-testing and link clicks are untouched. A document is named by
+        // its contents, so it takes no accessible name — see
+        // `crate::a11y::role_requires_a_name`.
         div()
             .id(document_id)
-            .role(Role::Document)
+            .announce(A11y::new(Role::Document))
             .w_full()
             .flex()
             .flex_col()

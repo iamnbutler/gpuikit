@@ -835,7 +835,7 @@ impl Showcase {
         let text_field_disabled = cx.new(|cx| InputState::new_singleline(cx));
         let text_field_read_only = cx.new(|cx| {
             let mut state = InputState::new_singleline(cx);
-            state.set_content("gpuikit-0.7.0", cx);
+            state.set_content("gpuikit-0.8.0", cx);
             state
         });
         // One of each stateful control per rung. Built here rather than in

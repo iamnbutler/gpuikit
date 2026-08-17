@@ -10,15 +10,43 @@ A UI toolkit for GPUI applications.
 
 ```toml
 [dependencies]
-gpuikit = "0.7"
+gpuikit = "0.8"
 
 # OR to enable the text editor component:
-# gpuikit = { version = "0.7", features = ["editor"] }
+# gpuikit = { version = "0.8", features = ["editor"] }
 
 # OR, for streaming markdown, to close the syntax a half-written document
 # leaves open before parsing it (needs Rust 1.95+):
-# gpuikit = { version = "0.7", features = ["stitch"] }
+# gpuikit = { version = "0.8", features = ["stitch"] }
 ```
+
+## Features
+
+All features are off by default.
+
+| Feature | Needs Rust | What it adds |
+| --- | --- | --- |
+| `editor` | 1.85 | The `Editor` component, and the syntect-backed syntax highlighting that markdown code fences use once an app calls `markdown::init_code_highlighting`. Pulls in `syntect` |
+| `stitch` | **1.95** | Closes the syntax a partially streamed markdown document leaves open (`**bold`, `[label](htt`) before parsing, so streaming text does not flicker between literal markers and styled text. Pulls in [mdstitch](https://docs.rs/mdstitch), which declares `rust-version = "1.95.0"`. `markdown::preprocessing_available()` reports which build you got |
+| `runtime_shaders` | 1.85 | Compiles Metal shaders at runtime instead of at build time, so a macOS build needs no Xcode Metal toolchain |
+| `schema` | 1.85 | Adds the `schemars` dependency. Nothing in the crate derives `JsonSchema` yet, so today this only affects your dependency graph |
+
+### Minimum Rust version
+
+gpuikit declares `rust-version = "1.85"`. That is a statement about **this
+crate's own source** — it uses async closures, and gpui is edition 2024, which
+needs the same 1.85 — and not a guarantee about a whole build. The crate is
+edition 2021, so cargo's v2 feature resolver does not hold dependencies back to
+gpuikit's floor, and several of them already declare more (cosmic-text and
+smol_str 1.89, image and time 1.88, oo7 1.92 on the Linux secret-service path).
+On a toolchain near 1.85 you will most likely meet a dependency's floor before
+you meet gpuikit's. A recent stable is the practical answer.
+
+`stitch` is the one feature that raises the floor of gpuikit itself, to **1.95**.
+Leaving it off costs you only the partial-syntax closing: `Markdown::append` and
+the background parser are unconditional, so streaming still works — a
+half-written `**bold` just flashes as literal asterisks until its closer
+arrives.
 
 ## Control sizes
 

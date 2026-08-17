@@ -533,6 +533,7 @@ struct Showcase {
     text_field_action: Entity<InputState>,
     text_field_composed: Entity<InputState>,
     text_field_disabled: Entity<InputState>,
+    text_field_read_only: Entity<InputState>,
     /// One of each stateful control per rung, for the Control Sizes page.
     /// Indexed by `ControlSize::ALL`.
     control_row_checkboxes: [Entity<Checkbox>; 3],
@@ -542,6 +543,11 @@ struct Showcase {
     control_row_dropdowns: [Entity<DropdownState<Size>>; 3],
     control_row_fields: [Entity<InputState>; 3],
     textarea_example: Entity<InputState>,
+    /// Its own state: sharing the live example's was both a duplicate element
+    /// id and, now that `read_only` writes through to the state, a clobber
+    /// hazard.
+    textarea_disabled: Entity<InputState>,
+    textarea_read_only: Entity<InputState>,
     popover_example: Entity<PopoverState>,
     dialog_example: Entity<DialogState>,
     context_menu_pinned: bool,
@@ -780,6 +786,11 @@ impl Showcase {
         let text_field_action = cx.new(|cx| InputState::new_singleline(cx));
         let text_field_composed = cx.new(|cx| InputState::new_singleline(cx));
         let text_field_disabled = cx.new(|cx| InputState::new_singleline(cx));
+        let text_field_read_only = cx.new(|cx| {
+            let mut state = InputState::new_singleline(cx);
+            state.set_content("gpuikit-0.7.0", cx);
+            state
+        });
         // One of each stateful control per rung. Built here rather than in
         // `render` because `render` runs every frame.
         let control_row_checkboxes = ControlSize::ALL.map(|size| {
@@ -836,6 +847,16 @@ impl Showcase {
         let control_row_fields =
             ControlSize::ALL.map(|_| cx.new(|cx| InputState::new_singleline(cx)));
         let textarea_example = cx.new(|cx| InputState::new_multiline(cx));
+        let textarea_disabled = cx.new(|cx| InputState::new_multiline(cx));
+        let textarea_read_only = cx.new(|cx| {
+            let mut state = InputState::new_multiline(cx);
+            state.set_content(
+                "This one is read-only: select it, copy it, scroll it — but you \
+                 cannot change it.",
+                cx,
+            );
+            state
+        });
 
         let popover_example = cx.new(|_cx| {
             PopoverState::new(
@@ -929,6 +950,7 @@ impl Showcase {
             text_field_action,
             text_field_composed,
             text_field_disabled,
+            text_field_read_only,
             control_row_checkboxes,
             control_row_switches,
             control_row_toggles,
@@ -936,6 +958,8 @@ impl Showcase {
             control_row_dropdowns,
             control_row_fields,
             textarea_example,
+            textarea_disabled,
+            textarea_read_only,
             popover_example,
             dialog_example,
             context_menu_pinned: true,
@@ -1565,6 +1589,13 @@ impl Showcase {
                             .placeholder("Unavailable")
                             .disabled(true),
                         theme,
+                    ))
+                    .child(row(
+                        "Read-only:",
+                        // Still focusable and selectable; every edit path is
+                        // refused by `InputState`.
+                        text_field(&self.text_field_read_only, cx).read_only(true),
+                        theme,
                     )),
             )
     }
@@ -1587,12 +1618,31 @@ impl Showcase {
                             ),
                     )
                     .child(
-                        field().label("Disabled").child(
-                            textarea(&self.textarea_example, cx)
+                        // Disabled all the way down: the field dims its own
+                        // label, and the textarea paints static text with no
+                        // live element at all, so it takes neither focus nor
+                        // keystrokes. It clips a long value rather than
+                        // scrolling it — that is the trade for being inert.
+                        field().label("Disabled").disabled(true).child(
+                            textarea(&self.textarea_disabled, cx)
                                 .placeholder("This is disabled...")
                                 .rows(2)
                                 .disabled(true),
                         ),
+                    )
+                    .child(
+                        // Read-only is the other half: still focusable, still
+                        // selectable, still scrollable, and every edit path —
+                        // typing, IME, paste, delete, tab, undo — refused by
+                        // `InputState`.
+                        field()
+                            .label("Read-only")
+                            .description("Focus it, select it, copy it — it will not change")
+                            .child(
+                                textarea(&self.textarea_read_only, cx)
+                                    .rows(2)
+                                    .read_only(true),
+                            ),
                     ),
             )
     }

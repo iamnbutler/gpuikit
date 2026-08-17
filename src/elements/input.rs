@@ -395,9 +395,14 @@ impl Element for Input {
         let text_style = layout_state.text_style.clone();
         let multiline = self.multiline;
         let is_focused = focus_handle.is_focused(window);
+        // Asked unconditionally, so the blink state still follows focus, and
+        // then suppressed: a caret promises that what you type lands there,
+        // and in a read-only input it does not. Selection, movement and copy
+        // are unaffected.
         let cursor_visible = self
             .input
-            .update(cx, |input, cx| input.cursor_visible(is_focused, cx));
+            .update(cx, |input, cx| input.cursor_visible(is_focused, cx))
+            && !self.input.read(cx).is_read_only();
 
         self.interactivity.paint(
             global_id,
@@ -1348,5 +1353,81 @@ impl IntoElement for Input {
 
     fn into_element(self) -> Self::Element {
         self
+    }
+}
+
+/// What a control shows when it is disabled, and whether that is the
+/// placeholder.
+///
+/// Content first, then the placeholder, then nothing — the same fallback a
+/// live input paints, minus the caret.
+///
+/// A disabled control renders this as *static text* rather than dimming a live
+/// `Input`, because a painted `Input` registers its actions and its IME
+/// handler and is in the tab order: dimming one leaves a control that looks
+/// inert and still takes keystrokes. Read-only alone cannot substitute — an
+/// element that is painted is focusable.
+///
+/// Lives here rather than in either wrapper so that `Textarea` and `TextField`
+/// share one copy.
+pub(crate) fn disabled_display(
+    content: &str,
+    placeholder: Option<&SharedString>,
+) -> (SharedString, bool) {
+    if !content.is_empty() {
+        return (SharedString::from(content.to_string()), false);
+    }
+    match placeholder {
+        Some(placeholder) => (placeholder.clone(), true),
+        None => (SharedString::default(), false),
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use gpui::{Render, TestAppContext, VisualTestContext};
+
+    /// A window holding one focused control, drawn and parked — the harness
+    /// both wrapper test modules use to ask what a keystroke actually does.
+    ///
+    /// The input must be focused *and* the window must have drawn before a
+    /// keystroke; and any `state.update(...)` needs a `run_until_parked()`
+    /// before typing, or the keystroke lands on the previous frame.
+    pub(crate) struct Harness<F> {
+        build: F,
+    }
+
+    impl<F> Render for Harness<F>
+    where
+        F: Fn(&mut Window, &mut App) -> gpui::AnyElement + 'static,
+    {
+        fn render(
+            &mut self,
+            window: &mut Window,
+            cx: &mut Context<Self>,
+        ) -> impl gpui::IntoElement {
+            (self.build)(window, cx)
+        }
+    }
+
+    /// Open a window whose only content is `build`'s element, focus `state`,
+    /// and draw.
+    pub(crate) fn focused_input_window<'a, F>(
+        cx: &'a mut TestAppContext,
+        state: &Entity<InputState>,
+        build: F,
+    ) -> &'a mut VisualTestContext
+    where
+        F: Fn(&mut Window, &mut App) -> gpui::AnyElement + 'static,
+    {
+        cx.update(crate::theme::init);
+
+        let focus_handle = state.read_with(cx, |state, cx| state.focus_handle(cx));
+        let (_view, cx) = cx.add_window_view(move |_window, _cx| Harness { build });
+
+        cx.update(|window, cx| window.focus(&focus_handle, cx));
+        cx.run_until_parked();
+        cx
     }
 }

@@ -62,6 +62,18 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `InputState` learns read-only: `read_only(bool)` (builder),
+  `set_read_only(bool, cx)` and `is_read_only()`. It closes every *user* path
+  into the content — typing, IME composition, paste, cut's removal, the delete
+  family, tab, newlines, undo and redo — while leaving focus, cursor movement,
+  selection, copy, scrolling and the programmatic setters
+  (`set_content`, `insert_text`, `delete_backward`, `undo_action`,
+  `redo_action`) alone, the same split a browser's `readonly` attribute draws.
+  The delete family is guarded individually rather than left to the funnel,
+  because each *moves the selection* before deleting through it. `set_read_only`
+  no-ops on an unchanged value, so a wrapper may impose it every frame.
+  `TextField::read_only` is new; `Textarea::read_only` is unchanged in
+  signature and enforced rather than cosmetic — see Fixed
 - `Table` (`gpuikit::elements::table`), with sorting and row selection folded
   in as opt-ins rather than shipped as a second "data table" element. A
   `Column<R>` carries a header, a width, an alignment and a per-cell render
@@ -156,6 +168,27 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- `Textarea::disabled(true)` produces a control that is actually inert. It used
+  to set `opacity(0.65)` over a fully live `text_area()`, so the textarea
+  looked disabled while still taking focus, keystrokes and IME input. A
+  disabled `Textarea` now paints its value as static text with **no live
+  element at all**, which is the only thing that also stops it taking focus —
+  a painted `Input` registers its actions and its IME handler and is in the tab
+  order, so read-only alone cannot implement `disabled`. The consequence to
+  agree with: a disabled textarea *clips* a value longer than its rows instead
+  of scrolling it; `read_only` is the option that keeps scrolling, and the
+  showcase demonstrates both. `TextField` already worked this way and now
+  shares the helper rather than the crate growing a second copy
+- `Textarea::read_only(true)` means something. It was the same lie with
+  different colours — and said so in its own doc comment — and now imposes
+  `InputState`'s new read-only flag. **Behaviour change to note:**
+  `Textarea::read_only` and `TextField::read_only` *write to the `InputState`
+  they are given*, at the top of `render`. That is the only way a
+  wrapper-level property can be enforced, and it is scoped as tightly as it
+  can be: the wrapper field is an `Option<bool>`, so a wrapper that never calls
+  it says nothing and a state its owner made read-only is never quietly handed
+  back. A read-only `Input` also paints no caret — a caret promises that what
+  you type lands there
 - `Dropdown`, `Select` and `Popover` popups no longer hang out of the window by
   their own gap. Each put its distance from the trigger on the *child* of
   `anchored()` as a margin, and `Anchored::prepaint` fits the union of its

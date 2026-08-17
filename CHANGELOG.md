@@ -32,6 +32,12 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- The editor's syntax highlighter parses each line once instead of twice, so a
+  multi-line construct no longer corrupts the line after it. `highlight_line`
+  advanced the same `ParseState` over the line a second time "to update state",
+  and cached that — the state as if the line had occurred twice — for the next
+  line. The line after a JavaScript block comment, a Rust raw string or a Python
+  `'''` string lost its highlighting and flattened to one plain colour
 - A markdown list nested under an item no longer swallows that item's text.
   `- x` with an indented `- y` under it rendered as a single row: the nested
   list opened while the parent's text was still buffered, so the child's first

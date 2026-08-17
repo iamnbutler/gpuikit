@@ -888,3 +888,52 @@ fn test_control_characters() {
     // Cursor should be after all 4 characters
     assert_eq!(editor.cursor_position(), CursorPosition::new(0, 4));
 }
+
+/// The #135 regression through the path the paint loop actually uses:
+/// `Editor::highlight_line`, which runs `ensure_parse_states` first. The second
+/// parse used to overwrite the correct state that call had just cached, so the
+/// next `ensure_parse_states` adopted the corrupt entry as its starting point.
+///
+/// Editor lines arrive without their trailing newline, so this cannot be
+/// compared byte-for-byte against the stateless block pass (see the highlighter's
+/// own tests for that); it asserts the structural property instead — the code
+/// after `*/` is highlighted as code, not flattened to one plain colour.
+#[test]
+fn test_line_after_block_comment_is_highlighted_as_code() {
+    let lines: Vec<String> = [
+        "const before = 1;",
+        "/* opening a block comment",
+        "still inside the comment */",
+        "function after() { return 2; }",
+    ]
+    .iter()
+    .map(|line| line.to_string())
+    .collect();
+
+    let mut editor = Editor::new("test_block_comment", lines.clone());
+    editor.set_language("JavaScript".to_string());
+
+    // Paint the lines in order, as the element does.
+    let painted: Vec<Vec<gpui::TextRun>> = lines
+        .iter()
+        .enumerate()
+        .map(|(index, line)| editor.highlight_line(line, index, "Courier".into(), 14.0))
+        .collect();
+
+    let comment_color = painted[1][0].color;
+    let code = &painted[3];
+
+    assert!(
+        code.iter().all(|run| run.color != comment_color),
+        "the line after `*/` is still painted in the comment colour"
+    );
+
+    let distinct: std::collections::HashSet<String> =
+        code.iter().map(|run| format!("{:?}", run.color)).collect();
+    assert!(
+        distinct.len() >= 2,
+        "the line after `*/` collapsed to {} colour(s); `function` and `after` \
+         should not share the plain-text colour",
+        distinct.len()
+    );
+}

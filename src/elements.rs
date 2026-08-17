@@ -11,7 +11,6 @@ pub mod checkbox;
 pub mod collapsible;
 pub mod context_menu;
 pub mod dialog;
-pub mod dropdown;
 pub mod empty;
 pub mod field;
 pub mod icon_button;
@@ -414,6 +413,156 @@ mod overlay_coverage {
             !repo_root().join("src/traits/portal.rs").exists(),
             "src/traits/portal.rs is back. If a positioning abstraction is genuinely wanted \
              now, docs/overlays.md names the trigger and the argument to attack first"
+        );
+    }
+}
+
+/// `docs/menus-and-listboxes.md` is the decision record for #154: `Dropdown`
+/// and `Select` were one component under two names, and one of them was built
+/// on the other's internals. It is now one module, `select`, whose popup is
+/// private, and the document is the convention that keeps the listbox family
+/// and the menu family apart.
+///
+/// These tests are what hold that document to the crate. The naming problem it
+/// settles is exactly the kind that comes back through a merge, and the
+/// mechanical form of it — one family importing the other's insides — is
+/// checkable as source text, so it is checked rather than trusted.
+///
+/// Like `overlay_coverage` and unlike the two modules above, this reads element
+/// sources from disk: what is being checked is what one file imports from
+/// another, which `include_str!` on a fixed list could not follow.
+#[cfg(test)]
+mod family_coverage {
+    use std::fs;
+    use std::path::PathBuf;
+
+    const FAMILIES: &str = include_str!("../docs/menus-and-listboxes.md");
+    const ELEMENTS: &str = include_str!("elements.rs");
+
+    /// The two families, and there is deliberately no third. A component that
+    /// is neither offers values nor offers actions has not been thought about
+    /// yet — see the document.
+    const FAMILY_NAMES: [&str; 2] = ["Listbox", "Menu"];
+
+    fn repo_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    }
+
+    /// The family table, as `(module, family)`.
+    ///
+    /// Anchored on an HTML comment rather than on "the first table", copying
+    /// `triage_coverage`'s reasoning: the document has two tables, and picking
+    /// the wrong one would make every assertion below vacuous rather than
+    /// failing.
+    fn family_rows() -> Vec<(String, String)> {
+        let start = FAMILIES
+            .find("<!-- family-table -->")
+            .expect("docs/menus-and-listboxes.md no longer anchors its family table");
+
+        FAMILIES[start..]
+            .lines()
+            .skip_while(|line| !line.starts_with('|'))
+            .take_while(|line| line.starts_with('|'))
+            .filter_map(|line| {
+                let cells: Vec<&str> = line.trim_matches('|').split('|').map(str::trim).collect();
+                if cells.len() != 3 || cells[0] == "Module" || cells[0].starts_with("---") {
+                    return None;
+                }
+                let module = cells[0].trim_matches('`').to_string();
+                Some((module, cells[1].to_string()))
+            })
+            .collect()
+    }
+
+    fn source_of(module: &str) -> String {
+        let path = repo_root().join(format!("src/elements/{module}.rs"));
+        fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("`{}` cannot be read: {error}", path.display()))
+    }
+
+    #[test]
+    fn every_row_names_a_real_module_and_one_of_the_two_families() {
+        let rows = family_rows();
+
+        assert!(
+            rows.len() >= 2,
+            "the family table has {} rows — check how the document is being parsed before \
+             trusting a green result",
+            rows.len(),
+        );
+
+        for (module, family) in &rows {
+            assert!(
+                ELEMENTS.contains(&format!("pub mod {module};")),
+                "the family table names `{module}`, but src/elements.rs declares no \
+                 `pub mod {module};`"
+            );
+            assert!(
+                FAMILY_NAMES.contains(&family.as_str()),
+                "`{module}` is in family `{family}`, which is not one of the two. There is \
+                 deliberately no third family — see docs/menus-and-listboxes.md"
+            );
+        }
+
+        for family in FAMILY_NAMES {
+            assert!(
+                rows.iter().any(|(_, name)| name == family),
+                "no module is in the `{family}` family, so the layering test below has \
+                 nothing to compare and would pass against anything"
+            );
+        }
+    }
+
+    /// The mistake #154 undid, in the only form a test can see: `select.rs`
+    /// importing `DropdownMenu` and `DropdownOption` out of `dropdown.rs`. A
+    /// menu and a listbox share `docs/overlays.md` and nothing else, so neither
+    /// may name the other's module in a Rust path.
+    #[test]
+    fn neither_family_is_built_on_the_other() {
+        let rows = family_rows();
+        let mut checked = 0;
+
+        for (module, family) in &rows {
+            let source = source_of(module);
+
+            for (other, other_family) in &rows {
+                if other_family == family {
+                    continue;
+                }
+                checked += 1;
+
+                for path in [
+                    format!("elements::{other}::"),
+                    format!("elements::{other};"),
+                ] {
+                    assert!(
+                        !source.contains(&path),
+                        "`src/elements/{module}.rs` ({family}) refers to `{path}`, and \
+                         `{other}` is in the {other_family} family. The two families share \
+                         docs/overlays.md and nothing else — see \
+                         docs/menus-and-listboxes.md §3"
+                    );
+                }
+            }
+        }
+
+        // Deliberately not a per-module floor: an element that imports nothing
+        // from a sibling is the state this decision wants, so a floor per
+        // module would punish success. What has to be non-zero is the number of
+        // cross-family pairs this actually looked at.
+        assert!(
+            checked >= 1,
+            "no cross-family pair was compared, so this test asserted nothing"
+        );
+    }
+
+    #[test]
+    fn the_merged_dropdown_module_has_not_come_back() {
+        assert!(
+            !repo_root().join("src/elements/dropdown.rs").exists(),
+            "src/elements/dropdown.rs is back. It was `Select` under a second name; if a \
+             menu of actions opened from a trigger is genuinely wanted now, \
+             docs/menus-and-listboxes.md §5 says what it is built on and what it is called"
         );
     }
 }

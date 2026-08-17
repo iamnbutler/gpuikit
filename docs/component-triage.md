@@ -77,8 +77,8 @@ Both now exist, in `src/a11y.rs` and `docs/overlays.md`.
 
 | #59's blocker | Status | Evidence |
 |---|---|---|
-| Overlay/popup rendering | Resolved, and now written down | Six elements (`dialog`, `dropdown`, `select`, `popover`, `context_menu`, `toast`) each place their own `anchored()`/`deferred()`, which is the right amount of sharing — `gpui::anchored()` is the abstraction. `src/traits/portal.rs` (486 lines of positioning math, zero callers) was read against all six and **deleted**; the convention, the fit-mode choice and the draw-priority ladder are in `docs/overlays.md`, checked by `overlay_coverage` in `src/elements.rs` |
-| Focus management | Resolved | `FocusHandle` throughout; `src/traits/visual_focus.rs`; `Textarea`, `TextField`, `DropdownMenu` and `ContextMenu` all track focus |
+| Overlay/popup rendering | Resolved, and now written down | Six elements (`dialog`, `select`, `popover`, `context_menu`, `sidebar`, `toast`) each place their own `anchored()`/`deferred()`, which is the right amount of sharing — `gpui::anchored()` is the abstraction. `src/traits/portal.rs` (486 lines of positioning math, zero callers) was read against all six and **deleted**; the convention, the fit-mode choice and the draw-priority ladder are in `docs/overlays.md`, checked by `overlay_coverage` in `src/elements.rs` |
+| Focus management | Resolved | `FocusHandle` throughout; `src/traits/visual_focus.rs`; `Textarea`, `TextField`, `Select`'s `Listbox` and `ContextMenu` all track focus |
 | Keyboard dispatch | Resolved | `src/keymap/`, `src/input/bindings.rs`, and `ContextMenu`'s arrow-key navigation with its own tests |
 | Scrollable/virtualised lists | Resolved | `src/elements/scroll_area.rs`, `src/elements/list.rs` |
 | A shared control size scale | Resolved **by this change** | `src/theme/control.rs` and `src/traits/control_sized.rs`. #59-era components could not state their own metrics; they can now |
@@ -87,10 +87,14 @@ Both now exist, in `src/a11y.rs` and `docs/overlays.md`.
 The rows that were unresolved when this triage was taken are why it produces
 thirteen issue files for what is now eight surviving components: three of them
 are prerequisites rather than components, and two — `table.md` and
-`data-table.md` — have since been discharged by one module. Two of the three
+`data-table.md` — have since been discharged by one module. All three
 prerequisites are now settled: `overlays.md` by deleting the trait it was about,
-and `element-roles-convention.md` by `src/a11y.rs`. `Table` still reports no
-roles, but nothing blocks it now beyond the derived cell ids it needs first.
+`element-roles-convention.md` by `src/a11y.rs`, and `menu-vs-listbox-naming.md`
+by merging `Dropdown` into `Select`. Two of the three no longer have a body
+under `docs/issues/` at all — a settled question becomes a document in `docs/`,
+which is why the count of files there is smaller than the count of outputs
+above. `Table` still reports no roles, but nothing blocks it now beyond the
+derived cell ids it needs first.
 
 ## Roster comparison
 
@@ -270,9 +274,10 @@ exactly this to be recorded when the table landed.
 ## Prerequisites
 
 Three of the triage's outputs are not components. They are decisions that the
-component issues would otherwise each have to invent an answer to. One is still
-an issue body under `docs/issues/`; the other two are settled, and their
-answers are `docs/overlays.md` and `src/a11y.rs`.
+component issues would otherwise each have to invent an answer to. All three
+are now settled, and their answers are `src/a11y.rs`,
+[`docs/menus-and-listboxes.md`](menus-and-listboxes.md) and
+[`docs/overlays.md`](overlays.md).
 
 - **`docs/issues/element-roles-convention.md`** — **settled.** #146 makes the
   a11y answer a precondition for every new component, so each issue would
@@ -286,11 +291,16 @@ answers are `docs/overlays.md` and `src/a11y.rs`.
   `src/elements/table.rs`, which shipped without roles rather than invent a
   mechanism, is unblocked; it still needs derived cell ids before it can use
   one.
-- **`docs/issues/menu-vs-listbox-naming.md`** — `Select` is built on `Dropdown`'s
-  internals (`select.rs` imports `DropdownMenu` and `DropdownOption` from
-  `dropdown.rs`) and `ELEMENT_COVERAGE` maps both modules to one showcase page.
-  A chooser and a command list are different things with different roles and
-  different keyboard models. Hard-blocks Combobox.
+- **`docs/menus-and-listboxes.md`** — **settled.** `Select` was built on
+  `Dropdown`'s internals (`select.rs` imported `DropdownMenu` and
+  `DropdownOption` from `dropdown.rs`) and `ELEMENT_COVERAGE` mapped both
+  modules to one showcase page, because they were one component under two
+  names. `dropdown.rs` is deleted, `Select` took the union of the two APIs, and
+  the popup is now a private `Listbox` — private because a public one is what
+  let the two grow into each other. A chooser and a menu of actions are
+  different things with different roles and different keyboard models, and the
+  document says so in a sentence the module doc repeats. The Combobox block is
+  discharged.
 - **`docs/overlays.md`** — **settled.** `src/traits/portal.rs` was unused
   positioning math, and the answer to "what would it have saved" was nothing at
   all six overlay call sites: `gpui::anchored()` already does every one of its
@@ -303,7 +313,10 @@ answers are `docs/overlays.md` and `src/a11y.rs`.
 
 - `docs/issues/element-roles-convention.md` shapes every component issue, and
   is what the shipped `Table` is still waiting on for its roles.
-- `docs/issues/menu-vs-listbox-naming.md` hard-blocks `combobox.md`.
+- `docs/menus-and-listboxes.md` hard-blocked `combobox.md`. **Discharged** — it
+  was `docs/issues/menu-vs-listbox-naming.md`, now settled by merging
+  `Dropdown` into `Select`. `combobox.md` inherits the answer, including where
+  its popup comes from.
 - `docs/overlays.md` is the convention `command.md`, `combobox.md` and
   `date-picker.md` follow when they place an overlay. **Discharged** — it was
   `docs/issues/portal-adopt-or-delete.md`, now settled by deleting the trait.
@@ -336,6 +349,12 @@ A sibling `overlay_coverage` module does the same for
 `with_priority(n)` literal is a rung of the ladder it states, and the deleted
 `src/traits/portal.rs` has not come back.
 
+A third, `family_coverage`, does the same for
+[`docs/menus-and-listboxes.md`](menus-and-listboxes.md): every row of its family
+table names a real `pub mod` and one of the two families, no module in one
+family names a module in the other in a Rust path, and the deleted
+`src/elements/dropdown.rs` has not come back.
+
 The counts are stated in two places on purpose: editing the table without
 editing the prose fails. If a verdict legitimately changes, both move together.
 If a component ships, its row moves to Shipped and must then name its module —
@@ -350,10 +369,12 @@ Ready to paste:
 > had when the triage was taken; `Table` and `Data Table` have since been built
 > as one module), 11 are rejected with a reason and a named revisit trigger,
 > and 8 have a ready-to-file issue body under `docs/issues/` (plus three
-> prerequisites the triage surfaced — an element role convention, since settled
-> by `src/a11y.rs`; a menu-vs-listbox naming decision, still open; and
-> adopt-or-delete for `src/traits/portal.rs`, since settled by deleting it in
-> favour of [`docs/overlays.md`](../docs/overlays.md)).
+> prerequisites the triage surfaced, all three since settled — an element role
+> convention, by `src/a11y.rs`; a menu-vs-listbox naming decision, by merging
+> `Dropdown` into `Select` in favour of
+> [`docs/menus-and-listboxes.md`](../docs/menus-and-listboxes.md); and
+> adopt-or-delete for `src/traits/portal.rs`, by deleting it in favour of
+> [`docs/overlays.md`](../docs/overlays.md)).
 >
 > This list was shadcn/ui's roster rather than a decision, and it went stale
 > because nothing connected it to the crate. The replacement is checked by

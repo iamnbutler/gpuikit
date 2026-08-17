@@ -9,7 +9,7 @@ action, not choose a value).
 
 ## Why it survives triage
 
-`Select` cannot be typed into, and a `TextField` beside a `Dropdown` is two
+`Select` cannot be typed into, and a `TextField` beside a `Select` is two
 controls that do not share a selection. The combobox is the only entry on #59's
 list that fills a real gap between two things the crate already ships.
 
@@ -28,12 +28,18 @@ list that fills a real gap between two things the crate already ships.
 
 ## What it has to close in this crate
 
-- **The naming and layering problem, first.** `src/elements/select.rs` imports
-  `DropdownMenu` and `DropdownOption` from `src/elements/dropdown.rs` — one
-  component is built on the other's internals — and `ELEMENT_COVERAGE` maps both
-  modules to the same showcase page. A combobox is a third thing in that
-  neighbourhood and adding it before the naming is settled guarantees a fourth
-  overlapping popup implementation. This is a hard block, not a preference.
+- **The naming and layering problem — answered, not open.** This used to be a
+  hard block: `src/elements/select.rs` imported `DropdownMenu` and
+  `DropdownOption` from `src/elements/dropdown.rs`, one component built on the
+  other's internals, with both mapped to one showcase page. #154 settled it.
+  `dropdown.rs` is gone, there is one chooser (`Select`), and its popup is a
+  **private** `Listbox`. This component inherits that answer rather than
+  re-taking it: it is in the listbox family, it does not build a fourth popup
+  beside the existing one, and when it needs `Listbox` the move is to lift that
+  type into a `pub(crate)` module named by both callers — not to make it `pub`
+  where it sits, which is the state that produced the block in the first place.
+  Read [`docs/menus-and-listboxes.md`](../menus-and-listboxes.md) before
+  starting; §2 is the part that constrains this component.
 - **Value versus text.** The state has to hold both, and say what happens on
   blur with unmatched text: revert, keep, or create. Pick one default and make
   the others explicit options.
@@ -50,7 +56,9 @@ them.
 
 ## Blocked on
 
-- `docs/issues/menu-vs-listbox-naming.md` — **hard block**.
+- The menu-vs-listbox naming decision — was a **hard block**, now
+  **discharged**. The answer is [`docs/menus-and-listboxes.md`](../menus-and-listboxes.md),
+  and this component follows it rather than deciding anything itself.
 - `docs/issues/element-roles-convention.md`.
 - Nothing else. Its popup follows `docs/overlays.md`. Note that matching the
   trigger's width — which a combobox wants — is the one thing that document

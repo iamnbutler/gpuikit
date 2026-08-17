@@ -3,7 +3,7 @@
 //! This example demonstrates gpuikit's input components including:
 //! - Single-line text input
 //! - Multi-line text area
-//! - Dropdowns for font and sample text selection
+//! - Selects for font and sample text selection
 //! - Sliders for font size and line height
 
 #![allow(missing_docs)]
@@ -16,8 +16,8 @@ use gpui::{
     Hsla, KeyBinding, SharedString, Stateful, Window, WindowBounds, WindowOptions,
 };
 use gpui_platform;
-use gpuikit::elements::dropdown::{dropdown, DropdownChanged, DropdownState};
 use gpuikit::elements::input::{input, text_area};
+use gpuikit::elements::select::{select, SelectChanged, SelectState};
 use gpuikit::elements::slider::{Slider, SliderChanged};
 use gpuikit::input::{bind_input_keys, InputState};
 
@@ -213,9 +213,9 @@ struct InputSandbox {
     multiline_input: Entity<InputState>,
     singleline_input: Entity<InputState>,
     use_multiline: bool,
-    sample_dropdown: Entity<DropdownState<SampleText>>,
-    font_dropdown: Entity<DropdownState<SharedString>>,
-    weight_dropdown: Entity<DropdownState<FontWeightOption>>,
+    sample_select: Entity<SelectState<SampleText>>,
+    font_select: Entity<SelectState<SharedString>>,
+    weight_select: Entity<SelectState<FontWeightOption>>,
     font_size_slider: Entity<Slider>,
     line_height_slider: Entity<Slider>,
     selected_font: SharedString,
@@ -258,15 +258,16 @@ impl InputSandbox {
             input
         });
 
-        let multiline_input_for_dropdown = multiline_input.clone();
-        let sample_dropdown = cx.new(|_cx| {
+        let multiline_input_for_select = multiline_input.clone();
+        let sample_select = cx.new(|_cx| {
             let options: Vec<(SampleText, &'static str)> =
                 SampleText::ALL.iter().map(|s| (*s, s.label())).collect();
 
-            DropdownState::new(
-                dropdown("sample-dropdown", options, initial_sample)
+            SelectState::new(
+                select("sample-select", options)
+                    .selected(initial_sample)
                     .on_change(move |sample: SampleText, _window, cx| {
-                        multiline_input_for_dropdown.update(cx, |input, cx| {
+                        multiline_input_for_select.update(cx, |input, cx| {
                             input.set_content(sample.content(), cx);
                         });
                     })
@@ -279,10 +280,12 @@ impl InputSandbox {
             .map(|f| (f.clone(), f.clone()))
             .collect();
 
-        let default_font_for_dropdown = default_font.clone();
-        let font_dropdown = cx.new(|_cx| {
-            DropdownState::new(
-                dropdown("font-dropdown", font_options, default_font_for_dropdown).full_width(true),
+        let default_font_for_select = default_font.clone();
+        let font_select = cx.new(|_cx| {
+            SelectState::new(
+                select("font-select", font_options)
+                    .selected(default_font_for_select)
+                    .full_width(true),
             )
         });
 
@@ -291,9 +294,10 @@ impl InputSandbox {
             .map(|w| (*w, w.label()))
             .collect();
 
-        let weight_dropdown = cx.new(|_cx| {
-            DropdownState::new(
-                dropdown("weight-dropdown", weight_options, FontWeightOption::Normal)
+        let weight_select = cx.new(|_cx| {
+            SelectState::new(
+                select("weight-select", weight_options)
+                    .selected(FontWeightOption::Normal)
                     .full_width(true),
             )
         });
@@ -326,21 +330,27 @@ impl InputSandbox {
             },
         ));
 
+        // Every select holds an `Option<T>`, including these three, which are
+        // built with `.selected(…)` and never cleared. Nothing here wants to
+        // fall back to a default font, so an empty selection simply leaves the
+        // last one in place.
         subscriptions.push(cx.subscribe(
-            &font_dropdown,
-            |this, dropdown, _event: &DropdownChanged, cx| {
-                let selected = dropdown.read(cx).selected.clone();
-                this.selected_font = selected;
-                cx.notify();
+            &font_select,
+            |this, select, _event: &SelectChanged, cx| {
+                if let Some(selected) = select.read(cx).selected.clone() {
+                    this.selected_font = selected;
+                    cx.notify();
+                }
             },
         ));
 
         subscriptions.push(cx.subscribe(
-            &weight_dropdown,
-            |this, dropdown, _event: &DropdownChanged, cx| {
-                let selected = dropdown.read(cx).selected;
-                this.selected_weight = selected.to_font_weight();
-                cx.notify();
+            &weight_select,
+            |this, select, _event: &SelectChanged, cx| {
+                if let Some(selected) = select.read(cx).selected {
+                    this.selected_weight = selected.to_font_weight();
+                    cx.notify();
+                }
             },
         ));
 
@@ -348,9 +358,9 @@ impl InputSandbox {
             multiline_input,
             singleline_input,
             use_multiline: true,
-            sample_dropdown,
-            font_dropdown,
-            weight_dropdown,
+            sample_select,
+            font_select,
+            weight_select,
             font_size_slider,
             line_height_slider,
             selected_font: default_font,
@@ -517,13 +527,11 @@ impl Render for InputSandbox {
                     )
                     // Sample text selector (only in multiline mode)
                     .when(self.use_multiline, |this| {
-                        this.child(
-                            sidebar_section("Sample Text").child(self.sample_dropdown.clone()),
-                        )
+                        this.child(sidebar_section("Sample Text").child(self.sample_select.clone()))
                     })
                     // Font section
-                    .child(sidebar_section("Font Family").child(self.font_dropdown.clone()))
-                    .child(sidebar_section("Font Weight").child(self.weight_dropdown.clone()))
+                    .child(sidebar_section("Font Family").child(self.font_select.clone()))
+                    .child(sidebar_section("Font Weight").child(self.weight_select.clone()))
                     // Typography section
                     .child(
                         sidebar_section("Typography")

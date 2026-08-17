@@ -6,7 +6,7 @@ use crate::theme::ControlSize;
 ///
 /// Implemented by every element that can share a row with another control:
 /// `Button`, `IconButton`, `Checkbox`, `Switch`, `Toggle`, `Select`,
-/// `Dropdown`, `Badge`, `Kbd`, `Input`, `Textarea` and `Field`. The rung
+/// `TextField`, `Badge`, `Kbd`, `Input`, `Textarea` and `Field`. The rung
 /// resolves through the theme
 /// ([`Themeable::control`](crate::theme::Themeable::control)), so a control
 /// never names a height of its own.

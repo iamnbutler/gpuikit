@@ -38,6 +38,15 @@ All notable changes to this project will be documented in this file.
   and cached that — the state as if the line had occurred twice — for the next
   line. The line after a JavaScript block comment, a Rust raw string or a Python
   `'''` string lost its highlighting and flattened to one plain colour
+- A loose markdown list — one whose items are separated by a blank line —
+  renders as a list again. CommonMark wraps a loose item's content in a
+  paragraph, and the renderer flushed every paragraph as body text, so every
+  marker, indent and number disappeared and the list was announced to assistive
+  technology as a sequence of paragraphs. A paragraph ending inside an open
+  item is now flushed as that item's row. An item holding several blocks draws
+  its marker once: later blocks reserve the marker's width so their text stays
+  in the item's column, take no ordinal, and are announced as paragraphs rather
+  than inflating the list's item count
 - A markdown list nested under an item no longer swallows that item's text.
   `- x` with an indented `- y` under it rendered as a single row: the nested
   list opened while the parent's text was still buffered, so the child's first

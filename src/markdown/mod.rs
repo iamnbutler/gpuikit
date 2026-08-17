@@ -86,6 +86,12 @@ pub struct Markdown {
     /// [`source`](Self::source) while a parse is in flight.
     parsed_source: SharedString,
     events: Vec<MarkdownEvent>,
+    /// Which code block, if any, the parsed source leaves unclosed, as an
+    /// ordinal among the document's code blocks.
+    ///
+    /// Published together with [`events`](Self::events) so it can never
+    /// describe a different parse than the one being rendered.
+    unclosed_code_block: Option<usize>,
     /// Document-wide text selection, shared with every rendered run.
     selection: MarkdownSelection,
     parse_state: ParseState,
@@ -104,6 +110,23 @@ pub struct Markdown {
 enum ParseState {
     Idle,
     Parsing { dirty: bool },
+}
+
+/// One finished parse: the events, and what the source said about the last
+/// code block.
+///
+/// The two travel together on purpose. A flag published separately from the
+/// events it describes would, for one frame, describe the previous parse.
+struct ParsedDocument {
+    events: Vec<MarkdownEvent>,
+    /// The ordinal — among this document's code blocks, in document order —
+    /// of the block whose fence never closed, if there is one.
+    ///
+    /// That block is rendered as plain monospace: a fence that is still
+    /// arriving is a different cache key on every delta, so highlighting it
+    /// costs a full syntect pass per frame and evicts every settled block's
+    /// entry. It highlights once, and for good, when its closer lands.
+    unclosed_code_block: Option<usize>,
 }
 
 /// Parsed markdown event with source range information.
@@ -128,11 +151,12 @@ impl Markdown {
     pub fn new(source: impl Into<SharedString>, _cx: &mut Context<Self>) -> Self {
         let source: SharedString = source.into();
         let preprocess_partial = true;
-        let events = Self::parse(&source, preprocess_partial);
+        let parsed = Self::parse(&source, preprocess_partial);
         Self {
             parsed_source: source.clone(),
             source,
-            events,
+            events: parsed.events,
+            unclosed_code_block: parsed.unclosed_code_block,
             selection: MarkdownSelection::new(),
             parse_state: ParseState::Idle,
             parse_task: None,
@@ -253,9 +277,9 @@ impl Markdown {
                     cx.background_executor()
                         .spawn(async move { Self::parse(&source, preprocess_partial) })
                 };
-                let events = parse.await;
+                let parsed = parse.await;
 
-                match this.update(cx, |this, cx| this.parse_landed(source, events, cx)) {
+                match this.update(cx, |this, cx| this.parse_landed(source, parsed, cx)) {
                     Ok(Some(next)) => pending = next,
                     // Nothing more to parse, or the document is gone.
                     Ok(None) | Err(_) => break,
@@ -273,10 +297,11 @@ impl Markdown {
     fn parse_landed(
         &mut self,
         parsed_source: SharedString,
-        events: Vec<MarkdownEvent>,
+        parsed: ParsedDocument,
         cx: &mut Context<Self>,
     ) -> Option<(SharedString, bool)> {
-        self.events = events;
+        self.events = parsed.events;
+        self.unclosed_code_block = parsed.unclosed_code_block;
         self.parsed_source = parsed_source;
         cx.notify();
 
@@ -292,7 +317,14 @@ impl Markdown {
         }
     }
 
-    fn parse(source: &str, preprocess_partial: bool) -> Vec<MarkdownEvent> {
+    fn parse(source: &str, preprocess_partial: bool) -> ParsedDocument {
+        // Asked of the *raw* source, before preprocessing: `close_open_syntax`
+        // rewrites inline markers and its output is what the events describe,
+        // but a fence is a property of the text the caller actually appended
+        // to. (mdstitch closes no fences, so the two agree here regardless —
+        // asking the raw source is what keeps that true if it ever starts to.)
+        let fence_open = parser::has_open_code_fence(source);
+
         let source = if preprocess_partial {
             stitch::close_open_syntax(source)
         } else {
@@ -301,13 +333,31 @@ impl Markdown {
 
         let parser = Parser::new_ext(&source, parser::default_options());
 
-        parser
+        let events: Vec<MarkdownEvent> = parser
             .into_offset_iter()
             .map(|(event, range)| MarkdownEvent {
                 event: event.into_static(),
                 source_range: range,
             })
-            .collect()
+            .collect();
+
+        // The ordinal comes from the events rather than from the scan, so the
+        // two can never point at a block the renderer will not reach. A scan
+        // saying "open" with no code block in the events yields `None`.
+        let unclosed_code_block = if fence_open {
+            events
+                .iter()
+                .filter(|event| matches!(event.event, Event::Start(Tag::CodeBlock(_))))
+                .count()
+                .checked_sub(1)
+        } else {
+            None
+        };
+
+        ParsedDocument {
+            events,
+            unclosed_code_block,
+        }
     }
 
     /// Get the parsed events.
@@ -383,6 +433,7 @@ impl RenderOnce for MarkdownElement {
         let document_id = self.element_id();
         let markdown = self.markdown.read(cx);
         let events = markdown.events.clone();
+        let unclosed_code_block = markdown.unclosed_code_block;
         let selection = markdown.selection.clone();
         let style = self.style.clone();
 
@@ -390,7 +441,7 @@ impl RenderOnce for MarkdownElement {
         // dropped and must not be hit-tested.
         selection.begin_frame();
 
-        let renderer = MarkdownRenderer::new(style, selection);
+        let renderer = MarkdownRenderer::new(style, selection, unclosed_code_block);
         renderer.render_events(&events, document_id, cx)
     }
 }
@@ -406,6 +457,16 @@ struct MarkdownRenderer {
     /// The language token of the fence currently open, normalized from its
     /// info string. `None` for an indented block or a bare fence.
     code_block_language: Option<String>,
+    /// The ordinal of the code block the source leaves unclosed, if any —
+    /// see [`ParsedDocument::unclosed_code_block`].
+    unclosed_code_block: Option<usize>,
+    /// How many code blocks this renderer has opened. Counted here rather than
+    /// taken from the parse so that the ordinal is compared against the blocks
+    /// actually being drawn.
+    code_blocks_seen: usize,
+    /// Whether the block currently open is that unclosed one, i.e. whether it
+    /// draws plain.
+    code_block_is_unclosed: bool,
     in_block_quote: bool,
     in_image: Option<ImageContext>,
     list_stack: Vec<ListContext>,
@@ -435,6 +496,14 @@ struct MarkdownRenderer {
     /// landed in — exactly what nesting scrambles.
     #[cfg(test)]
     emitted_list_items: Vec<ListRow>,
+
+    /// The language every code block was flushed with, in document order.
+    ///
+    /// A drawn element reports its height, not its colors, so this is how the
+    /// tests read the plain-versus-highlighted decision. Mirrors
+    /// [`Self::emitted_list_items`].
+    #[cfg(test)]
+    emitted_code_blocks: Vec<Option<String>>,
 }
 
 /// One row `flush_list_item` emitted, as the tests read it.
@@ -473,7 +542,11 @@ struct ItemContext {
 }
 
 impl MarkdownRenderer {
-    fn new(style: MarkdownStyle, selection: MarkdownSelection) -> Self {
+    fn new(
+        style: MarkdownStyle,
+        selection: MarkdownSelection,
+        unclosed_code_block: Option<usize>,
+    ) -> Self {
         Self {
             style,
             selection,
@@ -481,6 +554,9 @@ impl MarkdownRenderer {
             in_heading: None,
             in_code_block: false,
             code_block_language: None,
+            unclosed_code_block,
+            code_blocks_seen: 0,
+            code_block_is_unclosed: false,
             in_block_quote: false,
             in_image: None,
             list_stack: Vec::new(),
@@ -494,6 +570,8 @@ impl MarkdownRenderer {
             active_style: InlineStyle::default(),
             #[cfg(test)]
             emitted_list_items: Vec::new(),
+            #[cfg(test)]
+            emitted_code_blocks: Vec::new(),
         }
     }
 
@@ -558,6 +636,11 @@ impl MarkdownRenderer {
             }
             Tag::CodeBlock(kind) => {
                 self.in_code_block = true;
+                // Compared before the increment, so the flag is set on the
+                // block whose ordinal this is rather than on the next one.
+                self.code_block_is_unclosed =
+                    self.unclosed_code_block == Some(self.code_blocks_seen);
+                self.code_blocks_seen += 1;
                 self.code_block_language =
                     parser::code_block_language(kind).and_then(code_highlight::normalize_language);
             }
@@ -838,9 +921,19 @@ impl MarkdownRenderer {
     }
 
     fn flush_code_block(&mut self, cx: &App) {
-        // Taken before the early return: an empty fence still closes, and its
-        // language must not leak into the next block.
-        let language = self.code_block_language.take();
+        // Both taken before the early return: an empty fence still closes, and
+        // neither its language nor its unclosed-ness must leak into the next
+        // block.
+        //
+        // A block whose fence has not closed yet is drawn with no language,
+        // which is the path a bare fence already takes: no syntect pass, and
+        // no cache entry for text that is about to change. It highlights once
+        // its closer arrives.
+        let is_unclosed = std::mem::take(&mut self.code_block_is_unclosed);
+        let language = self.code_block_language.take().filter(|_| !is_unclosed);
+
+        #[cfg(test)]
+        self.emitted_code_blocks.push(language.clone());
 
         if self.current_text.is_empty() {
             return;
@@ -1158,7 +1251,7 @@ mod tests {
         cx.update(crate::theme::init);
         cx.update(|cx| {
             let mut renderer =
-                MarkdownRenderer::new(MarkdownStyle::default(), MarkdownSelection::new());
+                MarkdownRenderer::new(MarkdownStyle::default(), MarkdownSelection::new(), None);
 
             let fence = |info: &'static str| Tag::CodeBlock(CodeBlockKind::Fenced(info.into()));
 
@@ -1275,11 +1368,11 @@ mod tests {
     /// needed: this reads what `flush_list_item` built, not what it laid out.
     fn emitted_rows(cx: &mut TestAppContext, source: &str) -> Vec<(ItemMarker, usize, String)> {
         cx.update(crate::theme::init);
-        let events = Markdown::parse(source, false);
+        let events = Markdown::parse(source, false).events;
 
         cx.update(|cx: &mut App| {
             let mut renderer =
-                MarkdownRenderer::new(MarkdownStyle::default(), MarkdownSelection::new());
+                MarkdownRenderer::new(MarkdownStyle::default(), MarkdownSelection::new(), None);
             for event in &events {
                 renderer.handle_event(&event.event, cx);
             }
@@ -2022,5 +2115,120 @@ mod tests {
             assert!(!markdown.preprocess_partial());
             assert_eq!(rendered_text(markdown), "A **partially written");
         });
+    }
+
+    // --- a code fence that has not closed yet ---
+    //
+    // A streaming fence is a different cache key on every delta, so
+    // highlighting it costs a full syntect pass per frame and fills the cache
+    // with prefixes that evict every settled block. The fix is to draw it
+    // plain until its closer arrives, which these read as `language == None`
+    // on the block — the same thing a bare fence gets, and the path that skips
+    // syntect entirely.
+
+    /// The language each code block was flushed with, in document order.
+    fn emitted_code_block_languages(cx: &mut TestAppContext, source: &str) -> Vec<Option<String>> {
+        cx.update(crate::theme::init);
+        let parsed = Markdown::parse(source, false);
+
+        cx.update(|cx: &mut App| {
+            let mut renderer = MarkdownRenderer::new(
+                MarkdownStyle::default(),
+                MarkdownSelection::new(),
+                parsed.unclosed_code_block,
+            );
+            for event in &parsed.events {
+                renderer.handle_event(&event.event, cx);
+            }
+            renderer.emitted_code_blocks.clone()
+        })
+    }
+
+    #[gpui::test]
+    fn an_unclosed_fence_is_drawn_plain(cx: &mut TestAppContext) {
+        assert_eq!(
+            emitted_code_block_languages(cx, "```rust\nfn main() {\n"),
+            vec![None],
+            "a fence still arriving must not be highlighted"
+        );
+    }
+
+    #[gpui::test]
+    fn a_closed_fence_keeps_its_language(cx: &mut TestAppContext) {
+        assert_eq!(
+            emitted_code_block_languages(cx, "```rust\nfn main() {}\n```\n"),
+            vec![Some("rust".to_string())],
+            "a settled block highlights, once, forever"
+        );
+    }
+
+    /// Only the block that is actually open loses its language. Earlier blocks
+    /// in the same document are settled and keep theirs.
+    #[gpui::test]
+    fn only_the_open_block_loses_its_language(cx: &mut TestAppContext) {
+        let source = "```rust\nfn a() {}\n```\n\nThen:\n\n```python\ndef b():\n";
+
+        assert_eq!(
+            emitted_code_block_languages(cx, source),
+            vec![Some("rust".to_string()), None],
+        );
+    }
+
+    /// The issue proposed keying this on `stitch::close_open_syntax` returning
+    /// `Cow::Owned`. It cannot be: an open `**bold` after a *settled* fence
+    /// makes that signal fire and would strip a finished block's colors.
+    #[gpui::test]
+    fn an_open_inline_marker_does_not_disturb_a_settled_fence(cx: &mut TestAppContext) {
+        let source = "```rust\nfn a() {}\n```\n\n**bold";
+
+        assert_eq!(
+            emitted_code_block_languages(cx, source),
+            vec![Some("rust".to_string())],
+            "the block closed; what happens after it is not its business"
+        );
+    }
+
+    /// The entity end to end: a fence streamed in through `append` is plain
+    /// for every delta until the closer lands, and highlighted from then on.
+    #[gpui::test]
+    fn a_streamed_fence_highlights_when_it_finishes(cx: &mut TestAppContext) {
+        let deltas = [
+            "Here you go:\n\n",
+            "```ru",
+            "st\n",
+            "fn main() {\n",
+            "    println!(\"hi\");\n",
+            "}\n",
+            "``",
+            "`\n",
+            "\nDone.",
+        ];
+
+        let markdown = document(cx, "");
+
+        for (index, delta) in deltas.iter().enumerate() {
+            markdown.update(cx, |markdown, cx| markdown.append(delta, cx));
+            cx.run_until_parked();
+
+            let source = markdown.read_with(cx, |markdown, _| markdown.source().to_string());
+            let languages = emitted_code_block_languages(cx, &source);
+            let closed = index >= 7;
+
+            if index < 1 {
+                assert!(languages.is_empty(), "no code block yet: {source:?}");
+            } else if closed {
+                assert_eq!(
+                    languages,
+                    vec![Some("rust".to_string())],
+                    "after delta {index} the fence has closed: {source:?}"
+                );
+            } else {
+                assert_eq!(
+                    languages,
+                    vec![None],
+                    "after delta {index} the fence is still open: {source:?}"
+                );
+            }
+        }
     }
 }

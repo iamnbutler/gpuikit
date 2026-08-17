@@ -51,7 +51,7 @@ use gpui::{
 };
 
 use crate::element_id::for_entity;
-use crate::elements::input::input;
+use crate::elements::input::{disabled_display, input};
 use crate::input::InputState;
 use crate::layout::h_stack;
 use crate::theme::{ActiveTheme, ControlSize, Themeable};
@@ -130,6 +130,8 @@ pub struct TextField {
     suffix: Option<Adornment>,
     full_width: bool,
     disabled: bool,
+    /// `None` means "say nothing about read-only" — see [`TextField::read_only`].
+    read_only: Option<bool>,
     size: ControlSize,
     element_id: Option<ElementId>,
 }
@@ -145,6 +147,7 @@ impl TextField {
             suffix: None,
             full_width: false,
             disabled: false,
+            read_only: None,
             size: ControlSize::default(),
             element_id: None,
         }
@@ -191,6 +194,22 @@ impl TextField {
         self.full_width = full_width;
         self
     }
+
+    /// Sets the read-only state: the field refuses every user edit — typing,
+    /// IME composition, paste, cut's removal, the delete family, tab, undo and
+    /// redo — while keeping focus, cursor movement, selection and copy.
+    ///
+    /// **This writes through to the `InputState` it was given**, at the top of
+    /// `render`, for the same reason and with the same scoping as
+    /// [`Textarea::read_only`](crate::elements::textarea::Textarea::read_only).
+    ///
+    /// Without this, `InputState::set_read_only` on a field would produce a
+    /// control that refuses edits while looking exactly like one that takes
+    /// them — the inverse of the bug `disabled` had.
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = Some(read_only);
+        self
+    }
 }
 
 impl Disableable for TextField {
@@ -222,6 +241,15 @@ impl Focusable for TextField {
 impl RenderOnce for TextField {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let element_id = self.element_id();
+
+        // Imposed before anything reads it back, so the chrome and the
+        // enforcement in `InputState` cannot disagree within one frame.
+        if let Some(read_only) = self.read_only {
+            self.state
+                .update(cx, |state, cx| state.set_read_only(read_only, cx));
+        }
+        let read_only = self.state.read(cx).is_read_only();
+
         let theme = cx.theme();
         let metrics = theme.control(self.size);
         let is_focused = self.focus_handle.is_focused(window);
@@ -229,6 +257,8 @@ impl RenderOnce for TextField {
 
         let bg_color = if disabled {
             theme.surface_tertiary()
+        } else if read_only {
+            theme.surface_secondary()
         } else {
             theme.input_bg()
         };
@@ -243,11 +273,13 @@ impl RenderOnce for TextField {
 
         let content = if disabled {
             // A disabled field renders its value as static text. This is the
-            // only layer that can honour `disabled` at all: `InputState` has
-            // no read-only support, and the raw `Input` registers its actions
-            // and its IME handler whenever it is painted — which is why the
-            // old `InputGroup`, which only dimmed a live input, still took
-            // keystrokes.
+            // only layer that can honour `disabled` at all: the raw `Input`
+            // registers its actions and its IME handler whenever it is painted
+            // and is in the tab order — which is why the old `InputGroup`,
+            // which only dimmed a live input, still took keystrokes.
+            // `InputState`'s read-only support closes every editing path but
+            // cannot close focus, so it is the answer to `read_only`, not to
+            // `disabled`.
             let value = self.state.read(cx).content();
             let (text, is_placeholder) = disabled_display(value, self.placeholder.as_ref());
             let color = if is_placeholder {
@@ -299,7 +331,10 @@ impl RenderOnce for TextField {
             .when(disabled, |this| this.cursor_not_allowed().opacity(0.65))
             .when(!disabled, |this| {
                 this.cursor_text()
-                    .when(!is_focused, |this| {
+                    // A hover border invites an edit a read-only field will
+                    // not take. The I-beam stays: the text is still
+                    // selectable.
+                    .when(!is_focused && !read_only, |this| {
                         this.hover(|style| style.border_color(theme.input_border_hover()))
                     })
                     // The whole box focuses the text, including the padding
@@ -318,20 +353,6 @@ impl RenderOnce for TextField {
             .when_some(self.suffix, |this, adornment| {
                 this.child(render_adornment(adornment, disabled, metrics.ink, cx))
             })
-    }
-}
-
-/// What a disabled field shows, and whether it is the placeholder.
-///
-/// Content first, then the placeholder, then nothing — the same fallback a
-/// live input paints, minus the caret.
-fn disabled_display(content: &str, placeholder: Option<&SharedString>) -> (SharedString, bool) {
-    if !content.is_empty() {
-        return (SharedString::from(content.to_string()), false);
-    }
-    match placeholder {
-        Some(placeholder) => (placeholder.clone(), true),
-        None => (SharedString::default(), false),
     }
 }
 
@@ -363,7 +384,68 @@ fn render_adornment(adornment: Adornment, disabled: bool, icon_size: Rems, cx: &
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elements::input::tests::focused_input_window;
     use gpui::TestAppContext;
+
+    /// Draw one field, focused, in its own window, and type into it. Reports
+    /// what the state holds afterwards — the question is whether a keystroke
+    /// lands, not what the field looks like.
+    fn type_into(
+        cx: &mut TestAppContext,
+        build: impl Fn(&Entity<InputState>, &App) -> TextField + 'static,
+        content: &str,
+        keystrokes: &str,
+    ) -> String {
+        let state = cx.update(|cx| cx.new(InputState::new_singleline));
+        let content = content.to_string();
+        state.update(cx, |state, cx| state.set_content(content, cx));
+
+        let for_render = state.clone();
+        let cx = focused_input_window(cx, &state, move |_window, cx| {
+            build(&for_render, cx).into_any_element()
+        });
+
+        cx.run_until_parked();
+        cx.simulate_keystrokes(keystrokes);
+        cx.run_until_parked();
+
+        state.read_with(cx, |state, _| state.content().to_string())
+    }
+
+    #[gpui::test]
+    fn a_disabled_field_does_not_take_a_keystroke(cx: &mut TestAppContext) {
+        let after = type_into(
+            cx,
+            |state, cx| text_field(state, cx).disabled(true),
+            "kept",
+            "x",
+        );
+
+        assert_eq!(after, "kept");
+    }
+
+    /// Without this, `InputState::set_read_only` on a field would produce a
+    /// control that refuses edits while looking exactly like one that takes
+    /// them.
+    #[gpui::test]
+    fn a_read_only_field_does_not_take_a_keystroke(cx: &mut TestAppContext) {
+        let after = type_into(
+            cx,
+            |state, cx| text_field(state, cx).read_only(true),
+            "kept",
+            "x",
+        );
+
+        assert_eq!(after, "kept");
+    }
+
+    /// The check that the harness bites.
+    #[gpui::test]
+    fn an_editable_field_takes_a_keystroke(cx: &mut TestAppContext) {
+        let after = type_into(cx, text_field, "kept", "x");
+
+        assert_eq!(after, "xkept");
+    }
 
     #[gpui::test]
     fn each_field_renders_under_its_own_state(cx: &mut TestAppContext) {

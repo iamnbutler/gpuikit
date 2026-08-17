@@ -44,8 +44,12 @@ is called `DropdownMenu`.
 2. **What the shared popup is called**, and whether it is public. Today
    `DropdownMenu` is public and reachable from both.
 3. **Whether the menu family (`ContextMenu`) and the listbox family share
-   anything.** They should probably share placement (see
-   `docs/issues/portal-adopt-or-delete.md`) and nothing else.
+   anything.** They already share placement, in the only sense that turned out
+   to be worth sharing: both follow `docs/overlays.md` and call
+   `gpui::anchored()` themselves. Note the two want *different* fit modes —
+   a menu at the pointer snaps, a popup under a trigger flips — so even that is
+   a convention rather than a shared implementation. Nothing else should be
+   shared.
 4. **The showcase pages.** One `ELEMENT_COVERAGE` row per module, and a page
    per component that exists after the decision.
 

@@ -163,18 +163,26 @@ mod editor_bridge {
     /// All three matter: the same text under a different theme is a different
     /// answer, which is what makes an app theme toggle re-highlight for free.
     ///
-    /// **Keying on the whole text means a streaming block never hits.** A fence
-    /// arriving through `Markdown::append` is a different key on every delta,
-    /// so it costs a full syntect pass over the whole block-so-far each time —
-    /// quadratic in the block's final length, on the render path. Worse, those
-    /// prefixes are all distinct entries, so one long streamed block can fill
+    /// **Keying on the whole text means a streaming block never hits**, and
+    /// that is handled upstream rather than here. A fence arriving through
+    /// `Markdown::append` used to be a different key on every delta, costing a
+    /// full syntect pass over the whole block-so-far each time — quadratic in
+    /// the block's final length, on the render path — and depositing hundreds
+    /// of prefix entries, so one long streamed block could fill
     /// [`MAX_CACHED_BLOCKS`] by itself and take every other block's entry with
-    /// it when the cache clears. [`MAX_HIGHLIGHT_BYTES`] bounds the individual
-    /// pass and is deliberately checked before the key is built, so an
-    /// oversized block never lands here at all — but it does not bound the
-    /// repetition. Fixing that means an incremental highlighter or a key that
-    /// is a prefix rather than an identity; neither is worth doing before
-    /// there is a profile that says so.
+    /// it when the cache cleared. The renderer now draws a block whose fence
+    /// has not closed yet with no language at all
+    /// (`markdown::has_open_code_fence`), so a streaming block never reaches
+    /// this function and never lands in this map; it highlights once, and
+    /// caches, when its closer arrives.
+    ///
+    /// An identity key is therefore the right key: what gets here is text that
+    /// has settled. [`MAX_HIGHLIGHT_BYTES`] bounds the individual pass and is
+    /// deliberately checked before the key is built, so an oversized block
+    /// never lands here at all. If a consumer ever wants colors *during* a
+    /// stream, the options are the ones this comment always named — an
+    /// incremental highlighter, or a key that is a prefix rather than an
+    /// identity — and neither is worth doing before something asks.
     type CacheKey = (String, String, String);
 
     type Highlights = Vec<(Range<usize>, HighlightStyle)>;

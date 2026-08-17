@@ -140,6 +140,13 @@ pub struct InputState {
     pub(crate) available_height: Pixels,
     pub(crate) available_width: Pixels,
     multiline: bool,
+    /// Whether every *user* path into the content is closed.
+    ///
+    /// Read-only is about what a keystroke can do, not about what the owner
+    /// can do: focus, cursor movement, selection, copy and scrolling all still
+    /// work, and so do the programmatic setters — the same split a browser's
+    /// `readonly` attribute draws.
+    read_only: bool,
     /// Which keystroke fires [`InputStateEvent::Submit`], if any.
     submit_on: Option<SubmitOn>,
     /// Stack of previous states for undo.
@@ -213,6 +220,7 @@ impl InputState {
             available_height: px(0.),
             available_width: px(0.),
             multiline: false,
+            read_only: false,
             submit_on: None,
             undo_stack: Vec::new(),
             cached_utf16_len: None,
@@ -233,6 +241,38 @@ impl InputState {
     /// Returns whether this input allows multiple lines.
     pub fn is_multiline(&self) -> bool {
         self.multiline
+    }
+
+    /// Makes this input read-only: it still takes focus, moves its cursor,
+    /// selects and copies, but no keystroke, IME composition, paste, delete,
+    /// tab, newline, undo or redo can change its content.
+    ///
+    /// Programmatic edits — [`set_content`](Self::set_content),
+    /// [`insert_text`](Self::insert_text), [`delete_backward`](Self::delete_backward),
+    /// [`undo_action`](Self::undo_action), [`redo_action`](Self::redo_action) —
+    /// are deliberately unaffected: they are the owner's API, as script
+    /// assigning to a `readonly` input's value is in a browser.
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
+        self
+    }
+
+    /// Turns read-only on or off after construction.
+    ///
+    /// Returns early when nothing changed, and only notifies when something
+    /// did, so a wrapper element may call this from its `render` every frame:
+    /// the first call settles and the rest are free.
+    pub fn set_read_only(&mut self, read_only: bool, cx: &mut Context<Self>) {
+        if self.read_only == read_only {
+            return;
+        }
+        self.read_only = read_only;
+        cx.notify();
+    }
+
+    /// Returns whether this input refuses user edits — see [`read_only`](Self::read_only).
+    pub fn is_read_only(&self) -> bool {
+        self.read_only
     }
 
     /// Configures which keystroke fires [`InputStateEvent::Submit`].
@@ -321,6 +361,8 @@ impl InputState {
 
     /// Sets the text content, resetting selection to the beginning.
     /// This clears the undo/redo history.
+    ///
+    /// Programmatic, so [`read_only`](Self::read_only) does not apply.
     pub fn set_content(&mut self, content: impl Into<String>, cx: &mut Context<Self>) {
         let content = content.into();
         self.content = if self.multiline {
@@ -398,6 +440,10 @@ impl InputState {
 
     /// Undoes the last edit by applying the reverse patch.
     pub(crate) fn undo(&mut self, _: &Undo, _: &mut Window, cx: &mut Context<Self>) {
+        if self.read_only {
+            return;
+        }
+
         if let Some(entry) = self.undo_stack.pop() {
             // Remember selection to restore
             let selected_range = entry.selected_range.clone();
@@ -420,6 +466,10 @@ impl InputState {
 
     /// Redoes the last undone edit by applying the forward patch.
     pub(crate) fn redo(&mut self, _: &Redo, _: &mut Window, cx: &mut Context<Self>) {
+        if self.read_only {
+            return;
+        }
+
         if let Some(entry) = self.redo_stack.pop() {
             // Apply the redo patch and get the undo patch
             let undo_entry = entry.apply_redo(&mut self.content);
@@ -491,6 +541,11 @@ impl InputState {
     }
 
     /// Inserts text at the current cursor position, replacing any selection.
+    ///
+    /// Deliberately **not** gated by [`read_only`](Self::read_only): this is
+    /// the owner's programmatic API, and read-only is about what the *user*
+    /// can do — the same split as assigning to a `readonly` input's value from
+    /// script in a browser.
     pub fn insert_text(&mut self, text: &str, cx: &mut Context<Self>) {
         let range = self
             .marked_range
@@ -530,6 +585,9 @@ impl InputState {
     }
 
     /// Deletes the character before the cursor (convenience method for benchmarks).
+    ///
+    /// Programmatic, so [`read_only`](Self::read_only) does not apply — unlike
+    /// the `backspace` action, which it does.
     pub fn delete_backward(&mut self, cx: &mut Context<Self>) {
         if self.selected_range.is_empty() {
             self.select_to(self.previous_boundary(self.cursor_offset()), cx);
@@ -538,6 +596,9 @@ impl InputState {
     }
 
     /// Undoes the last edit (convenience method without Window).
+    ///
+    /// Programmatic, so [`read_only`](Self::read_only) does not apply — unlike
+    /// the `undo` action, which it does.
     pub fn undo_action(&mut self, cx: &mut Context<Self>) {
         if let Some(entry) = self.undo_stack.pop() {
             let selected_range = entry.selected_range.clone();
@@ -557,6 +618,9 @@ impl InputState {
     }
 
     /// Redoes the last undone edit (convenience method without Window).
+    ///
+    /// Programmatic, so [`read_only`](Self::read_only) does not apply — unlike
+    /// the `redo` action, which it does.
     pub fn redo_action(&mut self, cx: &mut Context<Self>) {
         if let Some(entry) = self.redo_stack.pop() {
             let undo_entry = entry.apply_redo(&mut self.content);
@@ -765,9 +829,11 @@ impl InputState {
     }
 
     pub(crate) fn enter(&mut self, _: &Enter, window: &mut Window, cx: &mut Context<Self>) {
+        // Submitting is not an edit, so a read-only input still submits;
+        // only the newline is refused.
         if self.submit_on == Some(SubmitOn::Enter) {
             cx.emit(InputStateEvent::Submit);
-        } else if self.multiline {
+        } else if self.multiline && !self.read_only {
             self.replace_text_in_range(None, "\n", window, cx);
         }
     }
@@ -786,16 +852,27 @@ impl InputState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.multiline {
+        if self.multiline && !self.read_only {
             self.replace_text_in_range(None, "\n", window, cx);
         }
     }
 
     pub(crate) fn tab(&mut self, _: &Tab, window: &mut Window, cx: &mut Context<Self>) {
+        if self.read_only {
+            return;
+        }
         self.replace_text_in_range(None, "\t", window, cx);
     }
 
     pub(crate) fn backspace(&mut self, _: &Backspace, window: &mut Window, cx: &mut Context<Self>) {
+        // Guarded here rather than left to `replace_text_in_range`: each of
+        // these *moves the selection* before deleting through it, so a
+        // read-only field would otherwise answer a delete key by silently
+        // eating a grapheme of the user's selection.
+        if self.read_only {
+            return;
+        }
+
         if self.selected_range.is_empty() {
             self.select_to(self.previous_boundary(self.cursor_offset()), cx);
         }
@@ -803,6 +880,14 @@ impl InputState {
     }
 
     pub(crate) fn delete(&mut self, _: &Delete, window: &mut Window, cx: &mut Context<Self>) {
+        // Guarded here rather than left to `replace_text_in_range`: each of
+        // these *moves the selection* before deleting through it, so a
+        // read-only field would otherwise answer a delete key by silently
+        // eating a grapheme of the user's selection.
+        if self.read_only {
+            return;
+        }
+
         if self.selected_range.is_empty() {
             self.select_to(self.next_boundary(self.cursor_offset()), cx);
         }
@@ -815,6 +900,14 @@ impl InputState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        // Guarded here rather than left to `replace_text_in_range`: each of
+        // these *moves the selection* before deleting through it, so a
+        // read-only field would otherwise answer a delete key by silently
+        // eating a grapheme of the user's selection.
+        if self.read_only {
+            return;
+        }
+
         if self.selected_range.is_empty() {
             self.select_to(self.previous_word_boundary(self.cursor_offset()), cx);
         }
@@ -827,6 +920,14 @@ impl InputState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        // Guarded here rather than left to `replace_text_in_range`: each of
+        // these *moves the selection* before deleting through it, so a
+        // read-only field would otherwise answer a delete key by silently
+        // eating a grapheme of the user's selection.
+        if self.read_only {
+            return;
+        }
+
         if self.selected_range.is_empty() {
             self.select_to(self.next_word_boundary(self.cursor_offset()), cx);
         }
@@ -839,6 +940,14 @@ impl InputState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        // Guarded here rather than left to `replace_text_in_range`: each of
+        // these *moves the selection* before deleting through it, so a
+        // read-only field would otherwise answer a delete key by silently
+        // eating a grapheme of the user's selection.
+        if self.read_only {
+            return;
+        }
+
         if self.selected_range.is_empty() {
             self.select_to(self.find_line_start(self.cursor_offset()), cx);
         }
@@ -851,6 +960,14 @@ impl InputState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        // Guarded here rather than left to `replace_text_in_range`: each of
+        // these *moves the selection* before deleting through it, so a
+        // read-only field would otherwise answer a delete key by silently
+        // eating a grapheme of the user's selection.
+        if self.read_only {
+            return;
+        }
+
         if self.selected_range.is_empty() {
             self.select_to(self.find_line_end(self.cursor_offset()), cx);
         }
@@ -858,6 +975,10 @@ impl InputState {
     }
 
     pub(crate) fn paste(&mut self, _: &Paste, window: &mut Window, cx: &mut Context<Self>) {
+        if self.read_only {
+            return;
+        }
+
         if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
             if self.multiline {
                 self.replace_text_in_range(None, &text, window, cx);
@@ -886,11 +1007,18 @@ impl InputState {
     }
 
     pub(crate) fn cut(&mut self, _: &Cut, window: &mut Window, cx: &mut Context<Self>) {
+        // A read-only input still *takes* its text — taking is not an edit —
+        // so cut keeps the copy and drops the removal.
+        let read_only = self.read_only;
+
         if !self.selected_range.is_empty() {
             // Cut selected text
             cx.write_to_clipboard(ClipboardItem::new_string(
                 self.content[self.selected_range.clone()].to_string(),
             ));
+            if read_only {
+                return;
+            }
             self.replace_text_in_range(None, "", window, cx);
         } else {
             // No selection: cut the entire current line (including newline)
@@ -917,6 +1045,10 @@ impl InputState {
 
             let line_text = self.content[cut_start..cut_end].to_string();
             cx.write_to_clipboard(ClipboardItem::new_string(line_text));
+
+            if read_only {
+                return;
+            }
 
             self.selected_range = cut_start..cut_end;
             self.replace_text_in_range(None, "", window, cx);
@@ -1616,6 +1748,14 @@ impl EntityInputHandler for InputState {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        // The backstop, and the only guard that catches plain typing: gpui
+        // hands a character to the focused element's IME handler, not through
+        // an action. Every editing action also funnels through here, so
+        // read-only holds even if a future one forgets to check.
+        if self.read_only {
+            return;
+        }
+
         let range = range_utf16
             .as_ref()
             .map(|range_utf16| self.range_from_utf16(range_utf16))
@@ -1664,6 +1804,12 @@ impl EntityInputHandler for InputState {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        // Where an IME composition lands. Guarded for the same reason as
+        // `replace_text_in_range`.
+        if self.read_only {
+            return;
+        }
+
         let range = range_utf16
             .as_ref()
             .map(|range_utf16| self.range_from_utf16(range_utf16))
@@ -3703,6 +3849,167 @@ mod tests {
 
                 input.undo(&Undo, window, cx);
                 assert_eq!(input.content(), "hello world");
+            });
+        })
+        .unwrap();
+    }
+
+    // ============================================================
+    // READ-ONLY
+    // ============================================================
+    //
+    // Read-only closes every *user* path into the content while leaving
+    // focus, movement, selection, copy, scrolling and the programmatic
+    // setters alone.
+
+    fn create_read_only_input(
+        cx: &mut TestAppContext,
+        content: &str,
+        range: std::ops::Range<usize>,
+    ) -> WindowHandle<TestView> {
+        cx.add_window(|_window, cx| {
+            let input = cx.new(|cx| {
+                let mut input = InputState::new_multiline(cx).read_only(true);
+                input.content = content.to_string();
+                input.selected_range = range;
+                input
+            });
+            TestView { input }
+        })
+    }
+
+    /// Where plain typing actually arrives: gpui hands a character to the
+    /// focused element's IME handler, not through an action.
+    #[gpui::test]
+    fn test_read_only_refuses_typed_text(cx: &mut TestAppContext) {
+        let view = create_read_only_input(cx, "hello", 5..5);
+        view.update(cx, |view, window, cx| {
+            view.input.update(cx, |input, cx| {
+                input.replace_text_in_range(None, "x", window, cx);
+                assert_eq!(input.content(), "hello");
+                assert_eq!(input.selected_range, 5..5);
+            });
+        })
+        .unwrap();
+    }
+
+    #[gpui::test]
+    fn test_read_only_refuses_marked_text(cx: &mut TestAppContext) {
+        let view = create_read_only_input(cx, "hello", 5..5);
+        view.update(cx, |view, window, cx| {
+            view.input.update(cx, |input, cx| {
+                input.replace_and_mark_text_in_range(None, "\u{3053}", None, window, cx);
+                assert_eq!(input.content(), "hello");
+                assert!(input.marked_range().is_none());
+            });
+        })
+        .unwrap();
+    }
+
+    /// Each of these *moves the selection* before deleting through it, so
+    /// they need their own guard: leaning on the funnel would have a
+    /// read-only field answer backspace by silently eating a grapheme of the
+    /// user's selection.
+    #[gpui::test]
+    fn test_read_only_refuses_the_delete_family_without_moving_the_selection(
+        cx: &mut TestAppContext,
+    ) {
+        let view = create_read_only_input(cx, "hello world", 5..5);
+        view.update(cx, |view, window, cx| {
+            view.input.update(cx, |input, cx| {
+                input.backspace(&Backspace, window, cx);
+                input.delete(&Delete, window, cx);
+                input.delete_word_left(&DeleteWordLeft, window, cx);
+                input.delete_word_right(&DeleteWordRight, window, cx);
+                input.delete_to_beginning_of_line(&DeleteToBeginningOfLine, window, cx);
+                input.delete_to_end_of_line(&DeleteToEndOfLine, window, cx);
+                input.tab(&Tab, window, cx);
+                input.enter(&Enter, window, cx);
+                input.insert_newline(&InsertNewline, window, cx);
+
+                assert_eq!(input.content(), "hello world");
+                assert_eq!(
+                    input.selected_range,
+                    5..5,
+                    "a refused delete must not move the selection either"
+                );
+            });
+        })
+        .unwrap();
+    }
+
+    #[gpui::test]
+    fn test_read_only_refuses_paste_and_undo(cx: &mut TestAppContext) {
+        let view = create_read_only_input(cx, "hello", 5..5);
+        view.update(cx, |view, window, cx| {
+            cx.write_to_clipboard(ClipboardItem::new_string(" there".to_string()));
+            view.input.update(cx, |input, cx| {
+                input.paste(&Paste, window, cx);
+                assert_eq!(input.content(), "hello");
+
+                input.undo(&Undo, window, cx);
+                input.redo(&Redo, window, cx);
+                assert_eq!(input.content(), "hello");
+            });
+        })
+        .unwrap();
+    }
+
+    /// Taking text is not an edit, so cut keeps the copy and drops only the
+    /// removal.
+    #[gpui::test]
+    fn test_read_only_cut_copies_without_removing(cx: &mut TestAppContext) {
+        let view = create_read_only_input(cx, "hello world", 0..5);
+        view.update(cx, |view, window, cx| {
+            view.input.update(cx, |input, cx| {
+                input.cut(&Cut, window, cx);
+                assert_eq!(input.content(), "hello world");
+            });
+
+            assert_eq!(
+                cx.read_from_clipboard().and_then(|item| item.text()),
+                Some("hello".to_string()),
+                "cut should still have copied"
+            );
+        })
+        .unwrap();
+    }
+
+    /// Everything read-only is *not* about: moving, selecting, and the
+    /// owner's programmatic API.
+    #[gpui::test]
+    fn test_read_only_still_moves_selects_and_takes_set_content(cx: &mut TestAppContext) {
+        let view = create_read_only_input(cx, "hello world", 5..5);
+        view.update(cx, |view, window, cx| {
+            view.input.update(cx, |input, cx| {
+                input.left(&Left, window, cx);
+                assert_eq!(input.selected_range, 4..4);
+
+                input.select_all(&SelectAll, window, cx);
+                assert_eq!(input.selected_range, 0..11);
+
+                input.set_content("replaced", cx);
+                assert_eq!(input.content(), "replaced");
+
+                input.insert_text("!", cx);
+                assert_eq!(input.content(), "!replaced");
+            });
+        })
+        .unwrap();
+    }
+
+    #[gpui::test]
+    fn test_read_only_can_be_lifted(cx: &mut TestAppContext) {
+        let view = create_read_only_input(cx, "hello", 5..5);
+        view.update(cx, |view, window, cx| {
+            view.input.update(cx, |input, cx| {
+                assert!(input.is_read_only());
+
+                input.set_read_only(false, cx);
+                assert!(!input.is_read_only());
+
+                input.replace_text_in_range(None, "!", window, cx);
+                assert_eq!(input.content(), "hello!");
             });
         })
         .unwrap();

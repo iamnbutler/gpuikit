@@ -39,8 +39,9 @@ component name deliberately.
   one is worse than none.
 - **The overlay.** `Dialog` centres and scrims; a command palette usually wants
   to sit near the top of the window. Whether that is a `Dialog` option or a new
-  placement depends on `docs/issues/portal-adopt-or-delete.md`; do not add a
-  seventh hand-rolled `anchored()`/`deferred()` pair.
+  placement depends on nothing outstanding — follow `docs/overlays.md`, which
+  is the crate's overlay convention, and put the gap on `anchored().offset(…)`
+  rather than on the anchored child.
 - **The keyboard contract is the component.** Focus stays in the query field
   while up/down move the list selection; enter runs the selection; escape
   dismisses. `ContextMenu` already implements a version of this
@@ -59,12 +60,19 @@ there is no platform excuse. See the shared note below.
 ## Blocked on
 
 - `docs/issues/element-roles-convention.md` — before it reports a role.
-- `docs/issues/portal-adopt-or-delete.md` — before it places an overlay.
+- Nothing else. The overlay question is settled: `docs/overlays.md` is the
+  convention to follow when it places one.
 
 ### Accessibility
 
-No element in `src/elements/` reports a role today — `grep -rn '\.role(' src/elements/`
-returns nothing, and the crate's only accessibility work is in `src/markdown/`.
+`src/elements/sidebar.rs` is the only element in `src/elements/` that reports a
+role — it had to, because its own issue's Accessibility section required one,
+and it went ahead of the convention rather than shipping a landmark with no
+role. It is the accidental worked example: read it, and note that `.role()`
+lives on `StatefulInteractiveElement` and is reachable on any `div().id(…)`, so
+a `RenderOnce` does not have to become a real `Element` to report one. Beyond
+that file the crate's accessibility work is all in `src/markdown/`.
+
 gpui builds an `accesskit` node for an element that has *both* an id and an
 `Element::a11y_role`, and it hashes the element's whole id path into the node
 id, so a duplicate id is a `debug_assert!` in debug and a silently missing node

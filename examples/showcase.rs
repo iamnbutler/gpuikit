@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+use gpui::prelude::FluentBuilder;
 use gpui::{
     div, px, size, App, AppContext, Application, Bounds, ClipboardItem, Context, Entity,
     FocusHandle, FontWeight, Hsla, InteractiveElement, IntoElement, Menu, ParentElement, Render,
@@ -38,6 +39,7 @@ use gpuikit::{
         scroll_area::scroll_area,
         select::{select, SelectState},
         separator::separator,
+        sidebar::{sidebar, sidebar_trigger, SidebarEdge, SidebarState},
         slider::{slider, Slider},
         switch::{switch, Switch},
         table::{table, CellAlign, Column, Row, SortDescriptor, SortDirection},
@@ -139,6 +141,19 @@ new one lands, so the document never blanks.
 - Deltas arriving during a parse coalesce into one follow-up parse
 - Build with `--features stitch` to close syntax a half-written document
   leaves open, so `**bold` does not flash as literal asterisks
+
+```rust
+fn main() {
+    let greeting = \"Hello, GPUI!\";
+    for word in greeting.split(' ') {
+        println!(\"{word}\");
+    }
+}
+```
+
+The fence above stays plain monospace while it is still arriving and gains its
+colors the moment it closes: a growing block misses the highlight cache on
+every delta.
 ";
 
 /// Characters per delta, and the gap between them.
@@ -194,6 +209,7 @@ const ELEMENT_COVERAGE: &[(&str, &str)] = &[
     ("scroll_area", "scroll-area"),
     ("select", "dropdown"),
     ("separator", "separator"),
+    ("sidebar", "sidebar"),
     ("slider", "slider"),
     ("switch", "toggle"),
     ("table", "table"),
@@ -214,10 +230,15 @@ const ELEMENT_COVERAGE: &[(&str, &str)] = &[
 /// A `const` rather than a `vec!` rebuilt inside `render`: the rows it produces
 /// are built once, in `Showcase::new`, because `render` runs on every frame and
 /// the sidebar does not change between them.
-const NAV_SECTIONS: &[(&str, &[(&str, &str)])] = &[
-    ("Foundations", &[("control-sizes", "Control Sizes")]),
+const NAV_SECTIONS: &[NavSection] = &[
+    (
+        "Foundations",
+        DefaultIcons::ruler_square,
+        &[("control-sizes", "Control Sizes")],
+    ),
     (
         "Input",
+        DefaultIcons::input,
         &[
             ("button", "Button"),
             ("toggle", "Toggle"),
@@ -230,6 +251,7 @@ const NAV_SECTIONS: &[(&str, &[(&str, &str)])] = &[
     ),
     (
         "Display",
+        DefaultIcons::eye_open,
         &[
             ("avatar", "Avatar"),
             ("badge", "Badge"),
@@ -244,9 +266,11 @@ const NAV_SECTIONS: &[(&str, &[(&str, &str)])] = &[
     ),
     (
         "Layout",
+        DefaultIcons::layout,
         &[
             ("breadcrumb", "Breadcrumb"),
             ("separator", "Separator"),
+            ("sidebar", "Sidebar"),
             ("collapsible", "Collapsible"),
             ("scroll-area", "Scroll Area"),
             ("list", "List"),
@@ -254,6 +278,7 @@ const NAV_SECTIONS: &[(&str, &[(&str, &str)])] = &[
     ),
     (
         "Overlay",
+        DefaultIcons::stack,
         &[
             ("popover", "Popover"),
             ("dialog", "Dialog"),
@@ -261,10 +286,34 @@ const NAV_SECTIONS: &[(&str, &[(&str, &str)])] = &[
             ("toast", "Toast"),
         ],
     ),
-    ("Data", &[("table", "Table")]),
-    ("Content", &[("markdown", "Markdown"), ("editor", "Editor")]),
-    ("System", &[("theme", "Theme"), ("coverage", "Coverage")]),
+    ("Data", DefaultIcons::table, &[("table", "Table")]),
+    (
+        "Content",
+        DefaultIcons::file_text,
+        &[("markdown", "Markdown"), ("editor", "Editor")],
+    ),
+    (
+        "System",
+        DefaultIcons::gear,
+        &[("theme", "Theme"), ("coverage", "Coverage")],
+    ),
 ];
+
+/// One nav section: its label, the glyph its rail row draws when the sidebar
+/// is collapsed, and its pages.
+type NavSection = (
+    &'static str,
+    fn() -> gpui::Svg,
+    &'static [(&'static str, &'static str)],
+);
+
+/// Which section a page belongs to, so the collapsed rail can highlight the
+/// one the current page is in.
+fn section_of(page: &str) -> Option<&'static str> {
+    NAV_SECTIONS
+        .iter()
+        .find_map(|(label, _, items)| items.iter().any(|(id, _)| *id == page).then_some(*label))
+}
 
 /// A prebuilt sidebar row, and the page it selects — `None` for a section
 /// header, which selects nothing.
@@ -282,7 +331,7 @@ struct NavEntry {
 fn nav_entries(active_page: &Rc<RefCell<SharedString>>) -> Vec<NavEntry> {
     let mut entries = Vec::new();
 
-    for (section_label, items) in NAV_SECTIONS {
+    for (section_label, _icon, items) in NAV_SECTIONS {
         entries.push(NavEntry {
             page: None,
             entry: ListEntry::header(*section_label),
@@ -481,6 +530,17 @@ struct Showcase {
     /// The sidebar, built once. `render` clones these and stamps `selected` on
     /// them rather than rebuilding 24 rows per frame.
     nav: Vec<NavEntry>,
+    /// The showcase's own navigation panel. The state lives on the app rather
+    /// than in the component — that is the point of the design.
+    nav_collapsed: bool,
+    /// The demo page's own panel, independent of the one on the left.
+    demo_collapsed: bool,
+    demo_edge: SidebarEdge,
+    /// In rems, which is what `Sidebar::width` takes.
+    demo_width: f32,
+    /// Forces the demo panel to draw as a drawer whatever the window width is,
+    /// so the transition can be seen without resizing.
+    demo_overlay: bool,
     click_count: usize,
     toggled_count: usize,
     size_dropdown: Entity<DropdownState<Size>>,
@@ -520,6 +580,7 @@ struct Showcase {
     text_field_action: Entity<InputState>,
     text_field_composed: Entity<InputState>,
     text_field_disabled: Entity<InputState>,
+    text_field_read_only: Entity<InputState>,
     /// One of each stateful control per rung, for the Control Sizes page.
     /// Indexed by `ControlSize::ALL`.
     control_row_checkboxes: [Entity<Checkbox>; 3],
@@ -529,6 +590,11 @@ struct Showcase {
     control_row_dropdowns: [Entity<DropdownState<Size>>; 3],
     control_row_fields: [Entity<InputState>; 3],
     textarea_example: Entity<InputState>,
+    /// Its own state: sharing the live example's was both a duplicate element
+    /// id and, now that `read_only` writes through to the state, a clobber
+    /// hazard.
+    textarea_disabled: Entity<InputState>,
+    textarea_read_only: Entity<InputState>,
     popover_example: Entity<PopoverState>,
     dialog_example: Entity<DialogState>,
     context_menu_pinned: bool,
@@ -767,6 +833,11 @@ impl Showcase {
         let text_field_action = cx.new(|cx| InputState::new_singleline(cx));
         let text_field_composed = cx.new(|cx| InputState::new_singleline(cx));
         let text_field_disabled = cx.new(|cx| InputState::new_singleline(cx));
+        let text_field_read_only = cx.new(|cx| {
+            let mut state = InputState::new_singleline(cx);
+            state.set_content("gpuikit-0.7.0", cx);
+            state
+        });
         // One of each stateful control per rung. Built here rather than in
         // `render` because `render` runs every frame.
         let control_row_checkboxes = ControlSize::ALL.map(|size| {
@@ -823,6 +894,16 @@ impl Showcase {
         let control_row_fields =
             ControlSize::ALL.map(|_| cx.new(|cx| InputState::new_singleline(cx)));
         let textarea_example = cx.new(|cx| InputState::new_multiline(cx));
+        let textarea_disabled = cx.new(|cx| InputState::new_multiline(cx));
+        let textarea_read_only = cx.new(|cx| {
+            let mut state = InputState::new_multiline(cx);
+            state.set_content(
+                "This one is read-only: select it, copy it, scroll it — but you \
+                 cannot change it.",
+                cx,
+            );
+            state
+        });
 
         let popover_example = cx.new(|_cx| {
             PopoverState::new(
@@ -882,6 +963,11 @@ impl Showcase {
             focus_handle: cx.focus_handle(),
             active_page,
             nav,
+            nav_collapsed: false,
+            demo_collapsed: false,
+            demo_edge: SidebarEdge::Left,
+            demo_width: 13.75,
+            demo_overlay: false,
             click_count: 0,
             toggled_count: 0,
             size_dropdown,
@@ -916,6 +1002,7 @@ impl Showcase {
             text_field_action,
             text_field_composed,
             text_field_disabled,
+            text_field_read_only,
             control_row_checkboxes,
             control_row_switches,
             control_row_toggles,
@@ -923,6 +1010,8 @@ impl Showcase {
             control_row_dropdowns,
             control_row_fields,
             textarea_example,
+            textarea_disabled,
+            textarea_read_only,
             popover_example,
             dialog_example,
             context_menu_pinned: true,
@@ -1552,6 +1641,13 @@ impl Showcase {
                             .placeholder("Unavailable")
                             .disabled(true),
                         theme,
+                    ))
+                    .child(row(
+                        "Read-only:",
+                        // Still focusable and selectable; every edit path is
+                        // refused by `InputState`.
+                        text_field(&self.text_field_read_only, cx).read_only(true),
+                        theme,
                     )),
             )
     }
@@ -1574,12 +1670,31 @@ impl Showcase {
                             ),
                     )
                     .child(
-                        field().label("Disabled").child(
-                            textarea(&self.textarea_example, cx)
+                        // Disabled all the way down: the field dims its own
+                        // label, and the textarea paints static text with no
+                        // live element at all, so it takes neither focus nor
+                        // keystrokes. It clips a long value rather than
+                        // scrolling it — that is the trade for being inert.
+                        field().label("Disabled").disabled(true).child(
+                            textarea(&self.textarea_disabled, cx)
                                 .placeholder("This is disabled...")
                                 .rows(2)
                                 .disabled(true),
                         ),
+                    )
+                    .child(
+                        // Read-only is the other half: still focusable, still
+                        // selectable, still scrollable, and every edit path —
+                        // typing, IME, paste, delete, tab, undo — refused by
+                        // `InputState`.
+                        field()
+                            .label("Read-only")
+                            .description("Focus it, select it, copy it — it will not change")
+                            .child(
+                                textarea(&self.textarea_read_only, cx)
+                                    .rows(2)
+                                    .read_only(true),
+                            ),
                     ),
             )
     }
@@ -1975,6 +2090,186 @@ impl Showcase {
                     .child(separator())
                     .child(div().text_sm().child("Content below")),
             )
+    }
+
+    fn render_sidebar_page(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Colors resolved up front: `List::render` takes `cx` mutably.
+        let theme = cx.theme();
+        let border = theme.border();
+        let fg_muted = theme.fg_muted();
+        let state = SidebarState::from(!self.demo_collapsed);
+        let edge = self.demo_edge;
+
+        // The contents are `List` + `Separator` + `Button` and nothing else —
+        // no menu/group/header sub-components. That composition is the
+        // argument for the component's small scope.
+        let entries = vec![
+            ListEntry::header("Project"),
+            ListEntry::item("sidebar-demo-overview", |_w, _cx| {
+                div().px_2().child("Overview").into_any_element()
+            }),
+            ListEntry::item("sidebar-demo-activity", |_w, _cx| {
+                div().px_2().child("Activity").into_any_element()
+            }),
+            ListEntry::header("Settings"),
+            ListEntry::item("sidebar-demo-members", |_w, _cx| {
+                div().px_2().child("Members").into_any_element()
+            }),
+        ];
+
+        let rail = v_stack()
+            .gap_1()
+            .child(
+                icon_button("sidebar-demo-rail-overview", DefaultIcons::dashboard())
+                    .tooltip(tooltip("Overview")),
+            )
+            .child(
+                icon_button("sidebar-demo-rail-activity", DefaultIcons::activity_log())
+                    .tooltip(tooltip("Activity")),
+            )
+            .child(
+                icon_button("sidebar-demo-rail-members", DefaultIcons::person())
+                    .tooltip(tooltip("Members")),
+            );
+
+        let panel = sidebar("sidebar-demo")
+            .label("Project navigation")
+            .edge(edge)
+            .state(state)
+            .width(gpui::rems(self.demo_width))
+            // The demo box is 320px tall inside a much wider window, so the
+            // window-width breakpoint would never fire here. Forcing it is
+            // what makes the drawer visible without resizing the window — and
+            // it also shows, on purpose, that the drawer is positioned in
+            // *window* coordinates rather than inside this box.
+            .map(|panel| {
+                if self.demo_overlay {
+                    panel.overlay_below(px(100_000.))
+                } else {
+                    panel.never_overlay()
+                }
+            })
+            .on_dismiss(cx.listener(|this, _, _window, cx| {
+                this.demo_overlay = false;
+                cx.notify();
+            }))
+            .rail(rail)
+            .child(
+                h_stack().items_center().justify_between().child(
+                    sidebar_trigger("sidebar-demo-trigger", state)
+                        .edge(edge)
+                        .label("Toggle project navigation")
+                        .on_click(cx.listener(|this, _, _window, cx| {
+                            this.demo_collapsed = !this.demo_collapsed;
+                            cx.notify();
+                        })),
+                ),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .child(List::new("sidebar-demo-list", entries).render(window, cx)),
+            )
+            .child(separator())
+            .child(button("sidebar-demo-action", "New project"));
+
+        let body = div().flex_1().p_4().text_sm().text_color(fg_muted).child(
+            "The panel beside this text is a Sidebar. Collapse it and it becomes a rail \
+                 of icons rather than disappearing; make it overlay and it becomes a \
+                 dismissible drawer with a scrim.",
+        );
+
+        v_stack()
+            .gap_2()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(fg_muted)
+                    .child("Sidebar"),
+            )
+            .child(
+                h_stack()
+                    .gap_2()
+                    .items_center()
+                    .child(
+                        button(
+                            "sidebar-demo-collapse",
+                            if self.demo_collapsed {
+                                "Expand"
+                            } else {
+                                "Collapse"
+                            },
+                        )
+                        .on_click(cx.listener(|this, _, _window, cx| {
+                            this.demo_collapsed = !this.demo_collapsed;
+                            cx.notify();
+                        })),
+                    )
+                    .child(
+                        button(
+                            "sidebar-demo-edge",
+                            if edge == SidebarEdge::Left {
+                                "Dock right"
+                            } else {
+                                "Dock left"
+                            },
+                        )
+                        .on_click(cx.listener(|this, _, _window, cx| {
+                            this.demo_edge = if this.demo_edge == SidebarEdge::Left {
+                                SidebarEdge::Right
+                            } else {
+                                SidebarEdge::Left
+                            };
+                            cx.notify();
+                        })),
+                    )
+                    .child(button("sidebar-demo-wider", "Wider").on_click(cx.listener(
+                        |this, _, _window, cx| {
+                            this.demo_width = (this.demo_width + 2.5).min(25.);
+                            cx.notify();
+                        },
+                    )))
+                    .child(
+                        button("sidebar-demo-narrower", "Narrower").on_click(cx.listener(
+                            |this, _, _window, cx| {
+                                this.demo_width = (this.demo_width - 2.5).max(7.5);
+                                cx.notify();
+                            },
+                        )),
+                    )
+                    .child(
+                        button(
+                            "sidebar-demo-overlay",
+                            if self.demo_overlay {
+                                "Push instead"
+                            } else {
+                                "Show as overlay"
+                            },
+                        )
+                        .on_click(cx.listener(|this, _, _window, cx| {
+                            this.demo_overlay = !this.demo_overlay;
+                            cx.notify();
+                        })),
+                    ),
+            )
+            .child({
+                let frame = h_stack()
+                    .h(px(320.))
+                    .w_full()
+                    .border_1()
+                    .border_color(border)
+                    .rounded_md()
+                    .overflow_hidden();
+
+                // The panel is a flex child on the docked side, which is the
+                // whole of what "push" means.
+                if edge == SidebarEdge::Left {
+                    frame.child(panel).child(body)
+                } else {
+                    frame.child(body).child(panel)
+                }
+            })
     }
 
     fn render_collapsible_page(&self, cx: &Context<Self>) -> impl IntoElement {
@@ -2829,7 +3124,9 @@ impl Showcase {
                     .child(div().text_xs().text_color(theme.fg_muted()).child(
                         "`Markdown::append` extends the source and re-parses off the UI \
                              thread, so the previous parse keeps rendering until the new one \
-                             lands. examples/markdown_streaming.rs streams at frame rate.",
+                             lands. examples/markdown_streaming.rs streams at frame rate. \
+                             Watch the code fence: it draws plain until its closing ``` \
+                             arrives, then highlights once and stays cached.",
                     ))
                     .child(
                         button("markdown-stream", "Stream a reply")
@@ -3214,11 +3511,10 @@ impl Render for Showcase {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let current_page: SharedString = self.active_page.borrow().clone();
 
-        // Capture owned theme colors for sidebar before any mutable borrows
+        // Captured before any mutable borrow. The panel owns its own surface
+        // and border now, so only the window's own two colors are needed here.
         let bg = cx.theme().bg();
         let fg = cx.theme().fg();
-        let border = cx.theme().border();
-        let surface = cx.theme().surface();
 
         // The sidebar was built once in `Showcase::new`; a frame only decides
         // which row is highlighted.
@@ -3232,19 +3528,55 @@ impl Render for Showcase {
             })
             .collect();
 
-        let sidebar = v_stack()
-            .w(px(200.))
-            .min_h_full()
-            .border_r_1()
-            .border_color(border)
-            .bg(surface)
-            .flex_shrink_0()
+        // The acceptance test from the Sidebar issue: the showcase's own
+        // hand-rolled `div`-with-a-border sidebar is now the component, with a
+        // rail and a drawer. Nothing here is a sub-component — the contents
+        // are `List`, the theme `Dropdown`, and `IconButton`s.
+        let nav_state = SidebarState::from(!self.nav_collapsed);
+        let current_section = section_of(&current_page);
+
+        let rail = v_stack()
+            .gap_1()
+            .children(NAV_SECTIONS.iter().map(|(label, icon, items)| {
+                let first = items.first().map(|(id, _)| SharedString::from(*id));
+                let cell = self.active_page.clone();
+
+                icon_button(SharedString::from(format!("nav-rail-{label}")), icon())
+                    .selected(current_section == Some(*label))
+                    .tooltip(tooltip(*label))
+                    .on_click(move |_, window, _cx| {
+                        if let Some(page) = first.clone() {
+                            *cell.borrow_mut() = page;
+                            window.refresh();
+                        }
+                    })
+            }));
+
+        let sidebar_panel = sidebar("showcase-nav")
+            .label("Showcase navigation")
+            .state(nav_state)
+            .width(gpui::rems(12.5))
+            .rail(rail)
+            .on_dismiss(cx.listener(|this, _, _window, cx| {
+                this.nav_collapsed = true;
+                cx.notify();
+            }))
+            .child(
+                h_stack().items_center().justify_between().child(
+                    sidebar_trigger("showcase-nav-trigger", nav_state)
+                        .label("Toggle navigation")
+                        .on_click(cx.listener(|this, _, _window, cx| {
+                            this.nav_collapsed = !this.nav_collapsed;
+                            cx.notify();
+                        })),
+                ),
+            )
             .child(
                 div()
                     .flex_1()
                     .child(List::new("nav-list", entries).render(window, cx)),
             )
-            .child(div().p_2().child(self.theme_dropdown.clone()));
+            .child(self.theme_dropdown.clone());
 
         let content = match current_page.as_ref() {
             "button" => v_stack()
@@ -3298,6 +3630,7 @@ impl Render for Showcase {
             "aspect-ratio" => self.render_aspect_ratio_page(cx).into_any_element(),
             "breadcrumb" => self.render_breadcrumb_page(cx).into_any_element(),
             "separator" => self.render_separator_page(cx).into_any_element(),
+            "sidebar" => self.render_sidebar_page(window, cx).into_any_element(),
             "collapsible" => v_stack()
                 .gap_8()
                 .child(self.render_collapsible_page(cx))
@@ -3322,7 +3655,7 @@ impl Render for Showcase {
             .text_color(fg)
             .size_full()
             .overflow_hidden()
-            .child(sidebar)
+            .child(sidebar_panel)
             .child(
                 div()
                     .id("content-area")

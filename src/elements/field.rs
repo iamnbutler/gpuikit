@@ -119,6 +119,14 @@ impl Disableable for Field {
         self.disabled
     }
 
+    /// Dims this field's own label, description and error, and **nothing
+    /// else**: a field's child is an opaque `AnyElement`, so it cannot reach
+    /// the control inside it. Disable the control too —
+    /// `field().disabled(true).child(textarea(…).disabled(true))`.
+    ///
+    /// Checked deliberately while fixing the disabled `Textarea`, which looked
+    /// inert under an opacity and still took keystrokes: a `Field` puts no
+    /// opacity over its child, so it is not another instance of that bug.
     fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self

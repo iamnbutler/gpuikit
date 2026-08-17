@@ -6,6 +6,19 @@ All notable changes to this project will be documented in this file.
 
 ### Breaking Changes
 
+- `gpuikit::traits::portal` is gone — `Portal`, `PortalPosition`,
+  `AnchorCorner`, `AnchorEdge` and `FitMode` with it. 486 lines of positioning
+  math with zero callers, zero implementors and zero tests, read against all
+  six of this crate's overlay call sites and adopted at none of them:
+  `gpui::anchored()` offers every corner, fit mode and offset `PortalPosition`
+  did — plus edge-centre anchors and `.position()` — and computes them in
+  `prepaint`, where the overlay's measured size and the viewport size exist.
+  Those are exactly the two arguments `calculate_position` demanded from its
+  callers, and no `render()` body has either. Migration: `.offset(point)`
+  becomes `anchored().offset(point)`, and `FitMode::SnapToViewport` becomes
+  `anchored().snap_to_window_with_margin(margin)` — the two calls `Portal`
+  stood in for. The convention that replaces the trait is `docs/overlays.md`,
+  checked by `overlay_coverage` in `src/elements.rs`
 - `InputGroup` is gone, replaced by `TextField`
   (`gpuikit::elements::text_field`). The group drew an addon cell, a stripped
   input and another addon cell as three sibling boxes and spent most of its
@@ -49,6 +62,39 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `Sidebar` (`gpuikit::elements::sidebar`): a panel docked to the left or right
+  edge of the window, with a caller-owned width and expanded/collapsed state.
+  Collapsed is a **rail** of icon controls rather than a `when(open, …)`, which
+  is what makes it more than a conditional; and once the window is narrower
+  than a breakpoint (640px by default, `overlay_below`/`never_overlay` to move
+  or disable it) an expanded panel becomes a dismissible drawer with a scrim,
+  leaving a rail-width gutter behind so the content does not reflow. It ships
+  **no** menu/group/header/footer sub-components — `List` (with
+  `ListEntry::header`), `Separator` and `Button` are the contents, and both the
+  new showcase page and the showcase's own navigation are composed exactly that
+  way, replacing the hand-rolled `div`-with-a-border the showcase used to draw.
+  The one sub-component, `SidebarTrigger`, exists for an accessibility reason:
+  the panel reports `Role::Complementary` with an accessible name, and
+  `aria-expanded` belongs on the control that changes the state. These are the
+  first elements in `src/elements/` to report a role at all — ahead of
+  `docs/issues/element-roles-convention.md`, which could not be honoured
+  without shipping a landmark with no role; that issue now records what this
+  found, and this file is the first thing to migrate if the convention chooses
+  differently. `SidebarLayout::resolve` is a pure function and is where to
+  argue about the push-versus-overlay behaviour. No resizable edge — the width
+  is the caller's and never changes itself
+- `InputState` learns read-only: `read_only(bool)` (builder),
+  `set_read_only(bool, cx)` and `is_read_only()`. It closes every *user* path
+  into the content — typing, IME composition, paste, cut's removal, the delete
+  family, tab, newlines, undo and redo — while leaving focus, cursor movement,
+  selection, copy, scrolling and the programmatic setters
+  (`set_content`, `insert_text`, `delete_backward`, `undo_action`,
+  `redo_action`) alone, the same split a browser's `readonly` attribute draws.
+  The delete family is guarded individually rather than left to the funnel,
+  because each *moves the selection* before deleting through it. `set_read_only`
+  no-ops on an unchanged value, so a wrapper may impose it every frame.
+  `TextField::read_only` is new; `Textarea::read_only` is unchanged in
+  signature and enforced rather than cosmetic — see Fixed
 - `Table` (`gpuikit::elements::table`), with sorting and row selection folded
   in as opt-ins rather than shipped as a second "data table" element. A
   `Column<R>` carries a header, a width, an alignment and a per-cell render
@@ -143,6 +189,50 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- `Textarea::disabled(true)` produces a control that is actually inert. It used
+  to set `opacity(0.65)` over a fully live `text_area()`, so the textarea
+  looked disabled while still taking focus, keystrokes and IME input. A
+  disabled `Textarea` now paints its value as static text with **no live
+  element at all**, which is the only thing that also stops it taking focus —
+  a painted `Input` registers its actions and its IME handler and is in the tab
+  order, so read-only alone cannot implement `disabled`. The consequence to
+  agree with: a disabled textarea *clips* a value longer than its rows instead
+  of scrolling it; `read_only` is the option that keeps scrolling, and the
+  showcase demonstrates both. `TextField` already worked this way and now
+  shares the helper rather than the crate growing a second copy
+- `Textarea::read_only(true)` means something. It was the same lie with
+  different colours — and said so in its own doc comment — and now imposes
+  `InputState`'s new read-only flag. **Behaviour change to note:**
+  `Textarea::read_only` and `TextField::read_only` *write to the `InputState`
+  they are given*, at the top of `render`. That is the only way a
+  wrapper-level property can be enforced, and it is scoped as tightly as it
+  can be: the wrapper field is an `Option<bool>`, so a wrapper that never calls
+  it says nothing and a state its owner made read-only is never quietly handed
+  back. A read-only `Input` also paints no caret — a caret promises that what
+  you type lands there
+- `Dropdown`, `Select` and `Popover` popups no longer hang out of the window by
+  their own gap. Each put its distance from the trigger on the *child* of
+  `anchored()` as a margin, and `Anchored::prepaint` fits the union of its
+  children's **layout** bounds to the window — a margin is outside that union,
+  so gpui clamped each popup into the window correctly and the margin then
+  pushed it straight back out. The gap moves to `anchored().offset(…)`, which
+  is inside what gpui measures. Measured, not theorised: the new test in
+  `dropdown.rs` reported a popup spanning 0px to 244px in a 240px-tall window
+  before the fix
+- **Visible behaviour change.** A markdown code block whose fence has not
+  closed yet is drawn as plain monospace, and gains its syntax colors the
+  moment the closing fence arrives. The highlight cache is keyed on the whole
+  block's text, so a fence streaming in through `Markdown::append` missed it on
+  every delta — a full syntect pass over the block-so-far per rendered frame,
+  quadratic in the block's final length — and deposited one cache entry per
+  prefix, which evicted every settled block in the document when the cache hit
+  its cap. An unclosed block now reaches the code block element with no
+  language, which is the path a bare fence already took: no syntect pass and no
+  cache entry. The consequence to agree with: a *static* document ending in an
+  unclosed fence renders plain forever. New `markdown::has_open_code_fence`, a
+  byte scan of the raw source that is deliberately more eager to close a fence
+  than pulldown-cmark, so every disagreement costs a streaming block an
+  optimization rather than taking a settled block's colors away
 - A focused input no longer swallows `Copy` when it has nothing selected. gpui
   clears `propagate_event` before every bubble-phase listener, so an
   empty-selection `copy` that simply returned was indistinguishable from one

@@ -26,6 +26,7 @@ pub mod radio_group;
 pub mod scroll_area;
 pub mod select;
 pub mod separator;
+pub mod sidebar;
 pub mod slider;
 pub mod switch;
 pub mod table;
@@ -71,7 +72,7 @@ mod triage_coverage {
 
     /// The split the document states in prose. Restated here on purpose:
     /// editing the table without editing the prose fails.
-    const EXPECTED: [(&str, usize); 3] = [("Shipped", 10), ("Issue", 8), ("Rejected", 11)];
+    const EXPECTED: [(&str, usize); 3] = [("Shipped", 11), ("Issue", 7), ("Rejected", 11)];
 
     /// An issue body shorter than this is a stub, and #146 asked for complete
     /// ones — prior art, references, crate gaps, the a11y answer, sizing and
@@ -249,6 +250,171 @@ mod triage_coverage {
                  with better manners"
             );
         }
+    }
+}
+
+/// `docs/overlays.md` is the convention that replaced `src/traits/portal.rs`
+/// (#155): how this crate places an overlay, which fit mode to pick, and what
+/// each `deferred(…).with_priority(n)` layer is.
+///
+/// `portal.rs` survived a year unused because nothing connected its
+/// description of the world to the world. These tests are that connection for
+/// the document that replaced it.
+///
+/// Unlike the modules above, this one reads the element sources from disk
+/// rather than with `include_str!`: what is being discovered is the *set* of
+/// files placing an overlay, which a fixed list of `include_str!`s could not
+/// notice growing.
+#[cfg(test)]
+mod overlay_coverage {
+    use std::collections::BTreeSet;
+    use std::fs;
+    use std::path::PathBuf;
+
+    const OVERLAYS: &str = include_str!("../docs/overlays.md");
+
+    fn repo_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    }
+
+    /// A markdown table's first column, for the table introduced by `anchor`.
+    ///
+    /// Anchored on an HTML comment rather than on "the nth table", copying
+    /// `triage_coverage`'s reasoning: the document has three tables, and
+    /// picking the wrong one would make every assertion below vacuous rather
+    /// than failing.
+    fn first_column(anchor: &str) -> Vec<String> {
+        let start = OVERLAYS
+            .find(anchor)
+            .unwrap_or_else(|| panic!("docs/overlays.md no longer anchors `{anchor}`"));
+
+        OVERLAYS[start..]
+            .lines()
+            .skip_while(|line| !line.starts_with('|'))
+            .take_while(|line| line.starts_with('|'))
+            .filter_map(|line| {
+                let cell = line.trim_matches('|').split('|').next()?.trim();
+                if cell.starts_with("---") {
+                    return None;
+                }
+                Some(cell.to_string())
+            })
+            .skip(1) // the header row
+            .collect()
+    }
+
+    /// Every module under `src/elements/` whose source calls `deferred(` —
+    /// i.e. every module that actually places an overlay.
+    fn modules_placing_an_overlay() -> BTreeSet<String> {
+        let dir = repo_root().join("src/elements");
+        let mut found = BTreeSet::new();
+
+        for entry in fs::read_dir(&dir).expect("src/elements is readable") {
+            let path = entry.expect("directory entry is readable").path();
+            if path.extension().is_none_or(|ext| ext != "rs") {
+                continue;
+            }
+
+            let source = fs::read_to_string(&path).expect("an element module is readable");
+            if !source.contains("deferred(") {
+                continue;
+            }
+
+            found.insert(
+                path.file_stem()
+                    .and_then(|name| name.to_str())
+                    .expect("a module has a name")
+                    .to_string(),
+            );
+        }
+
+        assert!(
+            found.len() >= 4,
+            "only {} modules found to place an overlay — check how the tree is being located \
+             before trusting a green result",
+            found.len(),
+        );
+        found
+    }
+
+    /// Both directions: a new overlay cannot appear without declaring itself
+    /// in the document, and the document cannot go on naming a module that
+    /// stopped placing one.
+    #[test]
+    fn every_overlay_is_written_down() {
+        let placed = modules_placing_an_overlay();
+        let documented: BTreeSet<String> = first_column("<!-- overlay-table -->")
+            .into_iter()
+            .map(|cell| cell.trim_matches('`').to_string())
+            .collect();
+
+        for module in &placed {
+            assert!(
+                documented.contains(module),
+                "`src/elements/{module}.rs` places an overlay but has no row in the overlay \
+                 table in docs/overlays.md — say what it places, and which fit mode and \
+                 priority it uses"
+            );
+        }
+
+        for module in &documented {
+            assert!(
+                placed.contains(module),
+                "docs/overlays.md's overlay table names `{module}`, which no longer calls \
+                 `deferred(`"
+            );
+        }
+    }
+
+    /// Every draw-priority literal in `src/elements/` has to be a rung the
+    /// ladder names, so a seventh layer cannot be invented in passing.
+    #[test]
+    fn every_layer_is_on_the_ladder() {
+        let ladder: BTreeSet<String> = first_column("<!-- priority-ladder -->")
+            .into_iter()
+            .collect();
+
+        let dir = repo_root().join("src/elements");
+        let mut checked = 0;
+
+        for entry in fs::read_dir(&dir).expect("src/elements is readable") {
+            let path = entry.expect("directory entry is readable").path();
+            if path.extension().is_none_or(|ext| ext != "rs") {
+                continue;
+            }
+
+            let source = fs::read_to_string(&path).expect("an element module is readable");
+            for (index, _) in source.match_indices("with_priority(") {
+                let rest = &source[index + "with_priority(".len()..];
+                let priority: String = rest.chars().take_while(char::is_ascii_digit).collect();
+                if priority.is_empty() {
+                    continue;
+                }
+                checked += 1;
+
+                assert!(
+                    ladder.contains(&priority),
+                    "{} draws at priority {priority}, which is not a rung of the ladder in \
+                     docs/overlays.md",
+                    path.display(),
+                );
+            }
+        }
+
+        assert!(
+            checked >= 4,
+            "only {checked} priority literals found — check how the tree is being located \
+             before trusting a green result"
+        );
+    }
+
+    #[test]
+    fn the_deleted_portal_trait_has_not_come_back() {
+        assert!(
+            !repo_root().join("src/traits/portal.rs").exists(),
+            "src/traits/portal.rs is back. If a positioning abstraction is genuinely wanted \
+             now, docs/overlays.md names the trigger and the argument to attack first"
+        );
     }
 }
 

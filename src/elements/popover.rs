@@ -285,9 +285,17 @@ impl Render for PopoverState {
                     .when_some(trigger_element, |this, trigger| this.child(trigger)),
             )
             .when_some(self.panel.clone(), |this, panel| {
+                // The offset goes on the anchored element, not on its child as
+                // a margin: gpui fits the union of the child's *layout bounds*
+                // to the window, and a margin sits outside that union — so a
+                // panel near the window edge was clamped into it and then
+                // pushed straight back out by its own margin. See
+                // `docs/overlays.md`.
                 this.child(
                     deferred(
-                        anchored().child(div().occlude().mt(offset.y).ml(offset.x).child(panel)),
+                        anchored()
+                            .offset(offset)
+                            .child(div().occlude().child(panel)),
                     )
                     .with_priority(1),
                 )

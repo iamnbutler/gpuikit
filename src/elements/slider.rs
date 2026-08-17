@@ -1,5 +1,6 @@
 //! Slider component for gpuikit
 
+use crate::element_id::scoped;
 use crate::layout::{h_stack, v_stack};
 use crate::theme::{ActiveTheme, Themeable};
 use crate::traits::disableable::Disableable;
@@ -210,7 +211,9 @@ impl Render for Slider {
             })
             .child(
                 div()
-                    .id("slider-track-container")
+                    // Was unique only because it sits under the slider's own
+                    // `.id(self.id)`; it derives from that id directly now.
+                    .id(scoped(&self.id, "track"))
                     .relative()
                     .h(thumb_size)
                     .w_full()

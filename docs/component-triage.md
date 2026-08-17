@@ -70,9 +70,10 @@ The two partial entries:
 ## The blocker table, corrected
 
 #146 lists the infrastructure #59's entries were blocked on and marks it
-resolved. One row of that table still does not hold — accessibility roles. The
-overlay row held all along; what was missing was a written convention, and
-that now exists.
+resolved. Every row of that table now holds. The last one that did not —
+accessibility roles — held in the same sense the overlay row did: the
+mechanism existed all along, and what was missing was a written convention.
+Both now exist, in `src/a11y.rs` and `docs/overlays.md`.
 
 | #59's blocker | Status | Evidence |
 |---|---|---|
@@ -81,14 +82,15 @@ that now exists.
 | Keyboard dispatch | Resolved | `src/keymap/`, `src/input/bindings.rs`, and `ContextMenu`'s arrow-key navigation with its own tests |
 | Scrollable/virtualised lists | Resolved | `src/elements/scroll_area.rs`, `src/elements/list.rs` |
 | A shared control size scale | Resolved **by this change** | `src/theme/control.rs` and `src/traits/control_sized.rs`. #59-era components could not state their own metrics; they can now |
-| Accessibility roles | **Not resolved** | `grep -rn '\.role(' src/elements/` returns exactly one module, `sidebar.rs`, which shipped ahead of the convention because its own issue required a landmark. Everything else is in `src/markdown/`. See `docs/issues/element-roles-convention.md` |
+| Accessibility roles | Resolved, and now written down | `src/a11y.rs`: an element implements `traits::accessible::Accessible` and applies the `A11y` it returns with one `.announce(a11y)`. `Button` is the worked example, `sidebar.rs` — which shipped ahead of the convention — has been migrated onto it, and `a11y::tests::no_element_calls_gpuis_a11y_builders_directly` fails the build if anything under `src/` calls gpui's builders directly. The decision record is that module's docs; `docs/issues/element-roles-convention.md` records it against the questions it was asked |
 
-The two unresolved rows are why this triage produces thirteen issue files for
-what is now eight surviving components: three of them are prerequisites rather
-than components, and two — `table.md` and `data-table.md` — have since been
-discharged by one module. Only one of the prerequisites has been settled, and
-not by building it: `element-roles-convention.md` is still open, and still the
-reason `Table` reports no roles.
+The rows that were unresolved when this triage was taken are why it produces
+thirteen issue files for what is now eight surviving components: three of them
+are prerequisites rather than components, and two — `table.md` and
+`data-table.md` — have since been discharged by one module. Two of the three
+prerequisites are now settled: `overlays.md` by deleting the trait it was about,
+and `element-roles-convention.md` by `src/a11y.rs`. `Table` still reports no
+roles, but nothing blocks it now beyond the derived cell ids it needs first.
 
 ## Roster comparison
 
@@ -185,11 +187,12 @@ What was built, against the two issue bodies:
   `TextField` above the table, said in the module docs and demonstrated that way
   on the showcase page. Row virtualisation, column resizing, column visibility
   and multi-column sort are not built, deliberately.
-- **Not built from either: the accessibility roles.**
-  `docs/issues/element-roles-convention.md` is still open and still blocks that
-  half. The roles the element needs are named in its module docs, along with
-  two findings that issue has to decide about — gpui has no `aria_sort`, and
-  `role()` needs an id, which turns body cells into id-minting sites.
+- **Not built from either: the accessibility roles.** The convention that
+  blocked them has since landed (`src/a11y.rs`), and both of the findings this
+  element recorded for it have been answered: gpui still has no `aria_sort`, so
+  a sorted `ColumnHeader` cannot report its direction and that is an upstream
+  ask; and `role()` still needs an id, so the roles wait on derived cell ids.
+  The roles the element needs are named in its module docs.
 
 ## The rejections, argued
 
@@ -267,20 +270,22 @@ exactly this to be recorded when the table landed.
 ## Prerequisites
 
 Three of the triage's outputs are not components. They are decisions that the
-component issues would otherwise each have to invent an answer to. Two are
-still issue bodies under `docs/issues/`; the third has been settled, and its
-answer is now a document in `docs/`.
+component issues would otherwise each have to invent an answer to. One is still
+an issue body under `docs/issues/`; the other two are settled, and their
+answers are `docs/overlays.md` and `src/a11y.rs`.
 
-- **`docs/issues/element-roles-convention.md`** — still open, and now one
-  element ahead of itself. #146 makes the a11y answer a precondition for every
-  new component, so each issue would otherwise pick a different mechanism.
-  Decide it once. `src/elements/table.rs` shipped without roles rather than
-  invent one, and its module docs record the two findings this decision has to
-  cover; `src/elements/sidebar.rs` could not do the same — its own issue's
-  Accessibility section required a `Complementary` landmark — so it shipped
-  with a role and the convention issue has been updated with what that found.
-  If the convention chooses differently, `sidebar.rs` is the first thing to
-  migrate, and it is small.
+- **`docs/issues/element-roles-convention.md`** — **settled.** #146 makes the
+  a11y answer a precondition for every new component, so each issue would
+  otherwise have picked a different mechanism. It is decided once, in
+  `src/a11y.rs`: an element implements `traits::accessible::Accessible` and
+  applies the `A11y` it returns with `.announce(a11y)`, which gpui only offers
+  to an element that already has an id. `Button` is the worked example, and
+  `src/elements/sidebar.rs` — which had shipped a role ahead of the decision,
+  because its own issue's Accessibility section required a `Complementary`
+  landmark — was migrated with it, as that issue said it would have to be.
+  `src/elements/table.rs`, which shipped without roles rather than invent a
+  mechanism, is unblocked; it still needs derived cell ids before it can use
+  one.
 - **`docs/issues/menu-vs-listbox-naming.md`** — `Select` is built on `Dropdown`'s
   internals (`select.rs` imports `DropdownMenu` and `DropdownOption` from
   `dropdown.rs`) and `ELEMENT_COVERAGE` maps both modules to one showcase page.
@@ -345,10 +350,10 @@ Ready to paste:
 > had when the triage was taken; `Table` and `Data Table` have since been built
 > as one module), 11 are rejected with a reason and a named revisit trigger,
 > and 8 have a ready-to-file issue body under `docs/issues/` (plus three
-> prerequisites the triage surfaced — an element role convention, a
-> menu-vs-listbox naming decision, and adopt-or-delete for
-> `src/traits/portal.rs`, since settled by deleting it in favour of
-> [`docs/overlays.md`](../docs/overlays.md)).
+> prerequisites the triage surfaced — an element role convention, since settled
+> by `src/a11y.rs`; a menu-vs-listbox naming decision, still open; and
+> adopt-or-delete for `src/traits/portal.rs`, since settled by deleting it in
+> favour of [`docs/overlays.md`](../docs/overlays.md)).
 >
 > This list was shadcn/ui's roster rather than a decision, and it went stale
 > because nothing connected it to the crate. The replacement is checked by

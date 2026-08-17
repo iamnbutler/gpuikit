@@ -2,6 +2,54 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- `gpuikit::a11y` and `gpuikit::traits::accessible`: one convention for how an
+  element reports an accessibility role, which
+  `docs/issues/element-roles-convention.md` asked for and ten component issues
+  were waiting on. An element implements `Accessible`, returning an `A11y`
+  value — a role, an accessible name, and whatever state goes with the role
+  (`toggled`, `selected`, `expanded`, a text or bounded-number `value`,
+  `orientation`, `level`, `position_in_set`) — and applies it to the root
+  element it was already building with one method, `.announce(a11y)`. Nothing
+  has to become a hand-written `Element`: `Announce` is blanket-implemented for
+  gpui's `StatefulInteractiveElement`, so **"no id, no role" is enforced by the
+  type system** and roles stay out of `src/element_id.rs`'s duplicate-node
+  trap. The accessible name is *required* for the roles in
+  `a11y::role_requires_a_name` — a nameless `Role::Button` is a
+  `debug_assert!`, so `button("save", "")` now panics in debug builds — and it
+  comes from the element's own visible text where it has any, a constructor
+  argument where it has none, and never from the tooltip. That module's docs
+  are the decision record, one section per question the issue asked
+- `Button` is the worked example: it announces `Role::Button` named by its
+  label, so there is no second string to keep in step with it. Its tests read
+  the real `accesskit::Node` back through `a11y::test_support`, which calls the
+  two `Element` methods gpui's own accessibility walk calls — the only way to
+  see a node, since accessibility cannot be switched on in a test
+- `a11y::tests::no_element_calls_gpuis_a11y_builders_directly`: a source scan,
+  modelled on `element_id`'s constant-id scan, that fails the build if anything
+  under `src/` calls gpui's `.role()` / `.aria_*()` builders outside
+  `src/a11y.rs`. If `A11y` lacks a property, the intended move is to add the
+  field and apply it in `Announce::announce`
+
+### Changed
+
+- `Sidebar` and `SidebarTrigger`, which shipped roles ahead of the convention,
+  are migrated onto it — as their issue said they would be if the convention
+  chose differently. Behaviour is unchanged: the panel still reports
+  `Role::Complementary` with its optional name, and `aria-expanded` still sits
+  on the trigger, which the convention now states as a rule ("state goes on the
+  element that changes it"). The markdown document's `Role::Document` moves the
+  same way
+- Two properties this convention deliberately cannot express, because gpui
+  cannot: `disabled` (gpui has no `aria_disabled`; a disabled control is
+  distinguishable only by the `Click` action its node does not offer) and
+  `sort_direction` (no `aria_sort`, the finding `src/elements/table.rs` had
+  recorded). Both are documented as upstream asks at the point the crate would
+  use them, rather than modelled as fields that would silently do nothing
+
 ## [0.8.0] - 2026-08-17
 
 The release that makes streaming markdown depend on a published version rather

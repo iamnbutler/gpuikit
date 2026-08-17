@@ -48,9 +48,11 @@ use gpui::{
     Svg, Window,
 };
 
+use crate::a11y::{A11y, Announce};
 use crate::element_id::scoped;
 use crate::icons::Icons;
 use crate::theme::{ActiveTheme, ControlMetrics, ControlSize, Themeable};
+use crate::traits::accessible::Accessible;
 use crate::traits::clickable::Clickable;
 use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
@@ -347,10 +349,11 @@ impl Sidebar {
     fn region(self, layout: SidebarLayout, metrics: SidebarMetrics, cx: &App) -> Stateful<Div> {
         let theme = cx.theme();
         let expanded = self.state.is_expanded();
+        let a11y = self.a11y();
 
         let mut region = div()
             .id(self.id.clone())
-            .role(Role::Complementary)
+            .announce(a11y)
             .flex()
             .flex_col()
             .flex_none()
@@ -368,14 +371,25 @@ impl Sidebar {
         }
         .border_color(theme.border());
 
-        if let Some(label) = self.label {
-            region = region.aria_label(label);
-        }
-
         if expanded {
             region.children(self.children)
         } else {
             region.children(self.rail)
+        }
+    }
+}
+
+/// A landmark is named by what it contains, so the label stays optional here
+/// — `crate::a11y::role_requires_a_name` does not list `Complementary`. The
+/// expanded state deliberately is *not* reported on the region: it belongs on
+/// [`SidebarTrigger`], the control that changes it.
+impl Accessible for Sidebar {
+    fn a11y(&self) -> A11y {
+        let a11y = A11y::new(Role::Complementary);
+
+        match self.label.clone() {
+            Some(label) => a11y.name(label),
+            None => a11y,
         }
     }
 }
@@ -557,12 +571,31 @@ impl SidebarTrigger {
     }
 }
 
+/// The name has a default rather than being required of the caller, which is
+/// the one liberty this element takes with `crate::a11y`'s section 2: the
+/// glyph is always the same glyph, so "Toggle sidebar" is always true of it.
+/// `aria-expanded` is here rather than on the region because this is the
+/// control that changes the state.
+impl Accessible for SidebarTrigger {
+    fn a11y(&self) -> A11y {
+        A11y::new(Role::Button)
+            .name(
+                self.label
+                    .clone()
+                    .unwrap_or_else(|| "Toggle sidebar".into()),
+            )
+            .expanded(self.state.is_expanded())
+    }
+}
+
 impl RenderOnce for SidebarTrigger {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
         let metrics = theme.control(self.size);
         let glyph = self.glyph();
         let disabled = self.disabled;
+        // Before `self`'s fields are moved into the element below.
+        let a11y = self.a11y();
         let handler = self.handler;
 
         let color = if disabled {
@@ -573,11 +606,7 @@ impl RenderOnce for SidebarTrigger {
 
         div()
             .id(self.id)
-            .role(Role::Button)
-            .aria_label(self.label.unwrap_or_else(|| "Toggle sidebar".into()))
-            // On the trigger rather than the region: this is the control that
-            // changes the state.
-            .aria_expanded(self.state.is_expanded())
+            .announce(a11y)
             .w(metrics.height)
             .h(metrics.height)
             .flex()
@@ -634,6 +663,55 @@ mod tests {
     use crate::elements::separator::separator;
     use crate::theme::ControlScale;
     use gpui::{size, Context, Entity, Render, TestAppContext, VisualTestContext};
+
+    // --- what it announces ---
+
+    /// The migration onto `crate::a11y` is behaviour-preserving: the trigger
+    /// still announces a named button carrying the panel's expanded state.
+    ///
+    /// Only the trigger is checked this way. `Sidebar::render` returns an
+    /// `AnyElement`, which does not forward `a11y_role` to what it wraps, so
+    /// `announced` cannot see the region's landmark — see that helper's docs.
+    /// `Sidebar::a11y` is checked directly instead.
+    #[gpui::test]
+    fn the_trigger_announces_a_named_button_with_its_state(cx: &mut TestAppContext) {
+        cx.update(crate::theme::init);
+        let cx = cx.add_empty_window();
+
+        for (state, expanded) in [
+            (SidebarState::Expanded, true),
+            (SidebarState::Collapsed, false),
+        ] {
+            let announced = cx.update(|window, cx| {
+                crate::a11y::test_support::announced(
+                    sidebar_trigger("nav-toggle", state),
+                    window,
+                    cx,
+                )
+            });
+
+            assert_eq!(announced.role, Some(Role::Button));
+            assert_eq!(announced.name(), Some("Toggle sidebar"));
+            assert_eq!(
+                announced.node.as_ref().and_then(|node| node.is_expanded()),
+                Some(expanded),
+                "the state belongs on the control that changes it"
+            );
+        }
+    }
+
+    #[test]
+    fn the_region_is_a_landmark_named_by_its_label() {
+        let named = sidebar("app-nav").label("Navigation").a11y();
+        assert_eq!(named.role(), Role::Complementary);
+        assert_eq!(named.accessible_name(), Some(&"Navigation".into()));
+
+        // A landmark is named by what it contains, so this is legal — and the
+        // convention's naming rule agrees.
+        let unnamed = sidebar("app-nav").a11y();
+        assert_eq!(unnamed.accessible_name(), None);
+        assert!(!unnamed.is_missing_a_required_name());
+    }
 
     // --- the layout maths, with no window ---
 

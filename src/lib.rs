@@ -53,6 +53,7 @@ use gpui::App;
 use rust_embed::RustEmbed;
 
 // Core modules
+pub mod a11y;
 pub mod element_id;
 pub mod elements;
 pub mod error;

@@ -9,6 +9,7 @@
 //! A 486-line `Portal` trait lived here for a year with zero callers; see that
 //! document for why it could not have had any.
 
+pub mod accessible;
 pub mod button;
 pub mod clickable;
 pub mod control_sized;

@@ -1,8 +1,11 @@
-use crate::theme::{ActiveTheme, Themeable};
-use crate::traits::{clickable::Clickable, disableable::Disableable, selectable::Selectable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::traits::{
+    clickable::Clickable, control_sized::ControlSized, disableable::Disableable,
+    selectable::Selectable,
+};
 use gpui::{
-    prelude::FluentBuilder, px, AnyView, App, ClickEvent, Context, ElementId, Entity,
-    InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, RenderOnce,
+    prelude::FluentBuilder, AnyView, App, ClickEvent, Context, ElementId, Entity,
+    InteractiveElement, IntoElement, MouseButton, ParentElement, Rems, RenderOnce,
     StatefulInteractiveElement, Styled, Svg, Window,
 };
 
@@ -28,12 +31,15 @@ pub struct IconButton {
     /// Called when toggle state changes (only used with internal state)
     on_toggle: Option<Box<dyn Fn(&bool, &mut Window, &mut App) + 'static>>,
     tooltip: Option<Box<dyn Fn(&mut Window, &mut App) -> AnyView + 'static>>,
-    /// Button box width (default 24px)
-    width: Option<Pixels>,
-    /// Button box height (default 24px)
-    height: Option<Pixels>,
-    /// Rendered icon size (default 16px)
-    icon_size: Option<Pixels>,
+    /// The rung this button sits on. Everything below is an override of what
+    /// the rung says.
+    size: ControlSize,
+    /// Button box width, overriding the rung's height.
+    width: Option<Rems>,
+    /// Button box height, overriding the rung's height.
+    height: Option<Rems>,
+    /// Rendered icon size, overriding the rung's ink.
+    icon_size: Option<Rems>,
 }
 
 impl IconButton {
@@ -47,34 +53,41 @@ impl IconButton {
             handler: None,
             on_toggle: None,
             tooltip: None,
+            size: ControlSize::default(),
             width: None,
             height: None,
             icon_size: None,
         }
     }
 
-    /// Set the button box to a square of the given size (default 24px).
-    pub fn size(mut self, size: impl Into<Pixels>) -> Self {
+    /// Force the button box to a square of the given size, overriding the rung.
+    ///
+    /// Named `box_size` rather than `size` because `.size()` read as though it
+    /// set the *control* size; that is [`ControlSized::control_size`] and its
+    /// `.small()` / `.medium()` / `.large()` shorthands, which is what you
+    /// almost always want.
+    pub fn box_size(mut self, size: impl Into<Rems>) -> Self {
         let size = size.into();
         self.width = Some(size);
         self.height = Some(size);
         self
     }
 
-    /// Set the button box width (default 24px).
-    pub fn width(mut self, width: impl Into<Pixels>) -> Self {
+    /// Force the button box width, overriding the rung.
+    pub fn width(mut self, width: impl Into<Rems>) -> Self {
         self.width = Some(width.into());
         self
     }
 
-    /// Set the button box height (default 24px).
-    pub fn height(mut self, height: impl Into<Pixels>) -> Self {
+    /// Force the button box height, overriding the rung.
+    pub fn height(mut self, height: impl Into<Rems>) -> Self {
         self.height = Some(height.into());
         self
     }
 
-    /// Set the rendered icon size within the button (default 16px).
-    pub fn icon_size(mut self, size: impl Into<Pixels>) -> Self {
+    /// Force the rendered icon size within the button, overriding the rung's
+    /// ink.
+    pub fn icon_size(mut self, size: impl Into<Rems>) -> Self {
         self.icon_size = Some(size.into());
         self
     }
@@ -148,6 +161,7 @@ impl RenderOnce for IconButton {
             .unwrap_or_else(|| state.as_ref().map(|s| s.read(cx).toggled).unwrap_or(false));
 
         let theme = cx.theme();
+        let metrics = theme.control(self.size);
         let icon_color = match (is_selected, self.disabled) {
             (true, true) => theme.accent().opacity(0.5),
             (true, false) => theme.accent(),
@@ -161,13 +175,13 @@ impl RenderOnce for IconButton {
 
         gpui::div()
             .id(self.id)
-            .w(self.width.unwrap_or(px(24.)))
-            .h(self.height.unwrap_or(px(24.)))
+            .w(self.width.unwrap_or(metrics.height))
+            .h(self.height.unwrap_or(metrics.height))
             .flex()
             .flex_none()
             .items_center()
             .justify_center()
-            .rounded(px(4.))
+            .rounded(metrics.radius)
             .when(!disabled, |div| {
                 div.hover(|div| div.bg(theme.surface_secondary()))
                     .cursor_pointer()
@@ -200,7 +214,7 @@ impl RenderOnce for IconButton {
             .when_some(self.tooltip, |el, tooltip| el.tooltip(tooltip))
             .child(
                 self.icon
-                    .size(self.icon_size.unwrap_or(px(16.)))
+                    .size(self.icon_size.unwrap_or(metrics.ink))
                     .text_color(icon_color),
             )
     }
@@ -220,6 +234,13 @@ impl Disableable for IconButton {
 
     fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+}
+
+impl ControlSized for IconButton {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
         self
     }
 }

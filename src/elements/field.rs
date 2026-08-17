@@ -1,12 +1,19 @@
 //! Field component for wrapping form inputs with labels, descriptions, and error states.
 
-use crate::theme::{ActiveTheme, Themeable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use crate::traits::labelable::Labelable;
 use gpui::{
-    div, prelude::FluentBuilder, rems, AnyElement, App, IntoElement, ParentElement, RenderOnce,
-    SharedString, Styled, Window,
+    div, prelude::FluentBuilder, rems, AnyElement, App, IntoElement, ParentElement, Rems,
+    RenderOnce, SharedString, Styled, Window,
 };
+
+/// Width of the label column in the beside layout.
+const LABEL_COLUMN_WIDTH: Rems = Rems(8.0);
+
+/// Gap between the label column and the input beside it.
+const LABEL_COLUMN_GAP: Rems = Rems(0.75);
 
 /// Creates a new Field builder.
 pub fn field() -> Field {
@@ -43,6 +50,7 @@ pub struct Field {
     label_position: LabelPosition,
     child: Option<AnyElement>,
     disabled: bool,
+    size: ControlSize,
 }
 
 impl Field {
@@ -56,6 +64,7 @@ impl Field {
             label_position: LabelPosition::default(),
             child: None,
             disabled: false,
+            size: ControlSize::default(),
         }
     }
 
@@ -116,9 +125,17 @@ impl Disableable for Field {
     }
 }
 
+impl ControlSized for Field {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
 impl RenderOnce for Field {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
+        let metrics = theme.control(self.size);
         let has_error = self.error.is_some();
         let disabled = self.disabled;
 
@@ -185,15 +202,23 @@ impl RenderOnce for Field {
                         div()
                             .flex()
                             .items_start()
-                            .gap(rems(0.75))
+                            .gap(LABEL_COLUMN_GAP)
                             .when_some(label_element, |container, label| {
                                 container.child(
                                     div()
                                         .flex()
                                         .flex_col()
+                                        .justify_center()
                                         .gap(rems(0.25))
-                                        .pt(rems(0.5)) // Align with input
-                                        .min_w(rems(8.0))
+                                        // The label's box is exactly the
+                                        // input's box, so the two lines of
+                                        // text centre against each other —
+                                        // rather than the old
+                                        // `pt(rems(0.5)) // Align with input`,
+                                        // which was a guess at a height the
+                                        // input did not declare.
+                                        .min_h(metrics.height)
+                                        .min_w(LABEL_COLUMN_WIDTH)
                                         .child(label)
                                         .when_some(description_element, |this, desc| {
                                             this.child(desc)
@@ -205,11 +230,7 @@ impl RenderOnce for Field {
                             }),
                     )
                     .when_some(error_element, |container, err| {
-                        container.child(
-                            div()
-                                .pl(rems(8.75)) // Align with input (label width + gap)
-                                .child(err),
-                        )
+                        container.child(div().pl(LABEL_COLUMN_WIDTH + LABEL_COLUMN_GAP).child(err))
                     })
             }
         }

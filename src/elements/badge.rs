@@ -1,7 +1,7 @@
-use crate::theme::{ActiveTheme, Themeable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::traits::control_sized::ControlSized;
 use gpui::{
-    div, px, rems, App, FontWeight, IntoElement, ParentElement, RenderOnce, SharedString, Styled,
-    Window,
+    div, App, FontWeight, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
 };
 
 pub fn badge(label: impl Into<SharedString>) -> Badge {
@@ -21,6 +21,7 @@ pub enum BadgeVariant {
 pub struct Badge {
     label: SharedString,
     variant: BadgeVariant,
+    size: ControlSize,
 }
 
 impl Badge {
@@ -28,6 +29,7 @@ impl Badge {
         Badge {
             label: label.into(),
             variant: BadgeVariant::Default,
+            size: ControlSize::default(),
         }
     }
 
@@ -55,6 +57,7 @@ impl Badge {
 impl RenderOnce for Badge {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
+        let metrics = theme.control(self.size);
 
         let (bg, text_color, border_color) = match self.variant {
             BadgeVariant::Default => (theme.accent(), theme.bg(), theme.accent()),
@@ -68,17 +71,30 @@ impl RenderOnce for Badge {
         };
 
         div()
-            .px(rems(0.375))
-            .py(px(2.0))
-            .rounded(rems(0.25))
-            .text_xs()
+            // A declared height, rather than padding plus a line box and
+            // whatever that came to: the badge sits on the same rung as the
+            // controls beside it.
+            .h(metrics.height)
+            .flex()
+            .flex_none()
+            .items_center()
+            .px(metrics.padding_x)
+            .rounded(metrics.radius)
+            .text_size(metrics.text_size)
             .font_weight(FontWeight::SEMIBOLD)
-            .line_height(rems(1.0))
+            .line_height(metrics.line_height)
             .bg(bg)
             .text_color(text_color)
             .border_1()
             .border_color(border_color)
             .whitespace_nowrap()
             .child(self.label)
+    }
+}
+
+impl ControlSized for Badge {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
     }
 }

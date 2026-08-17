@@ -20,6 +20,28 @@ gpuikit = "0.7"
 # gpuikit = { version = "0.7", features = ["stitch"] }
 ```
 
+## Control sizes
+
+Controls that can share a row share one size scale. `ControlSize` names a rung
+— `Small` / `Medium` / `Large`, 16 / 20 / 24px at a 16px root, `Medium` the
+default — and the theme resolves it into every dimension a control needs:
+height, padding, gap, radius, text size, line box, and how much of its box the
+control's graphic fills.
+
+```rust,ignore
+use gpuikit::traits::control_sized::ControlSized;
+
+h_stack()
+    .child(button("save", "Save").large())
+    .child(badge("2").large())
+    .child(text_field(&state, cx).large())
+```
+
+Every control in that list is the same height, because none of them names one:
+the rung does. A theme can rescale the whole set at once through
+`Theme::controls`, and `Themeable::control_scale` is the method to override for
+a custom theme type.
+
 ## Streaming markdown
 
 Markdown parses off the UI thread, and content that arrives a piece at a time

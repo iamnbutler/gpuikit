@@ -20,7 +20,6 @@
 - Field
 - Icon Button
 - Input
-- Input Group
 - Kbd
 - Label
 - List
@@ -34,6 +33,7 @@
 - Slider
 - Switch
 - Tabs
+- Text Field
 - Textarea
 - Toast
 - Toggle
@@ -68,15 +68,15 @@ whoever revives one does not rebuild the same problem.
 
 ## Not Yet Implemented
 
-### Future — Data & Complex
+Every component that was on the old "Deferred" and "Future — Data & Complex"
+lists has been re-triaged against the crate as it stands: see
+[docs/component-triage.md](docs/component-triage.md) for a decision per
+component. Eight had already shipped, eleven are rejected with a reason and a
+named revisit trigger, and ten have a ready-to-file issue body under
+`docs/issues/` — along with three prerequisites the triage surfaced (an element
+role convention, a menu-vs-listbox naming decision, and adopt-or-delete for
+`src/traits/portal.rs`).
 
-- Table — needs grid layout primitives
-- Data Table — Table + sorting/filtering
-- Pagination — pairs with Table
-- Form — state management wrapper around Field
-
-### Deferred (see [#59](https://github.com/iamnbutler/gpuikit/issues/59))
-
-Hover Card, Alert Dialog, Sheet, Drawer, Menubar, Navigation Menu,
-Command, Combobox, Native Select, Resizable, Sidebar, Sonner,
-Calendar, Date Picker, Carousel, Chart, Input OTP
+The lists that used to live here are gone deliberately. Restating a roster in a
+second, uncheckable place is how the old one stayed alive for a year after the
+reasons behind it expired.

@@ -18,7 +18,8 @@ use gpui::{
     TextStyleRefinement, Window, WrappedLine,
 };
 
-use crate::theme::{ActiveTheme, Themeable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::traits::control_sized::ControlSized;
 
 use crate::input::{
     bindings::Escape, ElementInputHandler, InputLineLayout, InputState, TextDirection,
@@ -52,6 +53,7 @@ pub struct Input {
     selection_color: Option<Hsla>,
     cursor_color: Option<Hsla>,
     multiline: bool,
+    size: ControlSize,
 }
 
 impl Input {
@@ -65,6 +67,7 @@ impl Input {
             selection_color: None,
             cursor_color: None,
             multiline,
+            size: ControlSize::default(),
         };
         input.register_actions();
         input.key_context(INPUT_CONTEXT).track_focus(&focus_handle)
@@ -217,6 +220,13 @@ impl Styled for Input {
     }
 }
 
+impl ControlSized for Input {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
 impl InteractiveElement for Input {
     fn interactivity(&mut self) -> &mut Interactivity {
         &mut self.interactivity
@@ -254,13 +264,26 @@ impl Element for Input {
     ) -> (LayoutId, Self::RequestLayoutState) {
         let mut resolved_text_style = None;
         let multiline = self.multiline;
+        let metrics = cx.theme().control(self.size);
 
         // Content text defaults to the theme foreground — the window's
         // inherited style bottoms out at gpui's default (black), which is
         // invisible on dark themes. The element's own text-style refinement
         // is applied on top, so an explicit `.text_color()` still wins.
-        let themed_color = TextStyleRefinement {
+        //
+        // The rung's font size and line box ride along in the same
+        // refinement. That does mean a wrapper's `.text_lg()` no longer
+        // reaches the input — deliberate: a declared height and inherited
+        // text disagree, and the height is the thing a row is aligned on.
+        // `.text_size()` on the element itself still wins, as before.
+        let themed_base = TextStyleRefinement {
             color: Some(cx.theme().fg()),
+            font_size: Some(metrics.text_size.into()),
+            line_height: Some(if multiline {
+                metrics.multiline_line_height().into()
+            } else {
+                metrics.line_height.into()
+            }),
             ..Default::default()
         };
 
@@ -270,7 +293,7 @@ impl Element for Input {
             window,
             cx,
             |element_style, window, cx| {
-                window.with_text_style(Some(themed_color.clone()), |window| {
+                window.with_text_style(Some(themed_base.clone()), |window| {
                     window.with_text_style(element_style.text_style().cloned(), |window| {
                         resolved_text_style = Some(window.text_style());
 
@@ -282,6 +305,13 @@ impl Element for Input {
                             if let Length::Auto = layout_style.size.height {
                                 layout_style.size.height = relative(1.).into();
                             }
+                        } else if let Length::Auto = layout_style.size.height {
+                            // A single-line input paints text and nothing
+                            // else, so it has no children and an `Auto`
+                            // height resolves to zero — a field that is
+                            // invisible until whatever contains it happens to
+                            // set a height. Fall back to the rung.
+                            layout_style.size.height = metrics.height.into();
                         }
                         window.request_layout(layout_style, None, cx)
                     })

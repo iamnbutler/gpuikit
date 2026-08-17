@@ -16,7 +16,6 @@ pub mod empty;
 pub mod field;
 pub mod icon_button;
 pub mod input;
-pub mod input_group;
 pub mod kbd;
 pub mod label;
 pub mod list;
@@ -30,12 +29,18 @@ pub mod separator;
 pub mod slider;
 pub mod switch;
 pub mod tabs;
+pub mod text_field;
 pub mod textarea;
 pub mod toast;
 pub mod toggle;
 pub mod toggle_group;
 pub mod tooltip;
 pub mod typography;
+
+/// Cross-element tests for the shared control size scale — the property no
+/// single element can check from inside itself.
+#[cfg(test)]
+mod control_size_tests;
 
 /// The showcase is where a component is looked at, so an element with no page
 /// in it is an element nobody sees. These two tests cross-check this file

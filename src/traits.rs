@@ -1,5 +1,6 @@
 pub mod button;
 pub mod clickable;
+pub mod control_sized;
 pub mod disableable;
 pub mod labelable;
 pub mod orientable;

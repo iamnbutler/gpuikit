@@ -1,7 +1,14 @@
 //! A trait-based theme system for gpuikit
 //!
-//! The `Themeable` trait defines the color contract that gpuikit components use.
+//! The `Themeable` trait defines the color contract that gpuikit components use,
+//! and — since a control's height is as much a design decision as its colour —
+//! the shared size scale in [`control`].
+//!
 //! Consumers can implement this trait for their own theme types.
+
+pub mod control;
+
+pub use control::{ControlMetrics, ControlScale, ControlSize, TrackMetrics};
 
 use gpui::{hsla, App, Global, Hsla, SharedString};
 use std::sync::Arc;
@@ -199,6 +206,28 @@ pub trait Themeable {
     fn badge_gray(&self) -> Hsla {
         self.fg_muted()
     }
+
+    // === Control sizing ===
+    // Sits beside the colors deliberately: a control's height is a design
+    // decision of the same kind, and putting it anywhere else is how the crate
+    // ended up with five different control heights and no way to change them
+    // together.
+
+    /// The three rungs of the shared control size scale.
+    ///
+    /// Override this to rescale every control at once.
+    fn control_scale(&self) -> ControlScale {
+        ControlScale::default()
+    }
+
+    /// The metrics for one rung — height, padding, gap, radius, text size,
+    /// line box and ink.
+    ///
+    /// This is what an element calls; `control_scale` is what a theme
+    /// overrides.
+    fn control(&self, size: ControlSize) -> ControlMetrics {
+        self.control_scale().metrics(size)
+    }
 }
 
 pub fn init(cx: &mut App) {
@@ -260,6 +289,11 @@ pub struct Theme {
     pub badge_teal_color: Option<Hsla>,
     pub badge_amber_color: Option<Hsla>,
     pub badge_gray_color: Option<Hsla>,
+
+    /// The shared control size scale. Not an `Option`: every theme has one,
+    /// and `ControlScale::default()` is the crate's scale rather than an
+    /// absence of one.
+    pub controls: ControlScale,
 }
 
 impl Themeable for Theme {
@@ -405,6 +439,9 @@ impl Themeable for Theme {
     fn badge_gray(&self) -> Hsla {
         self.badge_gray_color.unwrap_or_else(|| self.fg_muted())
     }
+    fn control_scale(&self) -> ControlScale {
+        self.controls
+    }
 }
 
 impl Theme {
@@ -461,6 +498,7 @@ impl Theme {
             badge_teal_color: None,
             badge_amber_color: None,
             badge_gray_color: None,
+            controls: ControlScale::default(),
         }
     }
 
@@ -768,6 +806,26 @@ mod tests {
         // Derived values should work
         assert_eq!(theme.button_bg(), theme.surface());
         assert_eq!(theme.input_border_focused(), theme.accent());
+    }
+
+    /// A theme's scale has to actually reach the elements. `Themeable::control`
+    /// has a default impl, so this is the wire between `Theme::controls` and
+    /// what a control reads at render time.
+    #[test]
+    fn a_theme_can_rescale_every_control_at_once() {
+        let mut theme = Theme::default();
+        assert_eq!(
+            theme.control(ControlSize::Medium).height.0,
+            ControlScale::default().medium.height.0
+        );
+
+        theme.controls.medium.height = gpui::Rems(2.0);
+        assert_eq!(theme.control(ControlSize::Medium).height.0, 2.0);
+        // The other rungs are untouched by one override.
+        assert_eq!(
+            theme.control(ControlSize::Small).height.0,
+            ControlScale::default().small.height.0
+        );
     }
 
     #[test]

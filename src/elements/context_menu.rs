@@ -35,9 +35,10 @@ use gpui::{
 };
 
 use crate::element_id::scoped;
-use crate::elements::kbd::{kbd, KbdSize};
+use crate::elements::kbd::kbd;
 use crate::icons::Icons;
 use crate::theme::{ActiveTheme, Themeable};
+use crate::traits::control_sized::ControlSized;
 
 /// The id of the open popup of the menu attached to `menu_id`.
 ///
@@ -739,9 +740,7 @@ fn menu_row(row: Row, state: Entity<MenuState>, cx: &App) -> impl IntoElement {
                     this.child(icon().size(px(14.)).text_color(icon_color).flex_shrink_0())
                 })
                 .child(div().flex_1().child(label))
-                .when_some(shortcut, |this, shortcut| {
-                    this.child(kbd(shortcut).size(KbdSize::Small))
-                });
+                .when_some(shortcut, |this, shortcut| this.child(kbd(shortcut).small()));
 
             // Lets a test find where a row was actually laid out, so clicking
             // one does not mean hardcoding the menu's metrics.

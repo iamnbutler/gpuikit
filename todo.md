@@ -15,7 +15,6 @@
 - Collapsible
 - Context Menu
 - Dialog
-- Dropdown Menu
 - Empty
 - Field
 - Icon Button
@@ -28,7 +27,9 @@
 - Progress
 - Radio Group
 - Scroll Area
-- Select
+- Select (the crate's one chooser — `Dropdown` was the same component under a
+  second name and was merged into it, see
+  [docs/menus-and-listboxes.md](docs/menus-and-listboxes.md))
 - Separator
 - Sidebar
 - Slider
@@ -80,14 +81,16 @@ shipped as `src/elements/sidebar.rs` — eleven are rejected with a reason and a
 named revisit trigger, and seven have a
 ready-to-file issue body under `docs/issues/` — along with three prerequisites
 the triage surfaced (an element role convention, a menu-vs-listbox naming
-decision, and adopt-or-delete for `src/traits/portal.rs`). Two are settled: the
-portal trait is deleted and the convention that replaces it is
-[docs/overlays.md](docs/overlays.md), and the role convention is `src/a11y.rs`
+decision, and adopt-or-delete for `src/traits/portal.rs`). All three are
+settled: the portal trait is deleted and the convention that replaces it is
+[docs/overlays.md](docs/overlays.md); the role convention is `src/a11y.rs`
 — an element implements `traits::accessible::Accessible` and applies the `A11y`
-it returns with `.announce(a11y)`, with `Button` as the worked example. `Table`
+it returns with `.announce(a11y)`, with `Button` as the worked example; and the
+naming decision is [docs/menus-and-listboxes.md](docs/menus-and-listboxes.md) —
+`Dropdown` was `Select` under a second name, so it is deleted, `Select` took
+the union of the two APIs, and the popup they shared is now private. `Table`
 still reports no accessibility roles, but now for its own reason rather than a
-missing decision: its cells need derived ids before they can carry one. Only
-the menu-vs-listbox naming decision is still open.
+missing decision: its cells need derived ids before they can carry one.
 
 The lists that used to live here are gone deliberately. Restating a roster in a
 second, uncheckable place is how the old one stayed alive for a year after the

@@ -98,7 +98,7 @@ grep. Every `with_priority` in `src/elements/` must be a rung named here, and
 
 | Priority | Layer |
 | --- | --- |
-| 1 | Popups anchored to a trigger — dropdown, select, popover, context menu |
+| 1 | Popups anchored to a trigger — select, popover, context menu |
 | 2 | Sidebar's drawer and its scrim — above a popup, because a drawer covers the page a popup was opened on |
 | 10 | Dialog, and its scrim |
 | 15 | Toast — above a dialog, because a toast reports the result of what the dialog did |
@@ -110,8 +110,7 @@ grep. Every `with_priority` in `src/elements/` must be a rung named here, and
 | Module | What it places |
 | --- | --- |
 | `dialog` | A centred modal over a full-window scrim. Anchored to nothing — it is `anchored()`-free by design |
-| `dropdown` | A menu hanging one `MENU_GAP` below its trigger |
-| `select` | The same `DropdownMenu`, below the same trigger shape |
+| `select` | A listbox of values hanging one `LISTBOX_GAP` below its trigger |
 | `popover` | A caller-built panel, offset from its trigger by a caller-supplied `Point<Pixels>` |
 | `context_menu` | A menu at the pointer, `snap_to_window_with_margin(8px)` |
 | `sidebar` | A drawer over the whole viewport, `position((0, 0))` + `snap_to_window()`, in place of the in-flow panel once the window is narrower than the breakpoint. Anchored to the *window*, not to a trigger, which is why it positions rather than flips |

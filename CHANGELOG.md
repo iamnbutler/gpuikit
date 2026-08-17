@@ -4,7 +4,62 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- **`gpuikit::elements::dropdown` is gone in full.** `Dropdown`,
+  `DropdownState`, `DropdownChanged`, `DropdownMenu`, `DropdownOption` and
+  `dropdown()` are deleted, and `src/elements/dropdown.rs` with them.
+  `Dropdown` and `Select` were one component under two names — the same
+  bordered trigger with a chevron, the same popup one gap below it, the same
+  `ControlSize`, and `select.rs` importing `DropdownMenu`, `DropdownOption` and
+  `MENU_GAP` *from* `dropdown.rs` to get there. The only behavioural difference
+  was that a `Dropdown`'s selection could not be absent, which is a constructor
+  argument rather than a component. `Select` takes the union of the two APIs:
+
+  | Was | Is |
+  | --- | --- |
+  | `dropdown(id, options, value)` | `select(id, options).selected(value)` |
+  | `DropdownState::new(…)` | `SelectState::new(…)` |
+  | `DropdownChanged` | `SelectChanged` |
+  | `state.selected` (a `T`) | `state.selected` (an `Option<T>`) |
+  | `state.set_selected(value, cx)` | `state.set_selected(Some(value), cx)` |
+  | `DropdownMenu`, `DropdownOption` | no replacement — the popup is private |
+
+  `on_change`, `full_width`, `disabled`, `control_size`, `is_open`,
+  `is_disabled` and `set_disabled` carry over unchanged, and `Select` adds
+  `placeholder` and `clear()`, which a `Dropdown` could not express. 0.8.0's
+  note that `DropdownMenu::build` gained a `ControlSize` argument is now moot:
+  the type it describes no longer exists
+- The popup is **private**. `DropdownMenu` becomes `Listbox`, a private type in
+  `src/elements/select.rs`, and `DropdownOption` — a newtype over
+  `SharedString` — is deleted rather than renamed; the popup takes plain
+  labels. This is the part of the decision that enforces itself: a public popup
+  type is what let one element get built on another's internals in the first
+  place, so the next chooser in this neighbourhood has to either grow
+  `select.rs` or write its own, and both are visible in review.
+  `MENU_GAP` becomes a private `LISTBOX_GAP` for the same reason
+- Element ids and debug selectors move with the names: `dropdown-menu` /
+  `dropdown-option` become `select-listbox` / `select-option`, and the test-only
+  selectors become `gpuikit-select-trigger` / `gpuikit-select-popup`. These are
+  internal, but a consumer that had pinned a test to one would notice
+
 ### Added
+
+- `docs/menus-and-listboxes.md` — the decision record for the above, plus the
+  convention that keeps it: the sentence that separates the two families ("a
+  listbox offers *values* to choose between, and the choice persists; a menu
+  offers *actions* to invoke, and nothing stays selected"), a family table, why
+  `Select` is the name that survived, why the popup is private, what the two
+  families share (placement, via `docs/overlays.md`, and nothing else), the
+  migration table, and what would reopen it. It also reserves the freed name:
+  a future menu-of-actions-from-a-trigger is `DropdownMenu`, built on
+  `context_menu.rs`'s items rather than on `Select`
+- `mod family_coverage` in `src/elements.rs` holds that document to the crate,
+  in the shape `triage_coverage` and `overlay_coverage` already use: every row
+  of the family table names a real `pub mod` and one of the two families, **no
+  module in one family names a module in the other in a Rust path** — the
+  mechanical form of the mistake this change undid — and
+  `src/elements/dropdown.rs` has not come back
 
 - `gpuikit::a11y` and `gpuikit::traits::accessible`: one convention for how an
   element reports an accessibility role, which

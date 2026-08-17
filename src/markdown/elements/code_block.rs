@@ -16,6 +16,11 @@ use super::paragraph::{selection_styled_text, RunContext};
 /// [`init_code_highlighting`](super::super::code_highlight); otherwise, and
 /// for a language syntect has no grammar for, the block renders plain
 /// monospace exactly as before.
+///
+/// The renderer also passes `None` for a block whose fence has not closed yet,
+/// which is why a block gains its colors when it finishes streaming: a growing
+/// block misses the highlight cache on every delta and evicts everything else,
+/// so it takes this same no-syntect path until it settles.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn code_block(
     id: impl Into<ElementId>,

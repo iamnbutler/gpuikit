@@ -139,6 +139,19 @@ new one lands, so the document never blanks.
 - Deltas arriving during a parse coalesce into one follow-up parse
 - Build with `--features stitch` to close syntax a half-written document
   leaves open, so `**bold` does not flash as literal asterisks
+
+```rust
+fn main() {
+    let greeting = \"Hello, GPUI!\";
+    for word in greeting.split(' ') {
+        println!(\"{word}\");
+    }
+}
+```
+
+The fence above stays plain monospace while it is still arriving and gains its
+colors the moment it closes: a growing block misses the highlight cache on
+every delta.
 ";
 
 /// Characters per delta, and the gap between them.
@@ -2829,7 +2842,9 @@ impl Showcase {
                     .child(div().text_xs().text_color(theme.fg_muted()).child(
                         "`Markdown::append` extends the source and re-parses off the UI \
                              thread, so the previous parse keeps rendering until the new one \
-                             lands. examples/markdown_streaming.rs streams at frame rate.",
+                             lands. examples/markdown_streaming.rs streams at frame rate. \
+                             Watch the code fence: it draws plain until its closing ``` \
+                             arrives, then highlights once and stays cached.",
                     ))
                     .child(
                         button("markdown-stream", "Stream a reply")

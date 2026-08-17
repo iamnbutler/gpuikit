@@ -143,6 +143,20 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Visible behaviour change.** A markdown code block whose fence has not
+  closed yet is drawn as plain monospace, and gains its syntax colors the
+  moment the closing fence arrives. The highlight cache is keyed on the whole
+  block's text, so a fence streaming in through `Markdown::append` missed it on
+  every delta — a full syntect pass over the block-so-far per rendered frame,
+  quadratic in the block's final length — and deposited one cache entry per
+  prefix, which evicted every settled block in the document when the cache hit
+  its cap. An unclosed block now reaches the code block element with no
+  language, which is the path a bare fence already took: no syntect pass and no
+  cache entry. The consequence to agree with: a *static* document ending in an
+  unclosed fence renders plain forever. New `markdown::has_open_code_fence`, a
+  byte scan of the raw source that is deliberately more eager to close a fence
+  than pulldown-cmark, so every disagreement costs a streaming block an
+  optimization rather than taking a settled block's colors away
 - A focused input no longer swallows `Copy` when it has nothing selected. gpui
   clears `propagate_event` before every bubble-phase listener, so an
   empty-selection `copy` that simply returned was indistinguishable from one

@@ -870,11 +870,19 @@ impl InputState {
     }
 
     pub(crate) fn copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
-        if !self.selected_range.is_empty() {
-            cx.write_to_clipboard(ClipboardItem::new_string(
-                self.content[self.selected_range.clone()].to_string(),
-            ));
+        if self.selected_range.is_empty() {
+            // Nothing to copy here, so the action is not ours to consume. gpui
+            // clears `propagate_event` before every bubble-phase listener, so
+            // returning without this call would silently swallow the action and
+            // stop anything further out on the focus path from handling it —
+            // a selection elsewhere in the window, for instance.
+            cx.propagate();
+            return;
         }
+
+        cx.write_to_clipboard(ClipboardItem::new_string(
+            self.content[self.selected_range.clone()].to_string(),
+        ));
     }
 
     pub(crate) fn cut(&mut self, _: &Cut, window: &mut Window, cx: &mut Context<Self>) {
@@ -1793,8 +1801,11 @@ impl Focusable for InputState {
 mod tests {
     use super::*;
     use gpui::{
-        div, AppContext, Entity, IntoElement, Render, TestAppContext, TextStyle, WindowHandle,
+        div, AppContext, Entity, InteractiveElement, IntoElement, ParentElement, Render,
+        TestAppContext, TextStyle, WindowHandle,
     };
+    use std::cell::Cell;
+    use std::rc::Rc;
 
     struct TestView {
         input: Entity<InputState>,
@@ -1820,6 +1831,60 @@ mod tests {
             });
             TestView { input }
         })
+    }
+
+    /// A real `Input` under a `div` that handles `Copy`, so the action travels
+    /// the actual dispatch tree. `TestView` cannot serve here: it renders a
+    /// bare `div()`, so no input element is ever in the tree.
+    struct OuterCopyView {
+        input: Entity<InputState>,
+        outer_ran: Rc<Cell<bool>>,
+    }
+
+    impl Render for OuterCopyView {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let outer_ran = self.outer_ran.clone();
+            div()
+                .on_action::<Copy>(move |_, _, _| outer_ran.set(true))
+                .child(crate::elements::input::text_area(&self.input, cx))
+        }
+    }
+
+    /// Focuses a rendered input holding `"hello world"` with `range` selected,
+    /// dispatches `Copy` at it, and reports whether the handler *outside* the
+    /// input ran.
+    fn dispatch_copy_at_focused_input(
+        cx: &mut TestAppContext,
+        range: std::ops::Range<usize>,
+    ) -> bool {
+        // Rendering any real element needs the theme bound, or `cx.theme()`
+        // panics on the unbound global. Only the theme, not all of
+        // `gpuikit::init`, which would bind keys these tests do not want.
+        cx.update(crate::theme::init);
+
+        let outer_ran = Rc::new(Cell::new(false));
+        let (view, cx) = cx.add_window_view({
+            let outer_ran = outer_ran.clone();
+            move |_window, cx| {
+                let input = cx.new(|cx| {
+                    let mut input = InputState::new_multiline(cx);
+                    input.content = "hello world".to_string();
+                    input.selected_range = range;
+                    input
+                });
+                OuterCopyView { input, outer_ran }
+            }
+        });
+
+        cx.update(|window, cx| {
+            let handle = view.read(cx).input.focus_handle(cx);
+            window.focus(&handle, cx);
+        });
+        cx.run_until_parked();
+
+        cx.dispatch_action(Copy);
+
+        outer_ran.get()
     }
 
     fn create_test_input_with_layout(
@@ -2285,6 +2350,51 @@ mod tests {
 
         let clipboard = cx.read_from_clipboard();
         assert!(clipboard.is_some());
+        assert_eq!(clipboard.unwrap().text().as_deref(), Some("world"));
+    }
+
+    /// Propagating must not also clobber the clipboard: an input with nothing
+    /// selected has to leave whatever is there alone.
+    #[gpui::test]
+    fn test_copy_without_selection_leaves_the_clipboard_alone(cx: &mut TestAppContext) {
+        let view = create_test_input(cx, "hello world", 3..3);
+        cx.write_to_clipboard(ClipboardItem::new_string("untouched".to_string()));
+
+        view.update(cx, |view, window, cx| {
+            view.input.update(cx, |input, cx| {
+                input.copy(&Copy, window, cx);
+            });
+        })
+        .unwrap();
+
+        let clipboard = cx.read_from_clipboard();
+        assert_eq!(clipboard.unwrap().text().as_deref(), Some("untouched"));
+    }
+
+    /// The regression test. It has to go through a real dispatch — calling
+    /// `copy` directly sets `propagate_event` for nobody to read — so it
+    /// renders an actual `Input` inside a `div` that handles `Copy` and
+    /// dispatches at the focused input.
+    #[gpui::test]
+    fn test_copy_without_selection_reaches_the_outer_handler(cx: &mut TestAppContext) {
+        let outer_ran = dispatch_copy_at_focused_input(cx, 3..3);
+        assert!(
+            outer_ran,
+            "an input with no selection swallowed Copy instead of propagating it"
+        );
+    }
+
+    /// The other half: an input that does have a selection still consumes the
+    /// action, exactly as before.
+    #[gpui::test]
+    fn test_copy_with_selection_stops_at_the_input(cx: &mut TestAppContext) {
+        let outer_ran = dispatch_copy_at_focused_input(cx, 6..11);
+
+        assert!(
+            !outer_ran,
+            "an input with a selection let Copy escape to the outer handler"
+        );
+        let clipboard = cx.read_from_clipboard();
         assert_eq!(clipboard.unwrap().text().as_deref(), Some("world"));
     }
 

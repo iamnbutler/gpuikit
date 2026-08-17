@@ -7,13 +7,190 @@ use crate::traits::disableable::Disableable;
 use crate::traits::labelable::Labelable;
 use crate::traits::selectable::Selectable;
 use gpui::{
-    div, prelude::*, px, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
+    div, prelude::*, px, App, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
+    MouseButton, ParentElement, Render, RenderOnce, SharedString, StatefulInteractiveElement,
+    Styled, Window,
 };
 
 /// Event emitted when the checkbox state changes
 pub struct CheckboxChanged {
     pub checked: bool,
+}
+
+/// The three states the box itself can be drawn in.
+///
+/// `Checkbox` carries `checked` and `indeterminate` as two booleans for
+/// backwards compatibility; this is the same information as one value, and it
+/// is what a caller that draws boxes it does not own — a table's selection
+/// column — passes to [`checkbox_box`].
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum CheckState {
+    /// Nothing this box stands for is checked.
+    #[default]
+    Unchecked,
+    /// Everything this box stands for is checked.
+    Checked,
+    /// Some but not all of it is. Drawn as a bar rather than a tick.
+    Indeterminate,
+}
+
+impl CheckState {
+    /// The state a box standing for `total` things of which `selected` are
+    /// checked should be drawn in.
+    ///
+    /// Zero of zero is `Unchecked`: a box over nothing is not "all of it".
+    pub fn from_count(selected: usize, total: usize) -> Self {
+        if selected == 0 || total == 0 {
+            CheckState::Unchecked
+        } else if selected >= total {
+            CheckState::Checked
+        } else {
+            CheckState::Indeterminate
+        }
+    }
+
+    /// What a click on a box in this state asks for.
+    ///
+    /// Indeterminate becomes `Checked` rather than `Unchecked` — the
+    /// convention every platform toolkit follows, on the reasoning that a
+    /// partial selection was arrived at by adding rather than by removing.
+    pub fn toggled(self) -> Self {
+        match self {
+            CheckState::Checked => CheckState::Unchecked,
+            CheckState::Unchecked | CheckState::Indeterminate => CheckState::Checked,
+        }
+    }
+
+    /// Whether this state reads as "on" to a caller storing a bool.
+    pub fn is_checked(self) -> bool {
+        matches!(self, CheckState::Checked)
+    }
+
+    /// Whether this state is the partial one.
+    pub fn is_indeterminate(self) -> bool {
+        matches!(self, CheckState::Indeterminate)
+    }
+}
+
+/// The box a checkbox draws, without the row, the label or the click handling.
+///
+/// `Checkbox` is an entity, so an element that draws one box per row — a
+/// table's selection column — cannot mint one per frame. Without this it would
+/// draw its own approximation of the box instead, which is exactly the drift
+/// [`ControlMetrics::track`](crate::theme::ControlMetrics::track) exists to
+/// prevent for `Switch` and `Toggle`. `Checkbox::render` goes through this, so
+/// there is one box in the crate.
+#[derive(IntoElement)]
+pub struct CheckboxBox {
+    state: CheckState,
+    disabled: bool,
+    size: ControlSize,
+}
+
+impl CheckboxBox {
+    /// A box in the given state, on the default rung.
+    pub fn new(state: CheckState) -> Self {
+        Self {
+            state,
+            disabled: false,
+            size: ControlSize::default(),
+        }
+    }
+
+    /// Draws the box in its disabled colours. Does not affect interaction —
+    /// the box has none; that belongs to whatever contains it.
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+}
+
+/// Convenience function to create a bare checkbox box.
+pub fn checkbox_box(state: CheckState) -> CheckboxBox {
+    CheckboxBox::new(state)
+}
+
+impl ControlSized for CheckboxBox {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
+impl RenderOnce for CheckboxBox {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme();
+        let metrics = theme.control(self.size);
+        let disabled = self.disabled;
+        let checked = self.state.is_checked();
+        let indeterminate = self.state.is_indeterminate();
+
+        // The row is the rung; the box is the ink inside it. Sizing the row
+        // off the box is what put the checkbox on a rung of its own.
+        let box_size = metrics.ink;
+
+        let box_bg = if disabled {
+            theme.surface_tertiary()
+        } else if checked || indeterminate {
+            theme.accent()
+        } else {
+            theme.surface()
+        };
+
+        let box_border = if disabled {
+            theme.border_subtle()
+        } else if checked || indeterminate {
+            theme.accent()
+        } else {
+            theme.border()
+        };
+
+        let check_color = if disabled {
+            theme.fg_disabled()
+        } else {
+            theme.surface()
+        };
+
+        div()
+            .size(box_size)
+            .flex_none()
+            .flex()
+            .items_center()
+            .justify_center()
+            .bg(box_bg)
+            .border_1()
+            .border_color(box_border)
+            .rounded(metrics.radius)
+            .when(!disabled, |this| {
+                this.hover(|style| {
+                    style.border_color(if checked || indeterminate {
+                        theme.accent()
+                    } else {
+                        theme.border_secondary()
+                    })
+                })
+            })
+            .when(checked && !indeterminate, |this| {
+                // The glyph sizes off the box, not off a constant, so it stays
+                // proportional on every rung.
+                this.child(
+                    div()
+                        .text_size(box_size * 0.75)
+                        .line_height(box_size)
+                        .text_color(check_color)
+                        .child("✓"),
+                )
+            })
+            .when(indeterminate, |this| {
+                this.child(
+                    div()
+                        .w(box_size * 0.5)
+                        .h(px(2.))
+                        .bg(check_color)
+                        .rounded(px(1.)),
+                )
+            })
+    }
 }
 
 /// A checkbox component for toggling boolean values
@@ -89,35 +266,15 @@ impl Render for Checkbox {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         let metrics = theme.control(self.size);
-        let checked = self.checked;
         let disabled = self.disabled;
-        let indeterminate = self.indeterminate;
         let label = self.label.clone();
 
-        // The row is the rung; the box is the ink inside it. Sizing the row
-        // off the box is what put the checkbox on a rung of its own.
-        let box_size = metrics.ink;
-
-        let box_bg = if disabled {
-            theme.surface_tertiary()
-        } else if checked || indeterminate {
-            theme.accent()
+        let state = if self.indeterminate {
+            CheckState::Indeterminate
+        } else if self.checked {
+            CheckState::Checked
         } else {
-            theme.surface()
-        };
-
-        let box_border = if disabled {
-            theme.border_subtle()
-        } else if checked || indeterminate {
-            theme.accent()
-        } else {
-            theme.border()
-        };
-
-        let check_color = if disabled {
-            theme.fg_disabled()
-        } else {
-            theme.surface()
+            CheckState::Unchecked
         };
 
         h_stack()
@@ -136,45 +293,9 @@ impl Render for Checkbox {
             })
             .when(disabled, |this| this.cursor_not_allowed().opacity(0.65))
             .child(
-                div()
-                    .size(box_size)
-                    .flex_none()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .bg(box_bg)
-                    .border_1()
-                    .border_color(box_border)
-                    .rounded(metrics.radius)
-                    .when(!disabled, |this| {
-                        this.hover(|style| {
-                            style.border_color(if checked || indeterminate {
-                                theme.accent()
-                            } else {
-                                theme.border_secondary()
-                            })
-                        })
-                    })
-                    .when(checked && !indeterminate, |this| {
-                        // The glyph sizes off the box, not off a constant, so
-                        // it stays proportional on every rung.
-                        this.child(
-                            div()
-                                .text_size(box_size * 0.75)
-                                .line_height(box_size)
-                                .text_color(check_color)
-                                .child("✓"),
-                        )
-                    })
-                    .when(indeterminate, |this| {
-                        this.child(
-                            div()
-                                .w(box_size * 0.5)
-                                .h(px(2.))
-                                .bg(check_color)
-                                .rounded(px(1.)),
-                        )
-                    }),
+                checkbox_box(state)
+                    .disabled(disabled)
+                    .control_size(self.size),
             )
             .when_some(label, |this, label| {
                 this.child(

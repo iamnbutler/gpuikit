@@ -49,6 +49,28 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `Table` (`gpuikit::elements::table`), with sorting and row selection folded
+  in as opt-ins rather than shipped as a second "data table" element. A
+  `Column<R>` carries a header, a width, an alignment and a per-cell render
+  closure returning any element; a header stays put over a body that `max_h`
+  caps and scrolls; cells wrap. The data-view state stays with the caller: the
+  table is handed rows that are already filtered and already sorted plus the
+  `SortDescriptor` describing how, and reports `SortRequest` / `SelectRequest`
+  / `SelectAllRequest` back, so nothing moves until the caller moves it. The
+  header checkbox selects all — with `Checkbox`'s indeterminate middle state —
+  only for a caller that asked for it with `on_select_all`, because "all" is
+  only meaningful where the caller's table has all the rows. Filtering is a
+  `TextField` above the table, not a table feature. `ColumnWidth` has `Flex`
+  and `Fixed` arms and no content-sized one; see its doc comment for why that
+  needs a hand-written element. No accessibility roles yet — the convention
+  they need has not landed, and the element's module docs record what it will
+  need and two findings that decision has to cover
+- `CheckState` and `checkbox_box()` (`gpuikit::elements::checkbox`): the box a
+  checkbox draws, without the row, the label or the click handling, plus the
+  three-state value and its `from_count` / `toggled` rules. `Checkbox` is an
+  entity, so an element drawing one box per row cannot mint one per frame;
+  `Checkbox::render` goes through the same box, so there is only one of them in
+  the crate. `Checkbox`'s own API and rendering are unchanged
 - A shared control size scale, in `gpuikit::theme::control`. `ControlSize`
   names a rung — `Small` / `Medium` / `Large`, 16 / 20 / 24px at a 16px root,
   `Medium` the default — and `Themeable::control` resolves it into a
@@ -121,6 +143,14 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- A focused input no longer swallows `Copy` when it has nothing selected. gpui
+  clears `propagate_event` before every bubble-phase listener, so an
+  empty-selection `copy` that simply returned was indistinguishable from one
+  that handled the action, and ⌘C never reached anything further out on the
+  focus path — a markdown selection elsewhere in the window, say. `InputState`
+  now calls `cx.propagate()` in that branch; an input with a selection consumes
+  the action exactly as before, and `Cut` is untouched because an empty
+  selection means something there (it cuts the current line)
 - A single-line `input()` is no longer zero pixels tall. It paints text and has
   no children, so an `Auto` height resolved to zero and the field was invisible
   until whatever contained it happened to set a height — which is why

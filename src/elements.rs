@@ -28,6 +28,7 @@ pub mod select;
 pub mod separator;
 pub mod slider;
 pub mod switch;
+pub mod table;
 pub mod tabs;
 pub mod text_field;
 pub mod textarea;
@@ -70,7 +71,7 @@ mod triage_coverage {
 
     /// The split the document states in prose. Restated here on purpose:
     /// editing the table without editing the prose fails.
-    const EXPECTED: [(&str, usize); 3] = [("Shipped", 8), ("Issue", 10), ("Rejected", 11)];
+    const EXPECTED: [(&str, usize); 3] = [("Shipped", 10), ("Issue", 8), ("Rejected", 11)];
 
     /// An issue body shorter than this is a stub, and #146 asked for complete
     /// ones — prior art, references, crate gaps, the a11y answer, sizing and

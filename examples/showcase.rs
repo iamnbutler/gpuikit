@@ -40,6 +40,7 @@ use gpuikit::{
         separator::separator,
         slider::{slider, Slider},
         switch::{switch, Switch},
+        table::{table, CellAlign, Column, Row, SortDescriptor, SortDirection},
         tabs::{tab, tabs, Tabs},
         text_field::{text_field, Adornment},
         textarea::textarea,
@@ -58,6 +59,7 @@ use gpuikit::{
     DefaultIcons,
 };
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
@@ -194,6 +196,7 @@ const ELEMENT_COVERAGE: &[(&str, &str)] = &[
     ("separator", "separator"),
     ("slider", "slider"),
     ("switch", "toggle"),
+    ("table", "table"),
     ("tabs", "tabs"),
     ("text_field", "text"),
     ("textarea", "text"),
@@ -258,6 +261,7 @@ const NAV_SECTIONS: &[(&str, &[(&str, &str)])] = &[
             ("toast", "Toast"),
         ],
     ),
+    ("Data", &[("table", "Table")]),
     ("Content", &[("markdown", "Markdown"), ("editor", "Editor")]),
     ("System", &[("theme", "Theme"), ("coverage", "Coverage")]),
 ];
@@ -362,6 +366,115 @@ enum Country {
     FR,
 }
 
+/// The Table page's data. A plain `const` the page owns: the element is handed
+/// rows that are already filtered and already sorted, so the data has to live
+/// somewhere the page can re-derive it from.
+#[derive(Clone, Copy)]
+struct Repo {
+    id: u32,
+    name: &'static str,
+    language: &'static str,
+    stars: u32,
+    status: RepoStatus,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum RepoStatus {
+    Active,
+    Archived,
+    Draft,
+}
+
+impl RepoStatus {
+    fn label(self) -> &'static str {
+        match self {
+            RepoStatus::Active => "Active",
+            RepoStatus::Archived => "Archived",
+            RepoStatus::Draft => "Draft",
+        }
+    }
+}
+
+const REPOSITORIES: &[Repo] = &[
+    Repo {
+        id: 1,
+        name: "gpui",
+        language: "Rust",
+        stars: 8420,
+        status: RepoStatus::Active,
+    },
+    Repo {
+        id: 2,
+        name: "gpuikit",
+        language: "Rust",
+        stars: 312,
+        status: RepoStatus::Active,
+    },
+    Repo {
+        id: 3,
+        name: "taffy",
+        language: "Rust",
+        stars: 1904,
+        status: RepoStatus::Active,
+    },
+    Repo {
+        id: 4,
+        name: "accesskit",
+        language: "Rust",
+        stars: 1210,
+        status: RepoStatus::Active,
+    },
+    Repo {
+        id: 5,
+        name: "pulldown-cmark",
+        language: "Rust",
+        stars: 2180,
+        status: RepoStatus::Active,
+    },
+    Repo {
+        id: 6,
+        name: "syntect",
+        language: "Rust",
+        stars: 2036,
+        status: RepoStatus::Archived,
+    },
+    Repo {
+        id: 7,
+        name: "harfbuzz",
+        language: "C++",
+        stars: 4100,
+        status: RepoStatus::Active,
+    },
+    Repo {
+        id: 8,
+        name: "swash",
+        language: "Rust",
+        stars: 640,
+        status: RepoStatus::Draft,
+    },
+    Repo {
+        id: 9,
+        name: "cosmic-text",
+        language: "Rust",
+        stars: 1480,
+        status: RepoStatus::Active,
+    },
+    Repo {
+        id: 10,
+        name: "wgpu",
+        language: "Rust",
+        stars: 12800,
+        status: RepoStatus::Active,
+    },
+];
+
+/// The columns the Table page sorts by, by index. Restated here because the
+/// comparator is the page's job — the element is told *how* the rows are
+/// sorted, never *how to* sort them.
+const TABLE_COLUMN_REPOSITORY: usize = 0;
+const TABLE_COLUMN_LANGUAGE: usize = 1;
+const TABLE_COLUMN_STARS: usize = 2;
+
 struct Showcase {
     focus_handle: FocusHandle,
     active_page: Rc<RefCell<SharedString>>,
@@ -423,6 +536,14 @@ struct Showcase {
     /// Whether the Loading page's indicators advance. Pausing them takes the
     /// shared loading clock out of the picture without leaving the page.
     loading_playing: bool,
+    /// The Table page's data-view state, all three pieces of it. This is the
+    /// division of labour the element exists to demonstrate: the filter, the
+    /// sort and the selection are the page's, and the table is handed the
+    /// result plus a description of it.
+    table_filter: Entity<InputState>,
+    table_sort: SortDescriptor,
+    table_selected: HashSet<u32>,
+    table_status: SharedString,
 }
 
 impl Showcase {
@@ -748,6 +869,12 @@ impl Showcase {
             )
         });
 
+        let table_filter = cx.new(InputState::new_singleline);
+        // Typing in the filter has to re-derive the page's rows, and the rows
+        // are derived in `render`, so the page has to hear about the keystroke.
+        cx.observe(&table_filter, |_this, _filter, cx| cx.notify())
+            .detach();
+
         let active_page = Rc::new(RefCell::new(SharedString::from("button")));
         let nav = nav_entries(&active_page);
 
@@ -801,6 +928,10 @@ impl Showcase {
             context_menu_pinned: true,
             context_menu_status: "No action chosen yet.".into(),
             loading_playing: true,
+            table_filter,
+            table_sort: SortDescriptor::new(TABLE_COLUMN_STARS, SortDirection::Descending),
+            table_selected: HashSet::new(),
+            table_status: "No repository opened yet.".into(),
         }
     }
 
@@ -2326,6 +2457,242 @@ impl Showcase {
         cx.notify();
     }
 
+    /// The rows the table is handed: filtered by the field above it, then
+    /// sorted by whatever the last header click asked for.
+    ///
+    /// Both halves are the page's, not the element's. Filtering is a
+    /// `TextField` above the table by design, and sorting inside the element
+    /// would mean it owning comparison for arbitrary cell types.
+    fn visible_repositories(&self, cx: &App) -> Vec<Repo> {
+        let needle = self.table_filter.read(cx).content().to_lowercase();
+
+        let mut rows: Vec<Repo> = REPOSITORIES
+            .iter()
+            .copied()
+            .filter(|repo| {
+                needle.is_empty()
+                    || repo.name.to_lowercase().contains(&needle)
+                    || repo.language.to_lowercase().contains(&needle)
+            })
+            .collect();
+
+        let sort = self.table_sort;
+        rows.sort_by(|left, right| {
+            let ordering = match sort.column {
+                TABLE_COLUMN_REPOSITORY => left.name.cmp(right.name),
+                TABLE_COLUMN_LANGUAGE => left
+                    .language
+                    .cmp(right.language)
+                    .then_with(|| left.name.cmp(right.name)),
+                TABLE_COLUMN_STARS => left.stars.cmp(&right.stars),
+                // The Status column is not sortable, so nothing asks for this.
+                _ => std::cmp::Ordering::Equal,
+            };
+
+            match sort.direction {
+                SortDirection::Ascending => ordering,
+                SortDirection::Descending => ordering.reverse(),
+            }
+        });
+
+        rows
+    }
+
+    fn render_table_page(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        // The handlers below run with `&mut App`, not with this view's
+        // `Context`, so they reach the page through its own entity.
+        let view = cx.entity();
+
+        let rows = self.visible_repositories(cx);
+        let selected = self.table_selected.clone();
+        let selected_count = rows
+            .iter()
+            .filter(|repo| self.table_selected.contains(&repo.id))
+            .count();
+
+        let data_table = table("showcase-repositories")
+            .column(
+                Column::new("Repository", |repo: &Repo, _window, _cx| {
+                    div().child(repo.name).into_any_element()
+                })
+                .sortable()
+                .min_width(px(160.)),
+            )
+            .column(
+                Column::new("Language", |repo: &Repo, _window, _cx| {
+                    div().child(repo.language).into_any_element()
+                })
+                .sortable()
+                .fixed(px(140.)),
+            )
+            .column(
+                Column::new("Stars", |repo: &Repo, _window, _cx| {
+                    div().child(repo.stars.to_string()).into_any_element()
+                })
+                .sortable()
+                .fixed(px(110.))
+                .end(),
+            )
+            .column(
+                // A cell renderer returns any element, so a column can hold a
+                // control rather than text.
+                Column::new("Status", |repo: &Repo, _window, _cx| {
+                    match repo.status {
+                        RepoStatus::Active => badge(repo.status.label()),
+                        RepoStatus::Archived => badge(repo.status.label()).secondary(),
+                        RepoStatus::Draft => badge(repo.status.label()).outline(),
+                    }
+                    .into_any_element()
+                })
+                .fixed(px(130.))
+                .align(CellAlign::Center),
+            )
+            .rows(rows.iter().map(|repo| {
+                let repo = *repo;
+                let view = view.clone();
+                Row::new(repo)
+                    .selected(selected.contains(&repo.id))
+                    // Activation, which is a different act from selection —
+                    // clicking the checkbox does not open the row.
+                    .on_click(move |_window, cx| {
+                        view.update(cx, |this, cx| {
+                            this.table_status = format!("Opened {}", repo.name).into();
+                            cx.notify();
+                        });
+                    })
+            }))
+            .sorted_by(self.table_sort)
+            .on_sort({
+                let view = view.clone();
+                move |request, _window, cx| {
+                    view.update(cx, |this, cx| {
+                        // `suggested()` is the conventional toggle. A page that
+                        // wanted Stars to start descending would ignore it and
+                        // build its own descriptor here.
+                        this.table_sort = request.suggested();
+                        cx.notify();
+                    });
+                }
+            })
+            .on_select_row({
+                let view = view.clone();
+                move |request, _window, cx| {
+                    view.update(cx, |this, cx| {
+                        // The request carries a row *index*, in the order this
+                        // page handed the rows over, so it is resolved against
+                        // the same derivation before an id is stored. That
+                        // round trip is the demonstration.
+                        let rows = this.visible_repositories(cx);
+                        if let Some(repo) = rows.get(request.row) {
+                            if request.selected {
+                                this.table_selected.insert(repo.id);
+                            } else {
+                                this.table_selected.remove(&repo.id);
+                            }
+                        }
+                        cx.notify();
+                    });
+                }
+            })
+            .on_select_all({
+                let view = view.clone();
+                move |request, _window, cx| {
+                    view.update(cx, |this, cx| {
+                        // "All" means the rows currently on screen, because
+                        // those are the rows this page gave the table.
+                        let rows = this.visible_repositories(cx);
+                        for repo in rows {
+                            if request.selected {
+                                this.table_selected.insert(repo.id);
+                            } else {
+                                this.table_selected.remove(&repo.id);
+                            }
+                        }
+                        cx.notify();
+                    });
+                }
+            })
+            .max_h(px(320.))
+            .empty("No repositories match this filter.");
+
+        v_stack()
+            .gap_4()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .child("Table"),
+            )
+            .child(div().text_sm().text_color(theme.fg_muted()).child(
+                "Rows arrive already filtered and already sorted; the table reports \
+                         clicks back. The filter is a TextField above the table, not a table \
+                         feature.",
+            ))
+            .child(
+                h_stack()
+                    .gap_3()
+                    .items_center()
+                    .child(
+                        div().w(px(260.)).child(
+                            text_field(&self.table_filter, cx)
+                                .placeholder("Filter repositories")
+                                .prefix(Adornment::icon(DefaultIcons::magnifying_glass())),
+                        ),
+                    )
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(theme.fg_muted())
+                            .child(format!("{selected_count} of {} selected", rows.len())),
+                    ),
+            )
+            .child(data_table)
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(theme.fg_muted())
+                    .child(self.table_status.clone()),
+            )
+            .child(
+                v_stack()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(theme.fg_muted())
+                            .child("Sizes"),
+                    )
+                    .children(ControlSize::ALL.map(|size| {
+                        v_stack()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(theme.fg_muted())
+                                    .child(size.name()),
+                            )
+                            .child(
+                                table(SharedString::from(format!("table-size-{}", size.name())))
+                                    .control_size(size)
+                                    .column(Column::new("Repository", |repo: &Repo, _, _| {
+                                        div().child(repo.name).into_any_element()
+                                    }))
+                                    .column(
+                                        Column::new("Stars", |repo: &Repo, _, _| {
+                                            div().child(repo.stars.to_string()).into_any_element()
+                                        })
+                                        .fixed(px(110.))
+                                        .end(),
+                                    )
+                                    .rows(REPOSITORIES.iter().take(2).copied().map(Row::new)),
+                            )
+                    })),
+            )
+    }
+
     fn render_markdown_page(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
 
@@ -2942,6 +3309,7 @@ impl Render for Showcase {
             "dialog" => self.render_dialog_page(window, cx).into_any_element(),
             "context-menu" => self.render_context_menu_page(cx).into_any_element(),
             "toast" => self.render_toast_page(window, cx).into_any_element(),
+            "table" => self.render_table_page(cx).into_any_element(),
             "markdown" => self.render_markdown_page(cx).into_any_element(),
             "editor" => self.render_editor_page(cx).into_any_element(),
             "theme" => self.render_theme_page(cx).into_any_element(),

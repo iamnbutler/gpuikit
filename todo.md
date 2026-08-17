@@ -32,6 +32,8 @@
 - Separator
 - Slider
 - Switch
+- Table (sorting, filtering and selection are one element — see
+  [docs/component-triage.md](docs/component-triage.md))
 - Tabs
 - Text Field
 - Textarea
@@ -71,11 +73,13 @@ whoever revives one does not rebuild the same problem.
 Every component that was on the old "Deferred" and "Future — Data & Complex"
 lists has been re-triaged against the crate as it stands: see
 [docs/component-triage.md](docs/component-triage.md) for a decision per
-component. Eight had already shipped, eleven are rejected with a reason and a
-named revisit trigger, and ten have a ready-to-file issue body under
-`docs/issues/` — along with three prerequisites the triage surfaced (an element
-role convention, a menu-vs-listbox naming decision, and adopt-or-delete for
-`src/traits/portal.rs`).
+component. Ten have shipped — eight already had when the triage was taken, and
+`Table` and `Data Table` have since been built as one module — eleven are
+rejected with a reason and a named revisit trigger, and eight have a
+ready-to-file issue body under `docs/issues/` — along with three prerequisites
+the triage surfaced (an element role convention, a menu-vs-listbox naming
+decision, and adopt-or-delete for `src/traits/portal.rs`). The role convention
+is still open, and is why `Table` reports no accessibility roles.
 
 The lists that used to live here are gone deliberately. Restating a roster in a
 second, uncheckable place is how the old one stayed alive for a year after the

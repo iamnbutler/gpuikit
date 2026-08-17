@@ -56,6 +56,17 @@ All notable changes to this project will be documented in this file.
   a panic in debug builds, a silently dropped node in release. Each document
   now renders its runs under its own element, so run ids are unique by
   construction
+- Ten elements no longer mint an element id that is the same for every instance
+  of them. `Alert`'s dismiss button, `Textarea` and the context menu popup were
+  genuine collisions — two of them in one frame shared an id — and the dialog
+  panel and close button, the dropdown menu, the popover panel, the toast
+  container, action and dismiss button, and the slider track were unique only
+  by accident of an ancestor they do not control. gpui keys element state on an
+  element's whole id path and hashes that path into an accessibility node id,
+  where a duplicate is a `debug_assert!` in debug builds and a silently dropped
+  node in release, so each of these was one `a11y_role` away from a crash. Ids
+  are now derived from the entity backing the element, or from the id its
+  caller gave it
 
 ### Added
 
@@ -82,6 +93,17 @@ All notable changes to this project will be documented in this file.
   same entity is rendered more than once in one frame.
   `MarkdownElement::element_id` reads back whichever applies
 - `RunRole`, and `HeadingLevel::level()`
+- `element_id`, the rule for minting element ids written down once, with the
+  two helpers that implement it — `element_id::for_entity(name, entity_id)` for
+  an element backed by an entity and `element_id::scoped(&parent_id, part)` for
+  a named part of one — and a note on what does and does not scope an id in
+  gpui (an `Entity<V: Render>` child does, a `RenderOnce` struct does not,
+  `deferred()` neither scopes nor unscopes). A test scans this crate's own
+  source and fails on any element that mints a constant id
+- `Textarea::id`, to override the element id a textarea renders under, and
+  `Textarea::element_id` to read back whichever applies. The default is derived
+  from the `InputState` entity; set it when one state is rendered by more than
+  one textarea in a frame
 - Fenced code blocks are syntax highlighted from their info string. The
   language was parsed and then thrown away; it now reaches the element and is
   highlighted by the `editor` feature's syntect-backed `SyntaxHighlighter`.

@@ -4,10 +4,11 @@
 //! styling with borders, padding, and theme colors.
 
 use gpui::{
-    div, prelude::*, px, rems, App, Entity, FocusHandle, Focusable, IntoElement, ParentElement,
-    Pixels, RenderOnce, SharedString, Styled, Window,
+    div, prelude::*, px, rems, App, ElementId, Entity, EntityId, FocusHandle, Focusable,
+    IntoElement, ParentElement, Pixels, RenderOnce, SharedString, Styled, Window,
 };
 
+use crate::element_id::for_entity;
 use crate::elements::input::text_area;
 use crate::input::InputState;
 use crate::theme::{ActiveTheme, Themeable};
@@ -18,6 +19,16 @@ const DEFAULT_ROWS: u32 = 3;
 
 /// Approximate line height in rems for calculating min-height.
 const LINE_HEIGHT_REMS: f32 = 1.5;
+
+/// The id of the textarea backed by the `InputState` entity `state_id`.
+///
+/// `Textarea` is a `RenderOnce`, so nothing above it puts a per-instance
+/// segment in its id path: a bare `"textarea"` would be the same id for every
+/// textarea on screen. Keyed on the input state instead, which is unique per
+/// textarea and stable across frames.
+fn textarea_element_id(state_id: EntityId) -> ElementId {
+    for_entity("textarea", state_id)
+}
 
 /// Creates a new Textarea component.
 ///
@@ -48,6 +59,7 @@ pub struct Textarea {
     disabled: bool,
     read_only: bool,
     max_height: Option<Pixels>,
+    element_id: Option<ElementId>,
 }
 
 impl Textarea {
@@ -63,7 +75,26 @@ impl Textarea {
             disabled: false,
             read_only: false,
             max_height: None,
+            element_id: None,
         }
+    }
+
+    /// Override the element id this textarea renders under.
+    ///
+    /// The default is derived from the `InputState` entity, which is unique
+    /// and stable already. Set this only when the same state is rendered by
+    /// more than one textarea in a frame; each copy then needs its own id.
+    pub fn id(mut self, id: impl Into<ElementId>) -> Self {
+        self.element_id = Some(id.into());
+        self
+    }
+
+    /// The id this textarea renders under — the explicit [`Self::id`] if one
+    /// was given, otherwise the state-derived default.
+    pub fn element_id(&self) -> ElementId {
+        self.element_id
+            .clone()
+            .unwrap_or_else(|| textarea_element_id(self.state.entity_id()))
     }
 
     /// Sets the placeholder text shown when the textarea is empty.
@@ -120,6 +151,7 @@ impl Focusable for Textarea {
 
 impl RenderOnce for Textarea {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let element_id = self.element_id();
         let theme = cx.theme();
         let is_focused = self.focus_handle.is_focused(window);
         let disabled = self.disabled;
@@ -162,7 +194,7 @@ impl RenderOnce for Textarea {
 
         // Build the container
         div()
-            .id("textarea")
+            .id(element_id)
             .min_h(min_height)
             .when_some(self.max_height, |this, max_h| this.max_h(max_h))
             .w_full()
@@ -182,5 +214,34 @@ impl RenderOnce for Textarea {
             })
             .when(read_only && !disabled, |this| this.cursor_default())
             .child(inner)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui::TestAppContext;
+
+    #[gpui::test]
+    fn each_textarea_renders_under_its_own_state(cx: &mut TestAppContext) {
+        cx.update(crate::theme::init);
+        let (one, two) = cx.update(|cx| {
+            (
+                cx.new(InputState::new_multiline),
+                cx.new(InputState::new_multiline),
+            )
+        });
+
+        let (first, second, overridden) = cx.update(|cx| {
+            (
+                textarea(&one, cx).element_id(),
+                textarea(&two, cx).element_id(),
+                textarea(&one, cx).id("shared-state-left").element_id(),
+            )
+        });
+
+        assert_eq!(first, textarea_element_id(one.entity_id()));
+        assert_ne!(first, second);
+        assert_eq!(overridden, ElementId::Name("shared-state-left".into()));
     }
 }

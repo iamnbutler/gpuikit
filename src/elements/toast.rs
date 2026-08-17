@@ -22,6 +22,7 @@
 //!     .show(window, cx);
 //! ```
 
+use crate::element_id::{for_entity, scoped};
 use crate::icons::Icons;
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
@@ -366,7 +367,9 @@ impl Render for ToastManager {
 
         // Build the toast container with proper positioning
         let container = div()
-            .id("toast-container")
+            // Was unique only because a `ToastManager` is rendered as an
+            // `Entity<_>`, which puts an `ElementId::View` above it.
+            .id(for_entity("toast-container", cx.entity_id()))
             .absolute()
             .top_0()
             .left_0()
@@ -463,10 +466,15 @@ impl ToastManager {
         let action = toast.action.clone();
         let toast_entity_for_action = toast_entity.clone();
         let toast_entity_for_dismiss = toast_entity.clone();
+        // The parts of a toast were unique only because they sit under the
+        // toast's own `.id()`; they derive from it directly now.
+        let toast_id = toast.id.clone();
+        let action_id = scoped(&toast_id, "action");
+        let dismiss_id = scoped(&toast_id, "dismiss");
         let hover_bg: Hsla = border_theme_color.opacity(0.5);
 
         div()
-            .id(toast.id.clone())
+            .id(toast_id)
             .w_full()
             .flex()
             .gap(rems(0.75))
@@ -518,7 +526,7 @@ impl ToastManager {
                         content.child(
                             div().mt_1().child(
                                 div()
-                                    .id("toast-action")
+                                    .id(action_id)
                                     .text_sm()
                                     .font_weight(gpui::FontWeight::MEDIUM)
                                     .text_color(variant_color)
@@ -543,7 +551,7 @@ impl ToastManager {
             // Close button
             .child(
                 div()
-                    .id("toast-dismiss")
+                    .id(dismiss_id)
                     .flex_none()
                     .size(px(20.0))
                     .flex()

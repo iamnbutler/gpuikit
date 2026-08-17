@@ -2,6 +2,7 @@
 //!
 //! Supports different severity levels and optional dismiss functionality.
 
+use crate::element_id::scoped;
 use crate::icons::Icons;
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
@@ -13,6 +14,17 @@ use gpui::{
 /// Creates a new alert with an optional message
 pub fn alert(message: impl Into<SharedString>) -> Alert {
     Alert::new().description(message)
+}
+
+/// The id of the dismiss button of the alert identified by `alert_id`.
+///
+/// `Alert` is a `RenderOnce` with no id on its root, so the button gets no
+/// scope from being nested inside one: a bare `"alert-dismiss"` would be the
+/// same id for every alert on screen. It is derived from the alert's own id
+/// instead — which a dismissible alert must set anyway, since its dismissed
+/// flag is keyed on it.
+fn dismiss_element_id(alert_id: &ElementId) -> ElementId {
+    scoped(alert_id, "dismiss")
 }
 
 /// Alert variant determining severity/styling
@@ -283,15 +295,16 @@ impl RenderOnce for Alert {
             // Dismiss button
             .when(self.dismissible && id.is_some(), |alert| {
                 // Capture the dismiss state entity during render so the click handler can use it
-                let dismiss_id = id.clone().unwrap();
+                let alert_id = id.clone().unwrap();
+                let dismiss_id = dismiss_element_id(&alert_id);
                 let dismiss_state: Entity<DismissState> = window.use_keyed_state(
-                    dismiss_id,
+                    alert_id,
                     cx,
                     |_window, _cx: &mut Context<DismissState>| DismissState { dismissed: false },
                 );
                 alert.child(
                     div()
-                        .id("alert-dismiss")
+                        .id(dismiss_id)
                         .flex_none()
                         .size(px(20.0))
                         .flex()
@@ -315,5 +328,20 @@ impl RenderOnce for Alert {
                 )
             })
             .into_any_element()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_alert_dismisses_under_its_own_id() {
+        let one = ElementId::Name("save-failed".into());
+        let two = ElementId::Name("quota-warning".into());
+
+        assert_ne!(dismiss_element_id(&one), dismiss_element_id(&two));
+        assert_eq!(dismiss_element_id(&one), dismiss_element_id(&one));
+        assert_ne!(dismiss_element_id(&one), one);
     }
 }

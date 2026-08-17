@@ -28,6 +28,7 @@
 //! });
 //! ```
 
+use crate::element_id::for_entity;
 use crate::theme::{ActiveTheme, Themeable};
 use crate::traits::disableable::Disableable;
 use gpui::{
@@ -110,7 +111,9 @@ impl Render for DropdownMenu {
         let theme = cx.theme();
 
         div()
-            .id("dropdown-menu")
+            // Was unique only because a `DropdownMenu` is always rendered as an
+            // `Entity<_>`, which puts an `ElementId::View` above it.
+            .id(for_entity("dropdown-menu", cx.entity_id()))
             .track_focus(&focus_handle)
             .on_mouse_down_out(cx.listener(|this, _, window, cx| {
                 this.dismiss(window, cx);

@@ -30,6 +30,7 @@
 //! dialog_state.update(cx, |state, cx| state.open(window, cx));
 //! ```
 
+use crate::element_id::scoped;
 use crate::elements::icon_button::icon_button;
 use crate::icons::Icons;
 use crate::theme::{ActiveTheme, Themeable};
@@ -290,7 +291,9 @@ impl Render for DialogState {
                 // Dialog panel
                 .child(
                     div()
-                        .id("dialog-panel")
+                        // Was unique only because it sits under the backdrop's
+                        // `.id(self.id)`; it derives from that id directly now.
+                        .id(scoped(&self.id, "panel"))
                         // Prevent backdrop click from closing when clicking on panel
                         .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| {
                             cx.stop_propagation();
@@ -332,7 +335,11 @@ impl Render for DialogState {
                                     // Close button
                                     .when(show_close_button, |this| {
                                         this.child(
-                                            icon_button("dialog-close", Icons::cross_1()).on_click(
+                                            icon_button(
+                                                scoped(&self.id, "close"),
+                                                Icons::cross_1(),
+                                            )
+                                            .on_click(
                                                 cx.listener(|this, _, _window, cx| {
                                                     this.close(cx);
                                                 }),

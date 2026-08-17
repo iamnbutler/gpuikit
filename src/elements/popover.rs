@@ -21,6 +21,7 @@
 //! });
 //! ```
 
+use crate::element_id::for_entity;
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
     anchored, deferred, div, point, prelude::*, px, AnyElement, App, Context, DismissEvent,
@@ -83,7 +84,9 @@ impl Render for PopoverPanel {
         let content = (self.content_render)(window, cx);
 
         div()
-            .id("popover-panel")
+            // Was unique only because a `PopoverPanel` is always rendered as an
+            // `Entity<_>`, which puts an `ElementId::View` above it.
+            .id(for_entity("popover-panel", cx.entity_id()))
             .track_focus(&focus_handle)
             .on_mouse_down_out(cx.listener(|this, _, window, cx| {
                 this.dismiss(window, cx);

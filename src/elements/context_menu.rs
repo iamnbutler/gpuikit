@@ -34,9 +34,21 @@ use gpui::{
     Point, ScrollHandle, SharedString, Styled, Svg, Window,
 };
 
+use crate::element_id::scoped;
 use crate::elements::kbd::{kbd, KbdSize};
 use crate::icons::Icons;
 use crate::theme::{ActiveTheme, Themeable};
+
+/// The id of the open popup of the menu attached to `menu_id`.
+///
+/// The popup is a plain `div()` inside a `RenderOnce`, and `deferred()` does
+/// not give it a scope of its own — `Window::defer_draw` keeps whatever id path
+/// the popup was built under. Two menus open at once (or one menu and one
+/// keyboard-driven one) would otherwise be the same id. Derived from the id the
+/// caller gave the menu, which the open/closed state is keyed on already.
+fn menu_element_id(menu_id: &ElementId) -> ElementId {
+    scoped(menu_id, "popup")
+}
 
 /// Builds the leading icon of a menu item.
 pub type IconFactory = Rc<dyn Fn() -> Svg>;
@@ -490,6 +502,7 @@ impl ContextMenu {
 impl RenderOnce for ContextMenu {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let state = window.use_keyed_state(self.id.clone(), cx, |_window, cx| MenuState::new(cx));
+        let popup_id = menu_element_id(&self.id);
 
         let ContextMenu {
             trigger,
@@ -539,6 +552,7 @@ impl RenderOnce for ContextMenu {
                             // Keep the whole menu on screen near a window edge.
                             .snap_to_window_with_margin(px(8.))
                             .child(div().occlude().child(menu_popup(
+                                popup_id,
                                 rows,
                                 scroll,
                                 focus_handle,
@@ -556,6 +570,7 @@ impl RenderOnce for ContextMenu {
 
 #[allow(clippy::too_many_arguments)]
 fn menu_popup(
+    popup_id: ElementId,
     rows: Vec<Row>,
     scroll: ScrollHandle,
     focus_handle: FocusHandle,
@@ -567,7 +582,7 @@ fn menu_popup(
     let theme = cx.theme();
 
     div()
-        .id("gpuikit-context-menu")
+        .id(popup_id)
         .track_focus(&focus_handle)
         .on_mouse_down_out({
             let state = state.clone();
@@ -753,6 +768,16 @@ mod tests {
                 MenuEntry::Header(label) => label.as_ref(),
             })
             .collect()
+    }
+
+    #[test]
+    fn each_menu_pops_up_under_its_own_id() {
+        let row = ElementId::named_usize("row", 3);
+        let other_row = ElementId::named_usize("row", 4);
+
+        assert_ne!(menu_element_id(&row), menu_element_id(&other_row));
+        assert_eq!(menu_element_id(&row), menu_element_id(&row));
+        assert_ne!(menu_element_id(&row), row);
     }
 
     #[test]

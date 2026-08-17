@@ -11,7 +11,6 @@ use gpui::{div, prelude::*, px, Context, Entity, Pixels, Render, TestAppContext,
 use crate::elements::badge::badge;
 use crate::elements::button::button;
 use crate::elements::checkbox::{checkbox, Checkbox};
-use crate::elements::dropdown::{dropdown, DropdownState};
 use crate::elements::icon_button::icon_button;
 use crate::elements::kbd::kbd;
 use crate::elements::select::{select, SelectState};
@@ -35,7 +34,6 @@ const CONTROLS: &[&str] = &[
     "switch",
     "toggle",
     "select",
-    "dropdown",
     "text-field",
 ];
 
@@ -46,7 +44,6 @@ struct Toolbar {
     switch: Entity<Switch>,
     toggle: Entity<Toggle>,
     select: Entity<SelectState<u8>>,
-    dropdown: Entity<DropdownState<u8>>,
     field: Entity<InputState>,
 }
 
@@ -62,11 +59,6 @@ impl Toolbar {
                     select("sel", vec![(0u8, "Zero"), (1u8, "One")])
                         .selected(0u8)
                         .control_size(size),
-                )
-            }),
-            dropdown: cx.new(|_cx| {
-                DropdownState::new(
-                    dropdown("dd", vec![(0u8, "Zero"), (1u8, "One")], 0u8).control_size(size),
                 )
             }),
             field: cx.new(InputState::new_singleline),
@@ -104,7 +96,6 @@ impl Render for Toolbar {
             .child(measured("switch", self.switch.clone()))
             .child(measured("toggle", self.toggle.clone()))
             .child(measured("select", self.select.clone()))
-            .child(measured("dropdown", self.dropdown.clone()))
             .child(measured(
                 "text-field",
                 text_field(&self.field, cx)

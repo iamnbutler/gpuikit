@@ -5,8 +5,8 @@ use crate::theme::ControlSize;
 /// A control that can be put on a rung of the shared size scale.
 ///
 /// Implemented by every element that can share a row with another control:
-/// `Button`, `IconButton`, `Checkbox`, `Switch`, `Toggle`, `Select`,
-/// `Dropdown`, `Badge`, `Kbd`, `Input`, `Textarea` and `Field`. The rung
+/// `Button`, `IconButton`, `Checkbox`, `Switch`, `Toggle`, `Select`, `Badge`,
+/// `Kbd`, `Input`, `Textarea` and `Field`. The rung
 /// resolves through the theme
 /// ([`Themeable::control`](crate::theme::Themeable::control)), so a control
 /// never names a height of its own.

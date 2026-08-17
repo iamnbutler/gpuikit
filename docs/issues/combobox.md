@@ -9,7 +9,7 @@ action, not choose a value).
 
 ## Why it survives triage
 
-`Select` cannot be typed into, and a `TextField` beside a `Dropdown` is two
+`Select` cannot be typed into, and a `TextField` beside a `Select` is two
 controls that do not share a selection. The combobox is the only entry on #59's
 list that fills a real gap between two things the crate already ships.
 
@@ -28,12 +28,21 @@ list that fills a real gap between two things the crate already ships.
 
 ## What it has to close in this crate
 
-- **The naming and layering problem, first.** `src/elements/select.rs` imports
-  `DropdownMenu` and `DropdownOption` from `src/elements/dropdown.rs` — one
-  component is built on the other's internals — and `ELEMENT_COVERAGE` maps both
-  modules to the same showcase page. A combobox is a third thing in that
-  neighbourhood and adding it before the naming is settled guarantees a fourth
-  overlapping popup implementation. This is a hard block, not a preference.
+- **The naming and layering problem — answered, and inherited.** This used to
+  be a hard block: `src/elements/select.rs` imported `DropdownMenu` and
+  `DropdownOption` out of `src/elements/dropdown.rs`, so one component was built
+  on the other's internals. #154 settled it — `dropdown.rs` is deleted, `Select`
+  is the crate's one listbox, and the decision is
+  [`docs/menus-and-listboxes.md`](../menus-and-listboxes.md). Read it before
+  starting: a combobox is a **listbox** by its sentence (it presents values, and
+  the choice persists), so it belongs to `Select`'s family and not to
+  `context_menu`'s, and `family_coverage` in `src/elements.rs` will hold it to
+  that. **Do not make `Listbox` public to reuse it.** `Select`'s popup is
+  private on purpose; if this component genuinely wants the same popup, lift it
+  into a `pub(crate)` module named by *both* callers — with both
+  implementations in front of you — rather than exporting the one that happened
+  to exist first. Building a second popup and merging later is also a legitimate
+  answer; exporting the first one is not.
 - **Value versus text.** The state has to hold both, and say what happens on
   blur with unmatched text: revert, keep, or create. Pick one default and make
   the others explicit options.
@@ -50,7 +59,9 @@ them.
 
 ## Blocked on
 
-- `docs/issues/menu-vs-listbox-naming.md` — **hard block**.
+- ~~`docs/issues/menu-vs-listbox-naming.md`~~ — **discharged** by #154. The
+  answer is [`docs/menus-and-listboxes.md`](../menus-and-listboxes.md), and this
+  component inherits it rather than re-deciding it.
 - `docs/issues/element-roles-convention.md`.
 - Nothing else. Its popup follows `docs/overlays.md`. Note that matching the
   trigger's width — which a combobox wants — is the one thing that document

@@ -2,6 +2,72 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Breaking Changes
+
+- `gpuikit::elements::dropdown` is gone in full — `Dropdown`, `DropdownState`,
+  `DropdownChanged`, `DropdownMenu`, `DropdownOption` and `dropdown()` with it.
+  It and `Select` were one component under two names: the same bordered trigger
+  with a chevron, the same popup one gap below it, the same `ControlSize`, and
+  `select.rs` importing `DropdownMenu`, `DropdownOption` and `MENU_GAP` *out of*
+  `dropdown.rs` to get there. The only behavioural difference was that a
+  `Dropdown`'s selection could not be absent, which is a constructor argument
+  rather than a component. `Select` now takes the union of the two APIs, and
+  `.selected(v)` is what makes it the old `Dropdown`. Migration:
+
+  | Was | Is |
+  | --- | --- |
+  | `dropdown(id, options, value)` | `select(id, options).selected(value)` |
+  | `DropdownState::new(…)` | `SelectState::new(…)` |
+  | `DropdownChanged` | `SelectChanged` |
+  | `state.selected` (a `T`) | `state.selected` (an `Option<T>`) |
+  | `state.set_selected(value, cx)` | `state.set_selected(Some(value), cx)` |
+  | `DropdownMenu`, `DropdownOption` | private; no replacement is offered |
+
+  `.on_change`, `.full_width`, `.disabled`, `.control_size`, `is_open`,
+  `is_disabled` and `set_disabled` are unchanged; `.placeholder(…)` and
+  `clear()` are what an absent selection needs and are new to former `Dropdown`
+  callers. The popup is now `Listbox` and is **private** to
+  `src/elements/select.rs` — that is the part of the decision that enforces
+  itself, since a public popup type is how two components became one component
+  twice. `MENU_GAP` is a private `LISTBOX_GAP`. The `DropdownMenu::build`
+  signature change listed under 0.8.0 below therefore describes a type that no
+  longer exists
+- The element ids and test selectors moved with the type: `dropdown-menu` and
+  `dropdown-option` are now `select-listbox` and `select-option`, and the debug
+  selectors are `gpuikit-select-trigger` and `gpuikit-select-popup`. This
+  matters to anything driving a select from a test
+
+### Added
+
+- `docs/menus-and-listboxes.md`: the decision record for the above, plus the
+  convention it leaves behind. A listbox presents *values* to choose between and
+  the choice persists; a menu presents *actions* to invoke and nothing stays
+  selected. `Select` is the first, `ContextMenu` the second, and the two share
+  placement (`docs/overlays.md`) and nothing else. It also reserves the freed
+  name: a future menu-of-actions-from-a-button is `DropdownMenu`, built on
+  `context_menu.rs`'s items rather than on `Select`. Held to the crate by a new
+  `family_coverage` test module in `src/elements.rs`, which checks that every
+  row of its family table names a real module and a real family, that neither
+  family imports the other, and that `src/elements/dropdown.rs` has not come
+  back
+
+### Changed
+
+- The showcase has one page for one chooser. The Dropdown page is gone and the
+  Select page shows both shapes — a select that starts with a value and one that
+  starts with a placeholder — and the Control Sizes row measures one fewer
+  control, because the two it measured were the same control
+- `docs/issues/menu-vs-listbox-naming.md` is deleted, following
+  `portal-adopt-or-delete.md`: a settled prerequisite becomes a document under
+  `docs/`. `docs/issues/combobox.md`'s hard block is discharged — it inherits
+  the answer, including the instruction not to make `Listbox` public
+- The popup's selected row is an `Option<usize>`. `select.rs` used to pass
+  `usize::MAX` to mean "no row", which worked only because no option ever had
+  that index. Behaviour is unchanged; the state the sentinel stood for now has a
+  type and a test
+
 ## [0.8.0] - 2026-08-17
 
 The release that makes streaming markdown depend on a published version rather

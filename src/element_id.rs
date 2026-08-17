@@ -77,7 +77,7 @@ use gpui::{ElementId, EntityId, SharedString};
 /// reads as the element being replaced every frame.
 ///
 /// ```ignore
-/// div().id(element_id::for_entity("dropdown-menu", cx.entity_id()))
+/// div().id(element_id::for_entity("select-listbox", cx.entity_id()))
 /// ```
 pub fn for_entity(name: impl Into<SharedString>, entity_id: EntityId) -> ElementId {
     ElementId::NamedInteger(name.into(), entity_id.as_u64())

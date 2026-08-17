@@ -25,7 +25,6 @@ use gpuikit::{
         collapsible::{collapsible, Collapsible},
         context_menu::{context_menu, menu_item},
         dialog::{dialog, DialogState},
-        dropdown::{dropdown, DropdownState},
         empty::empty,
         field::{field, LabelPosition},
         icon_button::icon_button,
@@ -194,7 +193,6 @@ const ELEMENT_COVERAGE: &[(&str, &str)] = &[
     ("collapsible", "collapsible"),
     ("context_menu", "context-menu"),
     ("dialog", "dialog"),
-    ("dropdown", "dropdown"),
     ("empty", "empty"),
     ("field", "text"),
     ("icon_button", "button"),
@@ -207,7 +205,7 @@ const ELEMENT_COVERAGE: &[(&str, &str)] = &[
     ("progress", "loading"),
     ("radio_group", "selection"),
     ("scroll_area", "scroll-area"),
-    ("select", "dropdown"),
+    ("select", "select"),
     ("separator", "separator"),
     ("sidebar", "sidebar"),
     ("slider", "slider"),
@@ -243,7 +241,7 @@ const NAV_SECTIONS: &[NavSection] = &[
             ("button", "Button"),
             ("toggle", "Toggle"),
             ("selection", "Selection"),
-            ("dropdown", "Dropdown"),
+            ("select", "Select"),
             ("slider", "Slider"),
             ("text", "Text"),
             ("tabs", "Tabs"),
@@ -313,6 +311,18 @@ fn section_of(page: &str) -> Option<&'static str> {
     NAV_SECTIONS
         .iter()
         .find_map(|(label, _, items)| items.iter().any(|(id, _)| *id == page).then_some(*label))
+}
+
+/// A `SelectState`'s current value, for the readouts on the Select page.
+///
+/// A select's selection is an `Option`, because a chooser is allowed to have
+/// chosen nothing — that is the half of the API the deleted `Dropdown` could
+/// not express. See `docs/menus-and-listboxes.md`.
+fn selected_label<T: std::fmt::Debug>(selected: &Option<T>) -> String {
+    match selected {
+        Some(value) => format!("{value:?}"),
+        None => "None".to_string(),
+    }
 }
 
 /// A prebuilt sidebar row, and the page it selects — `None` for a section
@@ -543,9 +553,9 @@ struct Showcase {
     demo_overlay: bool,
     click_count: usize,
     toggled_count: usize,
-    size_dropdown: Entity<DropdownState<Size>>,
-    priority_dropdown: Entity<DropdownState<Priority>>,
-    theme_dropdown: Entity<DropdownState<ThemeChoice>>,
+    size_select: Entity<SelectState<Size>>,
+    priority_select: Entity<SelectState<Priority>>,
+    theme_select: Entity<SelectState<ThemeChoice>>,
     country_select: Entity<SelectState<Country>>,
     /// Retained, not minted per frame: selection state lives on the entity,
     /// so `markdown()` — which creates a fresh one per call — cannot hold it.
@@ -587,7 +597,6 @@ struct Showcase {
     control_row_switches: [Entity<Switch>; 3],
     control_row_toggles: [Entity<Toggle>; 3],
     control_row_selects: [Entity<SelectState<Size>>; 3],
-    control_row_dropdowns: [Entity<DropdownState<Size>>; 3],
     control_row_fields: [Entity<InputState>; 3],
     textarea_example: Entity<InputState>,
     /// Its own state: sharing the live example's was both a duplicate element
@@ -614,35 +623,39 @@ struct Showcase {
 
 impl Showcase {
     fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let size_dropdown = cx.new(|_cx| {
-            DropdownState::new(dropdown(
-                "size-dropdown",
-                vec![
-                    (Size::Small, "Small"),
-                    (Size::Medium, "Medium"),
-                    (Size::Large, "Large"),
-                ],
-                Size::Medium,
-            ))
+        let size_select = cx.new(|_cx| {
+            SelectState::new(
+                select(
+                    "size-select",
+                    vec![
+                        (Size::Small, "Small"),
+                        (Size::Medium, "Medium"),
+                        (Size::Large, "Large"),
+                    ],
+                )
+                .selected(Size::Medium),
+            )
         });
 
-        let priority_dropdown = cx.new(|_cx| {
-            DropdownState::new(dropdown(
-                "priority-dropdown",
-                vec![
-                    (Priority::Low, "Low"),
-                    (Priority::Normal, "Normal"),
-                    (Priority::High, "High"),
-                    (Priority::Critical, "Critical"),
-                ],
-                Priority::Normal,
-            ))
+        let priority_select = cx.new(|_cx| {
+            SelectState::new(
+                select(
+                    "priority-select",
+                    vec![
+                        (Priority::Low, "Low"),
+                        (Priority::Normal, "Normal"),
+                        (Priority::High, "High"),
+                        (Priority::Critical, "Critical"),
+                    ],
+                )
+                .selected(Priority::Normal),
+            )
         });
 
-        let theme_dropdown = cx.new(|_cx| {
-            DropdownState::new(
-                dropdown(
-                    "theme-dropdown",
+        let theme_select = cx.new(|_cx| {
+            SelectState::new(
+                select(
+                    "theme-select",
                     vec![
                         (ThemeChoice::GruvboxDark, "Gruvbox Dark"),
                         (ThemeChoice::GruvboxLight, "Gruvbox Light"),
@@ -651,8 +664,8 @@ impl Showcase {
                         (ThemeChoice::CatppuccinMacchiato, "Catppuccin Macchiato"),
                         (ThemeChoice::CatppuccinMocha, "Catppuccin Mocha"),
                     ],
-                    ThemeChoice::GruvboxDark,
                 )
+                .selected(ThemeChoice::GruvboxDark)
                 .full_width(true)
                 .on_change(|choice, window, cx| {
                     let theme = match choice {
@@ -879,18 +892,6 @@ impl Showcase {
                 )
             })
         });
-        let control_row_dropdowns = ControlSize::ALL.map(|size| {
-            cx.new(|_cx| {
-                DropdownState::new(
-                    dropdown(
-                        SharedString::from(format!("control-row-dropdown-{}", size.name())),
-                        vec![(Size::Small, "Small"), (Size::Medium, "Medium")],
-                        Size::Medium,
-                    )
-                    .control_size(size),
-                )
-            })
-        });
         let control_row_fields =
             ControlSize::ALL.map(|_| cx.new(|cx| InputState::new_singleline(cx)));
         let textarea_example = cx.new(|cx| InputState::new_multiline(cx));
@@ -970,9 +971,9 @@ impl Showcase {
             demo_overlay: false,
             click_count: 0,
             toggled_count: 0,
-            size_dropdown,
-            priority_dropdown,
-            theme_dropdown,
+            size_select,
+            priority_select,
+            theme_select,
             country_select,
             markdown,
             markdown_stream,
@@ -1007,7 +1008,6 @@ impl Showcase {
             control_row_switches,
             control_row_toggles,
             control_row_selects,
-            control_row_dropdowns,
             control_row_fields,
             textarea_example,
             textarea_disabled,
@@ -1372,76 +1372,10 @@ impl Showcase {
             .child(self.tabs_example.clone())
     }
 
-    fn render_dropdown_page(&self, cx: &Context<Self>) -> impl IntoElement {
-        let theme = cx.theme();
-        v_stack()
-            .gap_2()
-            .child(
-                div()
-                    .text_lg()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(theme.fg_muted())
-                    .child("Dropdown"),
-            )
-            .child(
-                h_stack()
-                    .gap_4()
-                    .items_start()
-                    .child(
-                        v_stack()
-                            .gap_1()
-                            .child(div().text_sm().text_color(theme.fg_muted()).child("Size"))
-                            .child(self.size_dropdown.clone()),
-                    )
-                    .child(
-                        v_stack()
-                            .gap_1()
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(theme.fg_muted())
-                                    .child("Priority"),
-                            )
-                            .child(self.priority_dropdown.clone()),
-                    ),
-            )
-            .child(
-                h_stack()
-                    .gap_4()
-                    .items_center()
-                    .mt_2()
-                    .child(
-                        h_stack()
-                            .gap_2()
-                            .items_center()
-                            .text_color(theme.fg_muted())
-                            .child("Selected size:")
-                            .child(
-                                div()
-                                    .text_color(theme.accent())
-                                    .font_weight(FontWeight::BOLD)
-                                    .child(format!("{:?}", self.size_dropdown.read(cx).selected)),
-                            ),
-                    )
-                    .child(
-                        h_stack()
-                            .gap_2()
-                            .items_center()
-                            .text_color(theme.fg_muted())
-                            .child("Selected priority:")
-                            .child(
-                                div()
-                                    .text_color(theme.accent())
-                                    .font_weight(FontWeight::BOLD)
-                                    .child(format!(
-                                        "{:?}",
-                                        self.priority_dropdown.read(cx).selected
-                                    )),
-                            ),
-                    ),
-            )
-    }
-
+    /// One page for one chooser. `Dropdown` was `Select` with a mandatory
+    /// selection, so what used to be two pages is one page showing both
+    /// shapes: a select that starts with a value, and a select that starts
+    /// with a placeholder. See `docs/menus-and-listboxes.md`.
     fn render_select_page(&self, cx: &Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         v_stack()
@@ -1454,39 +1388,89 @@ impl Showcase {
                     .child("Select"),
             )
             .child(
-                h_stack().gap_4().items_start().child(
-                    v_stack()
-                        .gap_1()
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(theme.fg_muted())
-                                .child("Country"),
-                        )
-                        .child(self.country_select.clone()),
-                ),
+                div()
+                    .text_sm()
+                    .text_color(theme.fg_muted())
+                    .child("With a starting value (`.selected(…)`), and without one."),
             )
             .child(
-                h_stack().gap_4().items_start().child(
-                    h_stack()
-                        .gap_2()
-                        .items_center()
-                        .text_color(theme.fg_muted())
-                        .child("Selected country:")
-                        .child(
-                            div()
-                                .text_color(theme.accent())
-                                .font_weight(FontWeight::BOLD)
-                                .child(
-                                    self.country_select
-                                        .read(cx)
-                                        .selected
-                                        .as_ref()
-                                        .map(|c| format!("{:?}", c))
-                                        .unwrap_or_else(|| "None".to_string()),
-                                ),
-                        ),
-                ),
+                h_stack()
+                    .gap_4()
+                    .items_start()
+                    .child(
+                        v_stack()
+                            .gap_1()
+                            .child(div().text_sm().text_color(theme.fg_muted()).child("Size"))
+                            .child(self.size_select.clone()),
+                    )
+                    .child(
+                        v_stack()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(theme.fg_muted())
+                                    .child("Priority"),
+                            )
+                            .child(self.priority_select.clone()),
+                    )
+                    .child(
+                        v_stack()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(theme.fg_muted())
+                                    .child("Country (placeholder)"),
+                            )
+                            .child(self.country_select.clone()),
+                    ),
+            )
+            .child(
+                h_stack()
+                    .gap_4()
+                    .items_center()
+                    .flex_wrap()
+                    .mt_2()
+                    .child(
+                        h_stack()
+                            .gap_2()
+                            .items_center()
+                            .text_color(theme.fg_muted())
+                            .child("Selected size:")
+                            .child(
+                                div()
+                                    .text_color(theme.accent())
+                                    .font_weight(FontWeight::BOLD)
+                                    .child(selected_label(&self.size_select.read(cx).selected)),
+                            ),
+                    )
+                    .child(
+                        h_stack()
+                            .gap_2()
+                            .items_center()
+                            .text_color(theme.fg_muted())
+                            .child("Selected priority:")
+                            .child(
+                                div()
+                                    .text_color(theme.accent())
+                                    .font_weight(FontWeight::BOLD)
+                                    .child(selected_label(&self.priority_select.read(cx).selected)),
+                            ),
+                    )
+                    .child(
+                        h_stack()
+                            .gap_2()
+                            .items_center()
+                            .text_color(theme.fg_muted())
+                            .child("Selected country:")
+                            .child(
+                                div()
+                                    .text_color(theme.accent())
+                                    .font_weight(FontWeight::BOLD)
+                                    .child(selected_label(&self.country_select.read(cx).selected)),
+                            ),
+                    ),
             )
     }
 
@@ -3287,7 +3271,6 @@ impl Showcase {
                                             .child(self.control_row_switches[index].clone())
                                             .child(self.control_row_toggles[index].clone())
                                             .child(self.control_row_selects[index].clone())
-                                            .child(self.control_row_dropdowns[index].clone())
                                             .child(
                                                 text_field(&self.control_row_fields[index], cx)
                                                     .placeholder("Field")
@@ -3531,7 +3514,7 @@ impl Render for Showcase {
         // The acceptance test from the Sidebar issue: the showcase's own
         // hand-rolled `div`-with-a-border sidebar is now the component, with a
         // rail and a drawer. Nothing here is a sub-component — the contents
-        // are `List`, the theme `Dropdown`, and `IconButton`s.
+        // are `List`, the theme `Select`, and `IconButton`s.
         let nav_state = SidebarState::from(!self.nav_collapsed);
         let current_section = section_of(&current_page);
 
@@ -3576,7 +3559,7 @@ impl Render for Showcase {
                     .flex_1()
                     .child(List::new("nav-list", entries).render(window, cx)),
             )
-            .child(self.theme_dropdown.clone());
+            .child(self.theme_select.clone());
 
         let content = match current_page.as_ref() {
             "button" => v_stack()
@@ -3596,11 +3579,7 @@ impl Render for Showcase {
                 .child(self.render_radio_group_page(cx))
                 .child(self.render_toggle_group_page(cx))
                 .into_any_element(),
-            "dropdown" => v_stack()
-                .gap_8()
-                .child(self.render_dropdown_page(cx))
-                .child(self.render_select_page(cx))
-                .into_any_element(),
+            "select" => self.render_select_page(cx).into_any_element(),
             "control-sizes" => self.render_control_sizes_page(cx).into_any_element(),
             "text" => v_stack()
                 .gap_8()

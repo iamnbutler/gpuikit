@@ -2,6 +2,11 @@
 //!
 //! A menu of actions, opened by right-clicking the element it is attached to.
 //!
+//! **A menu presents *actions* to invoke, and nothing stays selected
+//! afterwards. A listbox presents *values* to choose between, and the choice
+//! persists** — that is `select`, and it is a different family with its own
+//! popup and its own vocabulary. See `docs/menus-and-listboxes.md`.
+//!
 //! The menu attaches to an element you have already built, so it composes with
 //! whatever a view renders — a list row, a card, a piece of text — without
 //! restructuring that view:

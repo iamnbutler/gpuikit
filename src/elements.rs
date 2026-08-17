@@ -11,7 +11,6 @@ pub mod checkbox;
 pub mod collapsible;
 pub mod context_menu;
 pub mod dialog;
-pub mod dropdown;
 pub mod empty;
 pub mod field;
 pub mod icon_button;
@@ -414,6 +413,145 @@ mod overlay_coverage {
             !repo_root().join("src/traits/portal.rs").exists(),
             "src/traits/portal.rs is back. If a positioning abstraction is genuinely wanted \
              now, docs/overlays.md names the trigger and the argument to attack first"
+        );
+    }
+}
+
+/// `docs/menus-and-listboxes.md` is the decision record for #154: a listbox
+/// presents values to choose between, a menu presents actions to invoke, and
+/// `Dropdown` was deleted because it was `Select` under a presentation's name.
+///
+/// #154 happened because `select.rs` imported `dropdown.rs`'s popup — one
+/// component built on another's internals, with nothing to notice. These tests
+/// are what would notice. They parse the family table and fail the build when
+/// the document stops describing the crate, or when the two families start
+/// reaching into each other again.
+///
+/// Same shape as `overlay_coverage` above: the document is read with
+/// `include_str!`, and the module sources from disk, because what is being
+/// checked about the sources is a property of the *set* of them.
+#[cfg(test)]
+mod family_coverage {
+    use std::fs;
+    use std::path::PathBuf;
+
+    const FAMILIES_DOC: &str = include_str!("../docs/menus-and-listboxes.md");
+    const ELEMENTS: &str = include_str!("elements.rs");
+
+    /// There are two, and a third would be a decision rather than a row.
+    const FAMILIES: [&str; 2] = ["Listbox", "Menu"];
+
+    fn repo_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    }
+
+    /// The family table, as `(module, family)`.
+    ///
+    /// Anchored on an HTML comment rather than on "the first table", copying
+    /// `triage_coverage`'s reasoning: the document has three other tables and
+    /// picking the wrong one would make every assertion below vacuous rather
+    /// than failing.
+    fn family_rows() -> Vec<(String, String)> {
+        let start = FAMILIES_DOC
+            .find("<!-- family-table -->")
+            .expect("docs/menus-and-listboxes.md no longer anchors its family table");
+
+        FAMILIES_DOC[start..]
+            .lines()
+            .skip_while(|line| !line.starts_with('|'))
+            .take_while(|line| line.starts_with('|'))
+            .filter_map(|line| {
+                let cells: Vec<&str> = line.trim_matches('|').split('|').map(str::trim).collect();
+                if cells.len() != 3 || cells[0] == "Module" || cells[0].starts_with("---") {
+                    return None;
+                }
+                Some((cells[0].trim_matches('`').to_string(), cells[1].to_string()))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn every_family_row_names_a_real_module_and_a_real_family() {
+        let rows = family_rows();
+
+        assert!(
+            rows.len() >= 2,
+            "only {} rows in the family table — check how the document is being parsed \
+             before trusting a green result",
+            rows.len(),
+        );
+
+        for (module, family) in &rows {
+            assert!(
+                ELEMENTS.contains(&format!("pub mod {module};")),
+                "the family table names `{module}`, but src/elements.rs declares no \
+                 `pub mod {module};`"
+            );
+            assert!(
+                FAMILIES.contains(&family.as_str()),
+                "`{module}` is filed under `{family}`, which is not one of the two families. \
+                 A third family is a decision to argue for in the document, not a table cell"
+            );
+        }
+
+        for family in FAMILIES {
+            assert!(
+                rows.iter().any(|(_, name)| name == family),
+                "no module is filed under `{family}` — a table with one family in it is a \
+                 list, and the distinction is the point"
+            );
+        }
+    }
+
+    /// The mechanical form of the mistake #154 undid: `select.rs` imported the
+    /// popup out of `dropdown.rs`, so one component was the other's internals
+    /// with a different name on the front.
+    ///
+    /// The floor is `checked >= 1` rather than one-per-module on purpose. An
+    /// element that imports nothing from a sibling is exactly the state this
+    /// decision wants, so a per-module floor would punish success.
+    #[test]
+    fn neither_family_is_built_on_the_other() {
+        let rows = family_rows();
+        let mut checked = 0;
+
+        for (module, family) in &rows {
+            let source = fs::read_to_string(repo_root().join(format!("src/elements/{module}.rs")))
+                .unwrap_or_else(|error| panic!("src/elements/{module}.rs is unreadable: {error}"));
+            checked += 1;
+
+            for (other, other_family) in &rows {
+                if other_family == family {
+                    continue;
+                }
+
+                let import = format!("use crate::elements::{other}::");
+                assert!(
+                    !source.contains(&import),
+                    "`{module}` ({family}) imports from `{other}` ({other_family}). The two \
+                     families share placement and nothing else — see \
+                     docs/menus-and-listboxes.md §3. If they genuinely need to share an \
+                     implementation, lift it into a module named by both rather than \
+                     importing one into the other"
+                );
+            }
+        }
+
+        assert!(
+            checked >= 1,
+            "no module sources were read — check how the tree is being located before \
+             trusting a green result"
+        );
+    }
+
+    #[test]
+    fn the_merged_dropdown_module_has_not_come_back() {
+        assert!(
+            !repo_root().join("src/elements/dropdown.rs").exists(),
+            "src/elements/dropdown.rs is back. It was `Select` with a mandatory selection \
+             and a presentation for a name; if a menu-of-actions-from-a-button is what is \
+             wanted, docs/menus-and-listboxes.md §5 reserves that name for a module built \
+             on `context_menu`'s items"
         );
     }
 }

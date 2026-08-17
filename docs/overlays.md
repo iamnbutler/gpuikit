@@ -87,6 +87,12 @@ that asks for a snap margin loses its flip. This is not obvious from the API.
 The clamp-into-window pass runs for *every* fit mode, so no `anchored()`
 overlay can leave the window whatever it is configured with.
 
+That `select` flips and `context_menu` snaps is also the extent of what those
+two share: this document, and each calling `anchored()` itself. They are
+different families — a listbox chooses values, a menu invokes actions — and
+[`docs/menus-and-listboxes.md`](menus-and-listboxes.md) is where that is
+decided and checked.
+
 ## The draw-priority ladder
 
 `deferred(…).with_priority(n)` — higher paints later, i.e. on top. These
@@ -98,7 +104,7 @@ grep. Every `with_priority` in `src/elements/` must be a rung named here, and
 
 | Priority | Layer |
 | --- | --- |
-| 1 | Popups anchored to a trigger — dropdown, select, popover, context menu |
+| 1 | Popups anchored to a trigger — select, popover, context menu |
 | 2 | Sidebar's drawer and its scrim — above a popup, because a drawer covers the page a popup was opened on |
 | 10 | Dialog, and its scrim |
 | 15 | Toast — above a dialog, because a toast reports the result of what the dialog did |
@@ -110,8 +116,7 @@ grep. Every `with_priority` in `src/elements/` must be a rung named here, and
 | Module | What it places |
 | --- | --- |
 | `dialog` | A centred modal over a full-window scrim. Anchored to nothing — it is `anchored()`-free by design |
-| `dropdown` | A menu hanging one `MENU_GAP` below its trigger |
-| `select` | The same `DropdownMenu`, below the same trigger shape |
+| `select` | A listbox hanging one `LISTBOX_GAP` below its trigger |
 | `popover` | A caller-built panel, offset from its trigger by a caller-supplied `Point<Pixels>` |
 | `context_menu` | A menu at the pointer, `snap_to_window_with_margin(8px)` |
 | `sidebar` | A drawer over the whole viewport, `position((0, 0))` + `snap_to_window()`, in place of the in-flow panel once the window is narrower than the breakpoint. Anchored to the *window*, not to a trigger, which is why it positions rather than flips |

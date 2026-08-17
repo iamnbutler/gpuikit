@@ -15,7 +15,6 @@
 - Collapsible
 - Context Menu
 - Dialog
-- Dropdown Menu
 - Empty
 - Field
 - Icon Button
@@ -28,7 +27,9 @@
 - Progress
 - Radio Group
 - Scroll Area
-- Select
+- Select (the one chooser — `Dropdown` was the same component under a second
+  name and was merged into it; see
+  [docs/menus-and-listboxes.md](docs/menus-and-listboxes.md))
 - Separator
 - Sidebar
 - Slider
@@ -80,10 +81,12 @@ shipped as `src/elements/sidebar.rs` — eleven are rejected with a reason and a
 named revisit trigger, and seven have a
 ready-to-file issue body under `docs/issues/` — along with three prerequisites
 the triage surfaced (an element role convention, a menu-vs-listbox naming
-decision, and adopt-or-delete for `src/traits/portal.rs`). The last is settled:
-the trait is deleted and the convention that replaces it is
-[docs/overlays.md](docs/overlays.md). The role convention is still open, and is
-why `Table` reports no accessibility roles.
+decision, and adopt-or-delete for `src/traits/portal.rs`). The last two are
+settled, both by deleting the thing in question: the trait is gone and the
+convention that replaces it is [docs/overlays.md](docs/overlays.md), and
+`Dropdown` is gone and the decision that replaces it is
+[docs/menus-and-listboxes.md](docs/menus-and-listboxes.md). The role convention
+is still open, and is why `Table` reports no accessibility roles.
 
 The lists that used to live here are gone deliberately. Restating a roster in a
 second, uncheckable place is how the old one stayed alive for a year after the

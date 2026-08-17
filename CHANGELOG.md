@@ -121,6 +121,14 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- A focused input no longer swallows `Copy` when it has nothing selected. gpui
+  clears `propagate_event` before every bubble-phase listener, so an
+  empty-selection `copy` that simply returned was indistinguishable from one
+  that handled the action, and ⌘C never reached anything further out on the
+  focus path — a markdown selection elsewhere in the window, say. `InputState`
+  now calls `cx.propagate()` in that branch; an input with a selection consumes
+  the action exactly as before, and `Cut` is untouched because an empty
+  selection means something there (it cuts the current line)
 - A single-line `input()` is no longer zero pixels tall. It paints text and has
   no children, so an `Auto` height resolved to zero and the field was invisible
   until whatever contained it happened to set a height — which is why

@@ -54,6 +54,15 @@ actions!(
         /// Cut selected text to clipboard.
         Cut,
         /// Copy selected text to clipboard.
+        ///
+        /// An input only consumes this action when it actually has a selection.
+        /// With an empty selection it calls `cx.propagate()`, so the action
+        /// continues outward along the focus path and a handler registered
+        /// above the input — copying a markdown selection, say — still runs.
+        /// Register that handler with `on_action::<Copy>` on an ancestor; for
+        /// it to fire when focus is outside an input as well, also bind the
+        /// copy key to `Copy` in a wider key context (the crate's own bindings
+        /// only cover the `Input` context).
         Copy,
         /// Insert a newline at the cursor position, or submit when the input's
         /// submit mode is `SubmitOn::Enter`.

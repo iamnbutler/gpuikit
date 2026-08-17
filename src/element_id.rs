@@ -136,7 +136,23 @@ mod tests {
         let src = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
         let mut offenders = Vec::new();
 
-        for file in rust_files(&src) {
+        let files = rust_files(&src);
+
+        // A scan that finds nothing to scan reports no offenders, which is
+        // indistinguishable from a clean crate. `constant_ids` is unit-tested
+        // above, so the matcher cannot silently stop matching; this is the
+        // other half — the corpus cannot silently become empty. The floor is
+        // far below the real count and only has to be non-trivial.
+        assert!(
+            files.len() > 20,
+            "the scan found only {} source file(s) under {}, so it is not \
+             guarding anything — check how the source tree is being located \
+             before trusting a green result here",
+            files.len(),
+            src.display()
+        );
+
+        for file in files {
             let source = fs::read_to_string(&file).expect("source file is readable");
             let relative = file
                 .strip_prefix(&src)

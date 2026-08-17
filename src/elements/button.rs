@@ -1,9 +1,11 @@
-use crate::theme::{ActiveTheme, Themeable};
-use crate::{layout::h_stack, traits, traits::disableable::Disableable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::{
+    layout::h_stack, traits, traits::control_sized::ControlSized, traits::disableable::Disableable,
+};
 use gpui::{
-    prelude::FluentBuilder, rems, AnyView, App, ClickEvent, ElementId, FontWeight,
-    InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement, Styled, Window,
+    prelude::FluentBuilder, AnyView, App, ClickEvent, ElementId, FontWeight, InteractiveElement,
+    IntoElement, MouseButton, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
+    Styled, Window,
 };
 
 pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Button {
@@ -24,6 +26,7 @@ pub struct Button {
     id: ElementId,
     label: SharedString,
     disabled: bool,
+    size: ControlSize,
     handler: Option<Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>>,
     tooltip: Option<Box<dyn Fn(&mut Window, &mut App) -> AnyView + 'static>>,
 }
@@ -37,6 +40,7 @@ impl Button {
             id,
             label,
             disabled: false,
+            size: ControlSize::default(),
             handler: None,
             tooltip: None,
         }
@@ -64,17 +68,19 @@ impl Button {
 impl RenderOnce for Button {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
+        let metrics = theme.control(self.size);
 
         h_stack()
             .id(self.id)
-            .h(rems(1.0))
-            .px(rems(0.5))
-            .gap(rems(0.25))
+            .h(metrics.height)
+            .px(metrics.padding_x)
+            .gap(metrics.gap)
             .flex_none()
             .items_center()
             .justify_center()
-            .rounded(rems(0.25))
-            .text_xs()
+            .rounded(metrics.radius)
+            .text_size(metrics.text_size)
+            .line_height(metrics.line_height)
             .font_weight(FontWeight::MEDIUM)
             .bg(theme.button_bg())
             .text_color(theme.fg())
@@ -129,6 +135,13 @@ impl Disableable for Button {
 
     fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+}
+
+impl ControlSized for Button {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
         self
     }
 }

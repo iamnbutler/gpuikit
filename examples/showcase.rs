@@ -28,8 +28,7 @@ use gpuikit::{
         empty::empty,
         field::{field, LabelPosition},
         icon_button::icon_button,
-        input_group::{input_group, InputAddon},
-        kbd::{kbd, kbd_combo, KbdSize},
+        kbd::{kbd, kbd_combo},
         label::label,
         list::{List, ListEntry},
         loading_indicator::loading_indicator,
@@ -42,6 +41,7 @@ use gpuikit::{
         slider::{slider, Slider},
         switch::{switch, Switch},
         tabs::{tab, tabs, Tabs},
+        text_field::{text_field, Adornment},
         textarea::textarea,
         toast::ToastExt,
         toggle::{toggle, Toggle},
@@ -50,6 +50,8 @@ use gpuikit::{
         typography::{blockquote, h1, h2, h3, h4, lead, p, small, text},
     },
     layout::{h_stack, v_stack},
+    theme::ControlSize,
+    traits::control_sized::ControlSized,
     traits::disableable::Disableable,
     traits::labelable::Labelable,
     traits::orientable::Orientable,
@@ -180,7 +182,6 @@ const ELEMENT_COVERAGE: &[(&str, &str)] = &[
     ("field", "text"),
     ("icon_button", "button"),
     ("input", "text"),
-    ("input_group", "text"),
     ("kbd", "badge"),
     ("label", "badge"),
     ("list", "list"),
@@ -194,6 +195,7 @@ const ELEMENT_COVERAGE: &[(&str, &str)] = &[
     ("slider", "slider"),
     ("switch", "toggle"),
     ("tabs", "tabs"),
+    ("text_field", "text"),
     ("textarea", "text"),
     ("toast", "toast"),
     ("toggle", "toggle"),
@@ -210,6 +212,7 @@ const ELEMENT_COVERAGE: &[(&str, &str)] = &[
 /// are built once, in `Showcase::new`, because `render` runs on every frame and
 /// the sidebar does not change between them.
 const NAV_SECTIONS: &[(&str, &[(&str, &str)])] = &[
+    ("Foundations", &[("control-sizes", "Control Sizes")]),
     (
         "Input",
         &[
@@ -398,9 +401,20 @@ struct Showcase {
     toggle_group_alignment: Entity<ToggleGroup<Alignment>>,
     toggle_group_text_style: Entity<ToggleGroup<TextStyle>>,
     tabs_example: Entity<Tabs>,
-    input_with_icon: Entity<InputState>,
-    input_with_text: Entity<InputState>,
-    input_with_button: Entity<InputState>,
+    text_field_plain: Entity<InputState>,
+    text_field_icon: Entity<InputState>,
+    text_field_affixes: Entity<InputState>,
+    text_field_action: Entity<InputState>,
+    text_field_composed: Entity<InputState>,
+    text_field_disabled: Entity<InputState>,
+    /// One of each stateful control per rung, for the Control Sizes page.
+    /// Indexed by `ControlSize::ALL`.
+    control_row_checkboxes: [Entity<Checkbox>; 3],
+    control_row_switches: [Entity<Switch>; 3],
+    control_row_toggles: [Entity<Toggle>; 3],
+    control_row_selects: [Entity<SelectState<Size>>; 3],
+    control_row_dropdowns: [Entity<DropdownState<Size>>; 3],
+    control_row_fields: [Entity<InputState>; 3],
     textarea_example: Entity<InputState>,
     popover_example: Entity<PopoverState>,
     dialog_example: Entity<DialogState>,
@@ -626,9 +640,67 @@ impl Showcase {
                 .tab(tab("disabled", "Disabled").disabled(true))
         });
 
-        let input_with_icon = cx.new(|cx| InputState::new_singleline(cx));
-        let input_with_text = cx.new(|cx| InputState::new_singleline(cx));
-        let input_with_button = cx.new(|cx| InputState::new_singleline(cx));
+        let text_field_plain = cx.new(|cx| InputState::new_singleline(cx));
+        let text_field_icon = cx.new(|cx| InputState::new_singleline(cx));
+        let text_field_affixes = cx.new(|cx| InputState::new_singleline(cx));
+        let text_field_action = cx.new(|cx| InputState::new_singleline(cx));
+        let text_field_composed = cx.new(|cx| InputState::new_singleline(cx));
+        let text_field_disabled = cx.new(|cx| InputState::new_singleline(cx));
+        // One of each stateful control per rung. Built here rather than in
+        // `render` because `render` runs every frame.
+        let control_row_checkboxes = ControlSize::ALL.map(|size| {
+            cx.new(|_cx| {
+                checkbox(
+                    SharedString::from(format!("control-row-checkbox-{}", size.name())),
+                    true,
+                )
+                .control_size(size)
+            })
+        });
+        let control_row_switches = ControlSize::ALL.map(|size| {
+            cx.new(|_cx| {
+                switch(
+                    SharedString::from(format!("control-row-switch-{}", size.name())),
+                    true,
+                )
+                .control_size(size)
+            })
+        });
+        let control_row_toggles = ControlSize::ALL.map(|size| {
+            cx.new(|_cx| {
+                toggle(
+                    SharedString::from(format!("control-row-toggle-{}", size.name())),
+                    true,
+                )
+                .control_size(size)
+            })
+        });
+        let control_row_selects = ControlSize::ALL.map(|size| {
+            cx.new(|_cx| {
+                SelectState::new(
+                    select(
+                        SharedString::from(format!("control-row-select-{}", size.name())),
+                        vec![(Size::Small, "Small"), (Size::Medium, "Medium")],
+                    )
+                    .selected(Size::Medium)
+                    .control_size(size),
+                )
+            })
+        });
+        let control_row_dropdowns = ControlSize::ALL.map(|size| {
+            cx.new(|_cx| {
+                DropdownState::new(
+                    dropdown(
+                        SharedString::from(format!("control-row-dropdown-{}", size.name())),
+                        vec![(Size::Small, "Small"), (Size::Medium, "Medium")],
+                        Size::Medium,
+                    )
+                    .control_size(size),
+                )
+            })
+        });
+        let control_row_fields =
+            ControlSize::ALL.map(|_| cx.new(|cx| InputState::new_singleline(cx)));
         let textarea_example = cx.new(|cx| InputState::new_multiline(cx));
 
         let popover_example = cx.new(|_cx| {
@@ -711,9 +783,18 @@ impl Showcase {
             toggle_group_alignment,
             toggle_group_text_style,
             tabs_example,
-            input_with_icon,
-            input_with_text,
-            input_with_button,
+            text_field_plain,
+            text_field_icon,
+            text_field_affixes,
+            text_field_action,
+            text_field_composed,
+            text_field_disabled,
+            control_row_checkboxes,
+            control_row_switches,
+            control_row_toggles,
+            control_row_selects,
+            control_row_dropdowns,
+            control_row_fields,
             textarea_example,
             popover_example,
             dialog_example,
@@ -1256,8 +1337,27 @@ impl Showcase {
             )
     }
 
-    fn render_input_group_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_text_field_page(&self, cx: &Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
+
+        fn row(
+            label: &'static str,
+            field: impl IntoElement,
+            theme: &std::sync::Arc<gpuikit::theme::Theme>,
+        ) -> impl IntoElement {
+            h_stack()
+                .gap_2()
+                .items_center()
+                .child(
+                    div()
+                        .w(gpui::rems(6.0))
+                        .text_sm()
+                        .text_color(theme.fg_muted())
+                        .child(label),
+                )
+                .child(field)
+        }
+
         v_stack()
             .gap_4()
             .child(
@@ -1265,56 +1365,63 @@ impl Showcase {
                     .text_lg()
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(theme.fg_muted())
-                    .child("InputGroup"),
+                    .child("TextField"),
             )
             .child(
                 v_stack()
                     .gap_3()
-                    .child(
+                    .child(row(
+                        "Plain:",
+                        text_field(&self.text_field_plain, cx).placeholder("Your name"),
+                        theme,
+                    ))
+                    .child(row(
+                        "Icon:",
+                        text_field(&self.text_field_icon, cx)
+                            .placeholder("Search")
+                            .prefix(Adornment::icon(DefaultIcons::magnifying_glass())),
+                        theme,
+                    ))
+                    .child(row(
+                        "Affixes:",
+                        text_field(&self.text_field_affixes, cx)
+                            .placeholder("example")
+                            .prefix(Adornment::text("https://"))
+                            .suffix(Adornment::text(".com")),
+                        theme,
+                    ))
+                    .child(row(
+                        "Inline:",
+                        // An action *inside* the field is an adornment. It has
+                        // to fit the box, so it takes the same rung.
+                        text_field(&self.text_field_action, cx)
+                            .placeholder("Type to filter")
+                            .suffix(Adornment::element(
+                                icon_button("text-field-clear", DefaultIcons::cross_1()).small(),
+                            )),
+                        theme,
+                    ))
+                    .child(row(
+                        "Beside:",
+                        // A button that is its own box beside the field is
+                        // composition, not a field feature — which is the
+                        // three-boxes-pretending-to-be-one shape InputGroup was.
                         h_stack()
                             .gap_2()
                             .items_center()
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(theme.fg_muted())
-                                    .child("With icon:"),
-                            )
-                            .child(
-                                input_group(&self.input_with_icon, cx)
-                                    .left_addon(InputAddon::icon(DefaultIcons::magnifying_glass())),
-                            ),
-                    )
-                    .child(
-                        h_stack()
-                            .gap_2()
-                            .items_center()
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(theme.fg_muted())
-                                    .child("With text:"),
-                            )
-                            .child(
-                                input_group(&self.input_with_text, cx)
-                                    .left_addon(InputAddon::text("https://")),
-                            ),
-                    )
-                    .child(
-                        h_stack()
-                            .gap_2()
-                            .items_center()
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(theme.fg_muted())
-                                    .child("With button:"),
-                            )
-                            .child(
-                                input_group(&self.input_with_button, cx)
-                                    .right_addon(InputAddon::button(button("go-btn", "Go"))),
-                            ),
-                    ),
+                            .child(text_field(&self.text_field_composed, cx).placeholder("Query"))
+                            .child(button("text-field-go", "Go")),
+                        theme,
+                    ))
+                    .child(row(
+                        "Disabled:",
+                        // Actually inert: a disabled field renders its value as
+                        // static text rather than a dimmed live input.
+                        text_field(&self.text_field_disabled, cx)
+                            .placeholder("Unavailable")
+                            .disabled(true),
+                        theme,
+                    )),
             )
     }
 
@@ -1412,13 +1519,13 @@ impl Showcase {
                     .gap_2()
                     .items_center()
                     .mt_2()
-                    .child(kbd("S").size(KbdSize::Small))
+                    .child(kbd("S").small())
                     .child(kbd("M"))
-                    .child(kbd("L").size(KbdSize::Large))
+                    .child(kbd("L").large())
                     .child(
                         div()
                             .text_color(theme.fg_muted())
-                            .child("(small / default / large)"),
+                            .child("(small / medium / large)"),
                     ),
             )
     }
@@ -2419,6 +2526,115 @@ impl Showcase {
             .child(demo)
     }
 
+    /// Every control that can share a row, on one row, once per rung.
+    ///
+    /// Each row sits on a tinted stripe exactly the rung's height, so a control
+    /// that is off its rung is visible immediately rather than only in a test.
+    fn render_control_sizes_page(&self, cx: &Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+
+        v_stack()
+            .gap_6()
+            .child(
+                v_stack()
+                    .gap_1()
+                    .child(
+                        div()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child("Control Sizes"),
+                    )
+                    .child(div().text_sm().text_color(theme.fg_muted()).child(
+                        "One rung per row. The stripe behind each row is exactly the \
+                         rung's height — a control that overhangs it is off its rung.",
+                    )),
+            )
+            .children(
+                ControlSize::ALL
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, size)| {
+                        let metrics = theme.control(size);
+
+                        v_stack()
+                            .gap_2()
+                            .child(
+                                h_stack()
+                                    .gap_2()
+                                    .items_baseline()
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .child(size.name()),
+                                    )
+                                    .child(div().text_xs().text_color(theme.fg_muted()).child(
+                                        format!(
+                                            "{}px tall · {}px text",
+                                            metrics.height.0 * 16.0,
+                                            metrics.text_size.0 * 16.0,
+                                        ),
+                                    )),
+                            )
+                            .child(
+                                div()
+                                    .relative()
+                                    .child(
+                                        // The stripe is the rung, drawn behind the row.
+                                        div()
+                                            .absolute()
+                                            .top_0()
+                                            .left_0()
+                                            .right_0()
+                                            .h(metrics.height)
+                                            .bg(theme.accent().opacity(0.12)),
+                                    )
+                                    .child(
+                                        h_stack()
+                                            .gap_3()
+                                            // Flex defaults to stretch, which would
+                                            // give every control the row's height and
+                                            // make this page prove nothing.
+                                            .items_start()
+                                            .flex_wrap()
+                                            .child(
+                                                button(
+                                                    SharedString::from(format!(
+                                                        "control-row-button-{}",
+                                                        size.name()
+                                                    )),
+                                                    "Button",
+                                                )
+                                                .control_size(size),
+                                            )
+                                            .child(
+                                                icon_button(
+                                                    SharedString::from(format!(
+                                                        "control-row-icon-{}",
+                                                        size.name()
+                                                    )),
+                                                    DefaultIcons::star(),
+                                                )
+                                                .control_size(size),
+                                            )
+                                            .child(badge("Badge").control_size(size))
+                                            .child(kbd("K").control_size(size))
+                                            .child(self.control_row_checkboxes[index].clone())
+                                            .child(self.control_row_switches[index].clone())
+                                            .child(self.control_row_toggles[index].clone())
+                                            .child(self.control_row_selects[index].clone())
+                                            .child(self.control_row_dropdowns[index].clone())
+                                            .child(
+                                                text_field(&self.control_row_fields[index], cx)
+                                                    .placeholder("Field")
+                                                    .control_size(size),
+                                            ),
+                                    ),
+                            )
+                    }),
+            )
+    }
+
     fn render_coverage_page(&self, cx: &Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
 
@@ -2686,10 +2902,11 @@ impl Render for Showcase {
                 .child(self.render_dropdown_page(cx))
                 .child(self.render_select_page(cx))
                 .into_any_element(),
+            "control-sizes" => self.render_control_sizes_page(cx).into_any_element(),
             "text" => v_stack()
                 .gap_8()
                 .child(self.render_field_page(cx))
-                .child(self.render_input_group_page(cx))
+                .child(self.render_text_field_page(cx))
                 .child(self.render_textarea_page(cx))
                 .into_any_element(),
             "slider" => self.render_slider_page(cx).into_any_element(),

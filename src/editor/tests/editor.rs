@@ -889,15 +889,72 @@ fn test_control_characters() {
     assert_eq!(editor.cursor_position(), CursorPosition::new(0, 4));
 }
 
+/// Paint every line through `Editor::highlight_line`, in order, exactly as
+/// `EditorElement::paint_line` does, and return the colour of each *painted*
+/// byte.
+///
+/// It also asserts the invariant the paint loop depends on: the runs must sum
+/// to exactly the display line, because that same string is what
+/// `shape_line` is handed. `Editor::highlight_line` parses the line with the
+/// newline the grammar wants and trims back to here, and this is what catches
+/// it if the trim is ever dropped.
+#[cfg(test)]
+fn painted_colors(editor: &mut Editor, lines: &[String]) -> Vec<Vec<Option<gpui::Hsla>>> {
+    lines
+        .iter()
+        .enumerate()
+        .map(|(index, line)| {
+            let runs = editor.highlight_line(line, index, "Courier".into(), 14.0);
+            let painted: usize = runs.iter().map(|run| run.len).sum();
+            assert_eq!(
+                painted,
+                line.len(),
+                "line {index} ({line:?}) got runs covering {painted} bytes, but \
+                 `shape_line` is given the {} bytes of the line itself",
+                line.len(),
+            );
+            runs.iter()
+                .flat_map(|run| std::iter::repeat(Some(run.color)).take(run.len))
+                .collect()
+        })
+        .collect()
+}
+
+/// The same per-byte colours from the stateless whole-document pass, split back
+/// up by display line.
+///
+/// This is the oracle: same grammar, same theme, same `HighlightIterator`,
+/// differing only in how the cross-line state is carried. It is only a valid
+/// comparison because both sides now feed syntect lines that carry their `\n`.
+#[cfg(test)]
+fn block_colors_per_line(text: &str, language: &str) -> Vec<Vec<Option<gpui::Hsla>>> {
+    let highlighter = SyntaxHighlighter::new();
+    let mut colors: Vec<Option<gpui::Hsla>> = vec![None; text.len()];
+    for (range, style) in highlighter.highlight_block(text, language) {
+        for slot in &mut colors[range] {
+            *slot = style.color;
+        }
+    }
+
+    let mut per_line = Vec::new();
+    let mut offset = 0;
+    for line in text.split('\n') {
+        per_line.push(colors[offset..offset + line.len()].to_vec());
+        offset += line.len() + 1; // the separator this line was split on
+    }
+    per_line
+}
+
 /// The #135 regression through the path the paint loop actually uses:
 /// `Editor::highlight_line`, which runs `ensure_parse_states` first. The second
 /// parse used to overwrite the correct state that call had just cached, so the
 /// next `ensure_parse_states` adopted the corrupt entry as its starting point.
 ///
-/// Editor lines arrive without their trailing newline, so this cannot be
-/// compared byte-for-byte against the stateless block pass (see the highlighter's
-/// own tests for that); it asserts the structural property instead — the code
-/// after `*/` is highlighted as code, not flattened to one plain colour.
+/// Now that the editor feeds syntect the same newline-carrying lines
+/// `highlight_block` gets, this can assert the strong form the issue asked for:
+/// the painted colours must match the stateless block pass byte for byte. The
+/// structural assertions are kept underneath as documentation of what that
+/// comparison stands for.
 #[test]
 fn test_line_after_block_comment_is_highlighted_as_code() {
     let lines: Vec<String> = [
@@ -913,27 +970,123 @@ fn test_line_after_block_comment_is_highlighted_as_code() {
     let mut editor = Editor::new("test_block_comment", lines.clone());
     editor.set_language("JavaScript".to_string());
 
-    // Paint the lines in order, as the element does.
-    let painted: Vec<Vec<gpui::TextRun>> = lines
-        .iter()
-        .enumerate()
-        .map(|(index, line)| editor.highlight_line(line, index, "Courier".into(), 14.0))
-        .collect();
+    let painted = painted_colors(&mut editor, &lines);
+    assert_eq!(
+        painted,
+        block_colors_per_line(&lines.join("\n"), "JavaScript"),
+        "painting line by line disagreed with the stateless block pass"
+    );
 
-    let comment_color = painted[1][0].color;
+    let comment_color = painted[1][0];
     let code = &painted[3];
 
     assert!(
-        code.iter().all(|run| run.color != comment_color),
+        code.iter().all(|color| *color != comment_color),
         "the line after `*/` is still painted in the comment colour"
     );
 
     let distinct: std::collections::HashSet<String> =
-        code.iter().map(|run| format!("{:?}", run.color)).collect();
+        code.iter().map(|color| format!("{color:?}")).collect();
     assert!(
         distinct.len() >= 2,
         "the line after `*/` collapsed to {} colour(s); `function` and `after` \
          should not share the plain-text colour",
         distinct.len()
     );
+}
+
+/// #142: the syntax set is `load_defaults_newlines`, so a `//` comment only
+/// closes when the parser is shown the newline that closes it. Stripping the
+/// separator left the comment open forever and painted every following line as
+/// comment.
+///
+/// The language matters. Rust's `//` does *not* diverge in syntect 5.3's
+/// default newline grammars — which is why the existing `("Rust", "// just a
+/// line comment\n…")` fixture never caught this. JavaScript and C do.
+#[test]
+fn test_line_comment_terminates_at_end_of_line() {
+    let lines: Vec<String> = [
+        "// a line comment",
+        "function after() { return 2; }",
+        "const tail = 3;",
+    ]
+    .iter()
+    .map(|line| line.to_string())
+    .collect();
+
+    let mut editor = Editor::new("test_line_comment", lines.clone());
+    editor.set_language("JavaScript".to_string());
+
+    let painted = painted_colors(&mut editor, &lines);
+    assert_eq!(
+        painted,
+        block_colors_per_line(&lines.join("\n"), "JavaScript"),
+        "the `//` comment leaked past its newline"
+    );
+
+    let comment_color = painted[0][0];
+    assert!(
+        painted[1].iter().all(|color| *color != comment_color),
+        "the line after a `//` comment is still painted in the comment colour"
+    );
+}
+
+/// The other shape of #142: a string the grammar closes at end of line. Without
+/// the newline the Python grammar never terminates it, so the following line is
+/// painted as string.
+#[test]
+fn test_unterminated_python_string_ends_at_its_newline() {
+    let lines: Vec<String> = ["x = 'unterminated", "y = 2", "z = 3"]
+        .iter()
+        .map(|line| line.to_string())
+        .collect();
+
+    let mut editor = Editor::new("test_unterminated_string", lines.clone());
+    editor.set_language("Python".to_string());
+
+    let painted = painted_colors(&mut editor, &lines);
+    assert_eq!(
+        painted,
+        block_colors_per_line(&lines.join("\n"), "Python"),
+        "the unterminated string ran on past its newline"
+    );
+
+    let string_color = painted[0][4]; // the opening quote
+    assert!(
+        painted[1].iter().all(|color| *color != string_color),
+        "the line after an unterminated string is still painted as string"
+    );
+}
+
+/// The buffer decides which lines are newline-terminated, and the last one is
+/// not — matching what `LinesWithEndings` gives `highlight_block` for the same
+/// text. This guards the run-length invariant the fix could have broken: an
+/// empty line must still come back with exactly one zero-length run, not an
+/// empty `Vec`.
+#[test]
+fn test_last_line_is_not_given_a_separator_it_does_not_have() {
+    let lines: Vec<String> = ["fn main() {}", "", "// trailing"]
+        .iter()
+        .map(|line| line.to_string())
+        .collect();
+
+    let mut editor = Editor::new("test_last_line", lines.clone());
+    editor.set_language("Rust".to_string());
+
+    // `painted_colors` asserts runs sum to the line on every line, including
+    // the unterminated last one.
+    let painted = painted_colors(&mut editor, &lines);
+    assert_eq!(
+        painted,
+        block_colors_per_line(&lines.join("\n"), "Rust"),
+        "the last line was parsed as if it had a separator"
+    );
+
+    let empty_line_runs = editor.highlight_line("", 1, "Courier".into(), 14.0);
+    assert_eq!(
+        empty_line_runs.len(),
+        1,
+        "an empty line must keep exactly one zero-length run"
+    );
+    assert_eq!(empty_line_runs[0].len, 0);
 }

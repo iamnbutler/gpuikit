@@ -3,13 +3,14 @@
 //! A sliding switch control for toggling boolean values, similar to iOS-style switches.
 
 use crate::layout::h_stack;
-use crate::theme::{ActiveTheme, Themeable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use crate::traits::labelable::Labelable;
 use crate::traits::selectable::Selectable;
 use crate::utils::element_manager::ElementManagerExt;
 use gpui::{
-    div, prelude::*, rems, App, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
+    div, prelude::*, App, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
     MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
 };
 
@@ -34,6 +35,7 @@ pub struct Switch {
     label: Option<SharedString>,
     on: bool,
     disabled: bool,
+    size: ControlSize,
 }
 
 impl EventEmitter<SwitchChanged> for Switch {}
@@ -45,6 +47,7 @@ impl Switch {
             label: None,
             on,
             disabled: false,
+            size: ControlSize::default(),
         }
     }
 
@@ -84,15 +87,15 @@ impl Switch {
 impl Render for Switch {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
+        let metrics = theme.control(self.size);
         let on = self.on;
         let disabled = self.disabled;
         let label = self.label.clone();
 
-        // Switch dimensions - wider and shorter than toggle for a more pronounced switch look
-        let track_width = rems(2.75);
-        let track_height = rems(1.5);
-        let thumb_size = rems(1.25);
-        let thumb_margin = rems(0.125);
+        // Shared with `Toggle`. The two used to name their own track shapes and
+        // had drifted to different ones; what still tells them apart is the
+        // surface-coloured thumb and the heavier shadow below.
+        let track = metrics.track();
 
         let track_bg = if disabled {
             theme.surface_tertiary()
@@ -118,7 +121,10 @@ impl Render for Switch {
 
         h_stack()
             .id(self.id.clone())
-            .gap(rems(0.5))
+            .h(metrics.height)
+            // A label outside the control's own box wants more room than the
+            // gap between an icon and a label inside one.
+            .gap(metrics.gap * 2.0)
             .items_center()
             .when(!disabled, |this| {
                 this.cursor_pointer()
@@ -131,12 +137,12 @@ impl Render for Switch {
             .child(
                 div()
                     .relative()
-                    .w(track_width)
-                    .h(track_height)
+                    .w(track.width)
+                    .h(track.height)
                     .bg(track_bg)
                     .border_1()
                     .border_color(track_border)
-                    .rounded(track_height / 2.)
+                    .rounded(track.height / 2.)
                     .when(!disabled, |this| {
                         this.hover(|style| {
                             style.border_color(if on {
@@ -149,10 +155,10 @@ impl Render for Switch {
                     .child(
                         div()
                             .absolute()
-                            .top(thumb_margin)
-                            .when(on, |this| this.right(thumb_margin))
-                            .when(!on, |this| this.left(thumb_margin))
-                            .size(thumb_size)
+                            .top(track.thumb_margin)
+                            .when(on, |this| this.right(track.thumb_margin))
+                            .when(!on, |this| this.left(track.thumb_margin))
+                            .size(track.thumb)
                             .bg(thumb_bg)
                             .rounded_full()
                             .shadow_md(),
@@ -161,7 +167,8 @@ impl Render for Switch {
             .when_some(label, |this, label| {
                 this.child(
                     div()
-                        .text_sm()
+                        .text_size(metrics.text_size)
+                        .line_height(metrics.line_height)
                         .text_color(if disabled {
                             theme.fg_disabled()
                         } else {
@@ -201,6 +208,13 @@ impl Selectable for Switch {
 
     fn selected(mut self, selected: bool) -> Self {
         self.on = selected;
+        self
+    }
+}
+
+impl ControlSized for Switch {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
         self
     }
 }

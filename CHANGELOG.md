@@ -6,6 +6,36 @@ All notable changes to this project will be documented in this file.
 
 ### Breaking Changes
 
+- `InputGroup` is gone, replaced by `TextField`
+  (`gpuikit::elements::text_field`). The group drew an addon cell, a stripped
+  input and another addon cell as three sibling boxes and spent most of its
+  code disguising them as one; the field is a single bordered box that owns the
+  border, background, radius, hover/focus/disabled states and padding, with
+  optional adornments laid inside it. Migration:
+  `input_group(&state, cx).left_addon(InputAddon::icon(icon))` becomes
+  `text_field(&state, cx).prefix(Adornment::icon(icon))`, and `right_addon` /
+  `InputAddon::text` become `suffix` / `Adornment::text`.
+  `InputAddon::button` has no replacement on purpose — a button that is its own
+  box beside a field is composition,
+  `h_stack().child(text_field(…)).child(button(…))`; an action *inside* the
+  field is `Adornment::element`
+- `KbdSize` is gone; `Kbd` takes the shared `ControlSize` like every other
+  control. `kbd("S").size(KbdSize::Small)` becomes `kbd("S").small()`, and
+  `KbdSize::Default` is now `ControlSize::Medium`
+- `IconButton`'s pixel API is rems. `.size(px(24.))` becomes `.box_size(…)` —
+  renamed because `.size()` read as though it set the *control* size, which is
+  now `.small()` / `.medium()` / `.large()` — and `.width`, `.height` and
+  `.icon_size` take `impl Into<Rems>` instead of `impl Into<Pixels>`
+- `DropdownMenu::build` takes a `ControlSize` as its third argument, so a
+  popup's rows are the size of the trigger they dropped out of
+- `Input` applies the rung's font size and line height in the same base text
+  style that already forced the theme foreground, so a wrapper's `.text_lg()`
+  no longer reaches an input. This is deliberate — a declared height and
+  inherited text disagree, and the height is what a row is aligned on —
+  but `.text_size()` on the input itself still wins, as before
+- `Theme` gains a non-`Option` `controls: ControlScale` field. Themes built
+  through `Theme::new` (which is all of the bundled ones) are unaffected;
+  a struct-literal `Theme { … }` has to name it
 - `SelectableText::new` takes two more arguments: the run's plain text, and a
   `RunRole` saying how the run is announced. A run can no longer be built
   without deciding what it is. It exists to serve the markdown renderer, so
@@ -19,6 +49,33 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- A shared control size scale, in `gpuikit::theme::control`. `ControlSize`
+  names a rung — `Small` / `Medium` / `Large`, 16 / 20 / 24px at a 16px root,
+  `Medium` the default — and `Themeable::control` resolves it into a
+  `ControlMetrics` carrying height, horizontal padding, gap, radius, text size,
+  line box and *ink*, how much of its box a control's graphic fills. Every
+  control that can share a row takes one through the new
+  `traits::control_sized::ControlSized` trait, with free `.small()` /
+  `.medium()` / `.large()`: `Button`, `IconButton`, `Checkbox`, `Switch`,
+  `Toggle`, `Select`, `Dropdown`, `Badge`, `Kbd`, `Input`, `TextField`,
+  `Textarea` and `Field`. All dimensions are rems, and a theme rescales the
+  whole set at once through `Theme::controls`
+- `TextField` (`gpuikit::elements::text_field`) — the single-line counterpart
+  to `Textarea`, and the replacement for `InputGroup`. One bordered box, with
+  optional `prefix`/`suffix` `Adornment`s (an icon, a short label, or any
+  element) laid inside it. Two behaviours improve out of the shape: a click
+  anywhere in the box focuses the text, and a disabled field is actually inert
+  — it renders its value as static text — rather than a dimmed live input that
+  still took keystrokes
+- A "Control Sizes" showcase page under a new Foundations nav section: every
+  control on one row, one row per rung, each row on a tinted stripe exactly the
+  rung's height so a control off its rung is visible at a glance. Backed by
+  cross-element tests in `src/elements/control_size_tests.rs` that draw the
+  same row in a test window and measure each box
+- `docs/component-triage.md` — a decision per component for all 29 entries of
+  the deferred list, with 13 ready-to-file issue bodies under `docs/issues/`,
+  and tests in `src/elements.rs` that fail the build if the verdict table stops
+  describing the crate
 - `LoadingIndicator::playing(bool)`. A paused indicator renders its first frame
   and subscribes to nothing, so it costs its window no redraws at all;
   `App::reduce_motion` has the same effect regardless of the setting. The
@@ -64,6 +121,37 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- A single-line `input()` is no longer zero pixels tall. It paints text and has
+  no children, so an `Auto` height resolved to zero and the field was invisible
+  until whatever contained it happened to set a height — which is why
+  `InputGroup` hardcoded `h(px(36.))` and `examples/input/sandbox.rs` wraps one
+  in a `div().h(px(40.))`. An `Auto`-height single-line input now falls back to
+  its rung's height (iamnbutler/tasks#919)
+- Controls that can share a row are the same height. `Button` was 16px,
+  `Toggle` 20px, `Switch` and `IconButton` 24px, `InputGroup` 36px, and
+  `Select`, `Dropdown`, `Badge`, `Kbd` and `Input` declared no height at all —
+  whatever padding plus a line box came to. All of them now declare one from
+  the shared scale
+- `Switch` and `Toggle` draw the same track. They had drifted to 2.75×1.5rem
+  and 2.25×1.25rem with nothing holding them together, and both thumbs
+  overflowed their track by 2px: an absolute inset is relative to the padding
+  box, so the 1px border was not subtracted anywhere. The shape is now derived
+  once, in `ControlMetrics::track`
+- `Field`'s beside-label no longer guesses at the input's height. The
+  `pt(rems(0.5)) // Align with input` is gone; the label's box is exactly the
+  input's box, so the two lines of text centre against each other
+- The editor and the markdown code-fence highlighter are on one newline
+  convention. The crate parses against `SyntaxSet::load_defaults_newlines()`,
+  whose grammars anchor rules to end of line, but the editor stripped the `\n`
+  before feeding a line to syntect while `highlight_block` kept it. A
+  JavaScript or C `//` comment therefore never closed and painted the following
+  line as comment, and a Python string left unterminated at end of line ran on
+  into the next. `GapBuffer::to_lines_with_endings()` is the accessor the
+  highlighting path now uses; `Editor::highlight_line` parses the line with the
+  separator the buffer says follows it and trims the runs back to the painted
+  bytes, so its external contract — runs summing to exactly the display line
+  `shape_line` is given — is unchanged. The editor-level test from the
+  double-parse fix now asserts against `highlight_block` per byte
 - A `LoadingIndicator` no longer pins its window at the display refresh rate.
   It animated through `Animation::new(..).repeat()`, and a gpui
   `AnimationElement` asks for another frame for as long as its animation is

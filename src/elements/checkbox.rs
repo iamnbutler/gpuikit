@@ -1,12 +1,13 @@
 //! Checkbox component for gpuikit
 
 use crate::layout::h_stack;
-use crate::theme::{ActiveTheme, Themeable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use crate::traits::labelable::Labelable;
 use crate::traits::selectable::Selectable;
 use gpui::{
-    div, prelude::*, px, rems, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
+    div, prelude::*, px, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
     MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
 };
 
@@ -22,6 +23,7 @@ pub struct Checkbox {
     checked: bool,
     disabled: bool,
     indeterminate: bool,
+    size: ControlSize,
 }
 
 impl EventEmitter<CheckboxChanged> for Checkbox {}
@@ -34,6 +36,7 @@ impl Checkbox {
             checked,
             disabled: false,
             indeterminate: false,
+            size: ControlSize::default(),
         }
     }
 
@@ -85,12 +88,15 @@ impl Checkbox {
 impl Render for Checkbox {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
+        let metrics = theme.control(self.size);
         let checked = self.checked;
         let disabled = self.disabled;
         let indeterminate = self.indeterminate;
         let label = self.label.clone();
 
-        let box_size = rems(1.0);
+        // The row is the rung; the box is the ink inside it. Sizing the row
+        // off the box is what put the checkbox on a rung of its own.
+        let box_size = metrics.ink;
 
         let box_bg = if disabled {
             theme.surface_tertiary()
@@ -116,7 +122,10 @@ impl Render for Checkbox {
 
         h_stack()
             .id(self.id.clone())
-            .gap(rems(0.5))
+            .h(metrics.height)
+            // A label outside the control's own box wants more room than the
+            // gap between an icon and a label inside one.
+            .gap(metrics.gap * 2.0)
             .items_center()
             .when(!disabled, |this| {
                 this.cursor_pointer()
@@ -136,7 +145,7 @@ impl Render for Checkbox {
                     .bg(box_bg)
                     .border_1()
                     .border_color(box_border)
-                    .rounded(px(3.))
+                    .rounded(metrics.radius)
                     .when(!disabled, |this| {
                         this.hover(|style| {
                             style.border_color(if checked || indeterminate {
@@ -147,16 +156,31 @@ impl Render for Checkbox {
                         })
                     })
                     .when(checked && !indeterminate, |this| {
-                        this.child(div().text_xs().text_color(check_color).child("✓"))
+                        // The glyph sizes off the box, not off a constant, so
+                        // it stays proportional on every rung.
+                        this.child(
+                            div()
+                                .text_size(box_size * 0.75)
+                                .line_height(box_size)
+                                .text_color(check_color)
+                                .child("✓"),
+                        )
                     })
                     .when(indeterminate, |this| {
-                        this.child(div().w(rems(0.5)).h(px(2.)).bg(check_color).rounded(px(1.)))
+                        this.child(
+                            div()
+                                .w(box_size * 0.5)
+                                .h(px(2.))
+                                .bg(check_color)
+                                .rounded(px(1.)),
+                        )
                     }),
             )
             .when_some(label, |this, label| {
                 this.child(
                     div()
-                        .text_sm()
+                        .text_size(metrics.text_size)
+                        .line_height(metrics.line_height)
                         .text_color(if disabled {
                             theme.fg_disabled()
                         } else {
@@ -191,6 +215,13 @@ impl Selectable for Checkbox {
 
     fn selected(mut self, selected: bool) -> Self {
         self.checked = selected;
+        self
+    }
+}
+
+impl ControlSized for Checkbox {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
         self
     }
 }

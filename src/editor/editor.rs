@@ -193,7 +193,21 @@ impl Editor {
         }
     }
 
-    /// Get syntax highlighting for a line
+    /// Get syntax highlighting for a line.
+    ///
+    /// `line` is the *display* line — the caller passes what it is about to
+    /// shape, with no `\n` — and the returned runs cover exactly `line.len()`
+    /// bytes, because [`shape_line`](gpui::WindowTextSystem::shape_line) is
+    /// given that same string.
+    ///
+    /// Internally the line is parsed *with* the separator the buffer says
+    /// follows it, because the syntax set is `load_defaults_newlines`: a
+    /// grammar rule anchored to end of line only fires if the parser sees the
+    /// end of the line. Without it a `//` comment never closed and bled into
+    /// the following line. The runs are then trimmed back to the painted
+    /// bytes. The "is it terminated" decision comes from the buffer rather
+    /// than a blanket append, so the text parsed here is byte-identical to
+    /// what `ensure_parse_states` just parsed at the same index.
     pub fn highlight_line(
         &mut self,
         line: &str,
@@ -202,17 +216,32 @@ impl Editor {
         font_size: f32,
     ) -> Vec<TextRun> {
         // Ensure parse states are built up to this line
-        let lines: Vec<String> = self.buffer.to_lines();
+        let lines: Vec<String> = self.buffer.to_lines_with_endings();
         self.syntax_highlighter
             .ensure_parse_states(&self.language, line_index, &lines);
 
-        self.syntax_highlighter.highlight_line(
-            line,
+        let terminated = lines
+            .get(line_index)
+            .is_some_and(|buffer_line| buffer_line.ends_with('\n'));
+
+        let parsed = if terminated {
+            let mut parsed = String::with_capacity(line.len() + 1);
+            parsed.push_str(line);
+            parsed.push('\n');
+            parsed
+        } else {
+            line.to_string()
+        };
+
+        let runs = self.syntax_highlighter.highlight_line(
+            &parsed,
             &self.language,
             line_index,
             font_family,
             font_size,
-        )
+        );
+
+        truncate_runs(runs, line.len())
     }
 
     // Movement methods
@@ -605,7 +634,7 @@ impl Editor {
 
         // Pre-build parse states for the visible range when scrolling
         let range = self.visible_row_range(10.0);
-        let lines: Vec<String> = self.buffer.to_lines();
+        let lines: Vec<String> = self.buffer.to_lines_with_endings();
         let end_line = range.end.min(lines.len());
         self.syntax_highlighter
             .ensure_parse_states(&self.language, end_line, &lines);
@@ -629,7 +658,7 @@ impl Editor {
 
         // Pre-build parse states for the visible range when scrolling
         let range = self.visible_row_range(10.0);
-        let lines: Vec<String> = self.buffer.to_lines();
+        let lines: Vec<String> = self.buffer.to_lines_with_endings();
         let end_line = range.end.min(lines.len());
         self.syntax_highlighter
             .ensure_parse_states(&self.language, end_line, &lines);
@@ -691,11 +720,44 @@ impl Editor {
 
         // Pre-build parse states for the visible range after auto-scrolling
         let range = self.visible_row_range(viewport_height);
-        let lines: Vec<String> = self.buffer.to_lines();
+        let lines: Vec<String> = self.buffer.to_lines_with_endings();
         let end_line = range.end.min(lines.len());
         self.syntax_highlighter
             .ensure_parse_states(&self.language, end_line, &lines);
     }
+}
+
+/// Trim highlight runs back to the first `len` bytes.
+///
+/// [`Editor::highlight_line`] parses a line with the `\n` the grammar needs,
+/// but the string handed to `shape_line` does not have one, and `shape_line`
+/// requires the runs to sum to exactly the string it is shaping. Runs past
+/// `len` are dropped and the one straddling it is shortened.
+///
+/// `len == 0` is the case worth stating: an empty display line keeps a single
+/// zero-length run, because that is what the plain-text fallback returned
+/// before this trimming existed and callers index `runs[0]`.
+fn truncate_runs(mut runs: Vec<TextRun>, len: usize) -> Vec<TextRun> {
+    if len == 0 {
+        runs.truncate(1);
+        if let Some(run) = runs.first_mut() {
+            run.len = 0;
+        }
+        return runs;
+    }
+
+    let mut consumed = 0;
+    let mut keep = 0;
+    for run in runs.iter_mut() {
+        if consumed >= len {
+            break;
+        }
+        run.len = run.len.min(len - consumed);
+        consumed += run.len;
+        keep += 1;
+    }
+    runs.truncate(keep);
+    runs
 }
 
 #[cfg(test)]

@@ -264,7 +264,15 @@ impl GapBuffer {
         result
     }
 
-    /// Convert the buffer to lines
+    /// Convert the buffer to lines, with the `\n` separators stripped.
+    ///
+    /// This is the *display* view: it is what `get_line`, `line_len`,
+    /// `all_lines` and the editor element's layout read, so a row index here
+    /// means the same thing everywhere on screen.
+    ///
+    /// It is **not** what a syntax highlighter should be fed — the syntax set
+    /// is `load_defaults_newlines`, whose grammars anchor rules to end of line.
+    /// Use [`to_lines_with_endings`](Self::to_lines_with_endings) for that.
     pub fn to_lines(&self) -> Vec<String> {
         let text = self.to_string();
         if text.is_empty() {
@@ -277,6 +285,33 @@ impl GapBuffer {
                 lines
             }
         }
+    }
+
+    /// Convert the buffer to lines that still carry their `\n` separator.
+    ///
+    /// This is the view a syntax highlighter wants: the crate parses against
+    /// `SyntaxSet::load_defaults_newlines()`, whose grammars contain rules
+    /// anchored to end of line, so a `//` comment or an unterminated string
+    /// only closes if the parser is shown the newline that closes it.
+    ///
+    /// Two invariants hold by construction, and are tested:
+    ///
+    /// - The line *count* is identical to [`to_lines`](Self::to_lines), so a
+    ///   row index means the same thing in both.
+    /// - Concatenating the result reproduces [`to_string`](Self::to_string)
+    ///   byte for byte, so a line-by-line pass sees exactly the document a
+    ///   whole-text pass would.
+    ///
+    /// The last line is the one line that legitimately has no separator: text
+    /// ending in `\n` keeps `to_lines`'s trailing empty string, so no phantom
+    /// line is added here either.
+    pub fn to_lines_with_endings(&self) -> Vec<String> {
+        let mut lines = self.to_lines();
+        let last = lines.len().saturating_sub(1);
+        for line in lines.iter_mut().take(last) {
+            line.push('\n');
+        }
+        lines
     }
 
     /// Convert cursor position (row, col) to buffer position.
@@ -646,6 +681,58 @@ mod tests {
         let empty_buffer = GapBuffer::new();
         let empty_lines = empty_buffer.to_lines();
         assert_eq!(empty_lines, vec![""]);
+    }
+
+    #[test]
+    fn test_to_lines_with_endings() {
+        let buffer = GapBuffer::from_text("Line1\nLine2\nLine3");
+        assert_eq!(
+            buffer.to_lines_with_endings(),
+            vec!["Line1\n", "Line2\n", "Line3"]
+        );
+
+        // Text that ends in a newline keeps `to_lines`'s trailing empty line,
+        // and that line gets no separator of its own.
+        let buffer = GapBuffer::from_text("Line1\nLine2\n");
+        assert_eq!(
+            buffer.to_lines_with_endings(),
+            vec!["Line1\n", "Line2\n", ""]
+        );
+
+        let buffer = GapBuffer::from_text("no newline at all");
+        assert_eq!(buffer.to_lines_with_endings(), vec!["no newline at all"]);
+
+        let buffer = GapBuffer::new();
+        assert_eq!(buffer.to_lines_with_endings(), vec![""]);
+    }
+
+    #[test]
+    fn test_to_lines_with_endings_reproduces_the_buffer() {
+        for text in [
+            "",
+            "one line",
+            "Line1\nLine2\nLine3",
+            "Line1\nLine2\n",
+            "\n\n\n",
+            "Hello 世界\n🌍 emoji\n",
+        ] {
+            let buffer = GapBuffer::from_text(text);
+            let with_endings = buffer.to_lines_with_endings();
+
+            // Same number of rows as the display view.
+            assert_eq!(
+                with_endings.len(),
+                buffer.to_lines().len(),
+                "row count diverged for {text:?}"
+            );
+
+            // And concatenating them is the document, byte for byte.
+            assert_eq!(
+                with_endings.concat(),
+                buffer.to_string(),
+                "round trip failed for {text:?}"
+            );
+        }
     }
 
     #[test]

@@ -4,21 +4,23 @@
 //! styling with borders, padding, and theme colors.
 
 use gpui::{
-    div, prelude::*, px, rems, App, ElementId, Entity, EntityId, FocusHandle, Focusable,
-    IntoElement, ParentElement, Pixels, RenderOnce, SharedString, Styled, Window,
+    div, prelude::*, App, ElementId, Entity, EntityId, FocusHandle, Focusable, IntoElement,
+    ParentElement, Pixels, Rems, RenderOnce, SharedString, Styled, Window,
 };
 
 use crate::element_id::for_entity;
 use crate::elements::input::text_area;
 use crate::input::InputState;
-use crate::theme::{ActiveTheme, Themeable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 
 /// Default number of visible text rows.
 const DEFAULT_ROWS: u32 = 3;
 
-/// Approximate line height in rems for calculating min-height.
-const LINE_HEIGHT_REMS: f32 = 1.5;
+/// The 1px border the textarea draws, in rems at a 16px root — the one part of
+/// its height that is not a multiple of the line box.
+const BORDER_REMS: f32 = 1.0 / 16.0;
 
 /// The id of the textarea backed by the `InputState` entity `state_id`.
 ///
@@ -60,6 +62,7 @@ pub struct Textarea {
     read_only: bool,
     max_height: Option<Pixels>,
     element_id: Option<ElementId>,
+    size: ControlSize,
 }
 
 impl Textarea {
@@ -76,6 +79,7 @@ impl Textarea {
             read_only: false,
             max_height: None,
             element_id: None,
+            size: ControlSize::default(),
         }
     }
 
@@ -143,6 +147,13 @@ impl Disableable for Textarea {
     }
 }
 
+impl ControlSized for Textarea {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
 impl Focusable for Textarea {
     fn focus_handle(&self, _cx: &App) -> FocusHandle {
         self.focus_handle.clone()
@@ -153,12 +164,23 @@ impl RenderOnce for Textarea {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let element_id = self.element_id();
         let theme = cx.theme();
+        let metrics = theme.control(self.size);
         let is_focused = self.focus_handle.is_focused(window);
         let disabled = self.disabled;
         let read_only = self.read_only;
 
-        // Calculate min-height based on rows
-        let min_height = rems(self.rows as f32 * LINE_HEIGHT_REMS + 1.0); // +1.0 for padding
+        // The height is the rows the caller asked for, plus the padding and
+        // border that sit around them — rather than the old
+        // `rows * 1.5 + 1.0`, whose `+1.0` was commented "for padding" and
+        // matched no padding the element actually drew.
+        //
+        // The rung's `padding_y` is sized to centre one line box inside one
+        // rung, which is far too tight around several lines; a textarea is a
+        // box of text rather than a control with a line in it, so it uses the
+        // rung's padding on both axes.
+        let padding = metrics.padding_x;
+        let min_height = metrics.multiline_line_height() * self.rows as f32
+            + (padding + Rems(BORDER_REMS)) * 2.0;
 
         // Determine colors based on state
         let bg_color = if disabled {
@@ -185,6 +207,7 @@ impl RenderOnce for Textarea {
 
         // Build the inner text_area element
         let mut inner = text_area(&self.state, cx)
+            .control_size(self.size)
             .size_full()
             .text_color(text_color);
 
@@ -198,14 +221,13 @@ impl RenderOnce for Textarea {
             .min_h(min_height)
             .when_some(self.max_height, |this, max_h| this.max_h(max_h))
             .w_full()
-            .px(rems(0.75))
-            .py(rems(0.5))
+            .p(padding)
             .bg(bg_color)
             .border_1()
             .border_color(border_color)
-            .rounded(px(6.))
+            .rounded(metrics.radius)
             .overflow_hidden()
-            .text_sm()
+            .text_size(metrics.text_size)
             .when(disabled, |this| this.cursor_not_allowed().opacity(0.65))
             .when(!disabled && !read_only, |this| {
                 this.cursor_text().when(!is_focused, |this| {

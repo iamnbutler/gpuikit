@@ -29,16 +29,21 @@
 //! ```
 
 use crate::element_id::for_entity;
-use crate::theme::{ActiveTheme, Themeable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use gpui::{
     anchored, deferred, div, prelude::*, px, App, Context, DismissEvent, ElementId, Entity,
-    EventEmitter, FocusHandle, Focusable, IntoElement, ParentElement, Render, SharedString, Styled,
-    Window,
+    EventEmitter, FocusHandle, Focusable, IntoElement, ParentElement, Rems, Render, SharedString,
+    Styled, Window,
 };
 
 use crate::icons::Icons;
 use std::rc::Rc;
+
+/// The width a trigger will not shrink below, so a short label still gives the
+/// chevron somewhere to sit.
+const MIN_TRIGGER_WIDTH: Rems = Rems(6.25);
 
 /// Event emitted when the dropdown selection changes.
 pub struct DropdownChanged;
@@ -60,6 +65,9 @@ impl DropdownOption {
 pub struct DropdownMenu {
     options: Vec<DropdownOption>,
     selected_index: usize,
+    /// The rung of the trigger that opened this menu, so a popup's rows are
+    /// the same size as the control they dropped out of.
+    size: ControlSize,
     focus_handle: FocusHandle,
     on_select: Option<Rc<dyn Fn(usize, &mut Window, &mut App)>>,
 }
@@ -76,6 +84,7 @@ impl DropdownMenu {
     pub fn build(
         options: Vec<DropdownOption>,
         selected_index: usize,
+        size: ControlSize,
         on_select: impl Fn(usize, &mut Window, &mut App) + 'static,
         window: &mut Window,
         cx: &mut App,
@@ -86,6 +95,7 @@ impl DropdownMenu {
             Self {
                 options,
                 selected_index,
+                size,
                 focus_handle,
                 on_select: Some(Rc::new(on_select)),
             }
@@ -109,6 +119,7 @@ impl Render for DropdownMenu {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let focus_handle = self.focus_handle.clone();
         let theme = cx.theme();
+        let metrics = theme.control(self.size);
 
         div()
             // Was unique only because a `DropdownMenu` is always rendered as an
@@ -127,9 +138,9 @@ impl Render for DropdownMenu {
             .bg(theme.surface())
             .border_1()
             .border_color(theme.border())
-            .rounded_md()
+            .rounded(metrics.radius)
             .shadow_lg()
-            .py_1()
+            .py(metrics.padding_y())
             .flex()
             .flex_col()
             .children(self.options.iter().enumerate().map(|(index, option)| {
@@ -142,9 +153,12 @@ impl Render for DropdownMenu {
                         "dropdown-option".into(),
                         index as u64,
                     ))
-                    .px_3()
-                    .py_1()
-                    .text_xs()
+                    .flex()
+                    .items_center()
+                    .h(metrics.height)
+                    .px(metrics.padding_x * 1.5)
+                    .text_size(metrics.text_size)
+                    .line_height(metrics.line_height)
                     .cursor_pointer()
                     .when(is_selected, |this| {
                         this.bg(theme.accent()).text_color(theme.bg())
@@ -171,6 +185,7 @@ pub struct Dropdown<T: Clone + PartialEq + 'static> {
     on_change: Option<Rc<dyn Fn(T, &mut Window, &mut App)>>,
     full_width: bool,
     disabled: bool,
+    size: ControlSize,
 }
 
 /// Creates a new dropdown builder.
@@ -214,6 +229,7 @@ impl<T: Clone + PartialEq + 'static> Dropdown<T> {
             on_change: None,
             full_width: false,
             disabled: false,
+            size: ControlSize::default(),
         }
     }
 
@@ -241,6 +257,13 @@ impl<T: Clone + PartialEq + 'static> Disableable for Dropdown<T> {
     }
 }
 
+impl<T: Clone + PartialEq + 'static> ControlSized for Dropdown<T> {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
 /// Stateful dropdown component that manages the menu popup.
 ///
 /// Create using [`Dropdown`] and wrap in an Entity:
@@ -257,6 +280,7 @@ pub struct DropdownState<T: Clone + PartialEq + 'static> {
     on_change: Option<Rc<dyn Fn(T, &mut Window, &mut App)>>,
     full_width: bool,
     disabled: bool,
+    size: ControlSize,
 }
 
 impl<T: Clone + PartialEq + 'static> EventEmitter<DropdownChanged> for DropdownState<T> {}
@@ -271,6 +295,7 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
             on_change: dropdown.on_change,
             full_width: dropdown.full_width,
             disabled: dropdown.disabled,
+            size: dropdown.size,
         }
     }
 
@@ -342,6 +367,7 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
         let menu = DropdownMenu::build(
             options,
             selected_index,
+            self.size,
             move |index, window, cx| {
                 if let Some(value) = values.get(index).cloned() {
                     if let Some(on_change) = &on_change {
@@ -380,6 +406,7 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
         let full_width = self.full_width;
         let disabled = self.disabled;
         let theme = cx.theme();
+        let metrics = theme.control(self.size);
 
         let border_color = if disabled {
             theme.border_subtle()
@@ -398,16 +425,20 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
                     .flex()
                     .items_center()
                     .justify_between()
-                    .gap_2()
-                    .px_2()
-                    .py_1()
-                    .min_w(px(100.))
+                    // A declared height. The trigger used to be padding plus a
+                    // line box, which is why it could not line up with
+                    // anything.
+                    .h(metrics.height)
+                    .gap(metrics.gap)
+                    .px(metrics.padding_x)
+                    .min_w(MIN_TRIGGER_WIDTH)
                     .when(full_width, |this| this.w_full())
                     .bg(theme.input_bg())
                     .border_1()
                     .border_color(border_color)
-                    .rounded_sm()
-                    .text_xs()
+                    .rounded(metrics.radius)
+                    .text_size(metrics.text_size)
+                    .line_height(metrics.line_height)
                     .text_color(if disabled {
                         theme.fg_disabled()
                     } else {
@@ -425,7 +456,7 @@ impl<T: Clone + PartialEq + 'static> DropdownState<T> {
                     .child(
                         div().flex().items_center().justify_center().child(
                             Icons::chevron_down()
-                                .size(px(12.))
+                                .size(metrics.text_size)
                                 .text_color(theme.fg_muted()),
                         ),
                     ),

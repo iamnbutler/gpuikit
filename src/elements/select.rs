@@ -31,16 +31,21 @@
 //! });
 //! ```
 
-use crate::theme::{ActiveTheme, Themeable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use gpui::{
-    anchored, deferred, div, prelude::*, px, App, Context, DismissEvent, ElementId, Entity,
+    anchored, deferred, div, prelude::*, App, Context, DismissEvent, ElementId, Entity,
     EventEmitter, IntoElement, ParentElement, Render, SharedString, Styled, Window,
 };
 
 use crate::elements::dropdown::{DropdownMenu, DropdownOption};
 use crate::icons::Icons;
 use std::rc::Rc;
+
+/// The width a trigger will not shrink below, so a short label still gives the
+/// chevron somewhere to sit.
+const MIN_TRIGGER_WIDTH: gpui::Rems = gpui::Rems(6.25);
 
 /// Event emitted when the select value changes.
 pub struct SelectChanged;
@@ -56,6 +61,7 @@ pub struct Select<T: Clone + PartialEq + 'static> {
     on_change: Option<Rc<dyn Fn(T, &mut Window, &mut App)>>,
     full_width: bool,
     disabled: bool,
+    size: ControlSize,
 }
 
 /// Creates a new select builder.
@@ -95,6 +101,7 @@ impl<T: Clone + PartialEq + 'static> Select<T> {
             on_change: None,
             full_width: false,
             disabled: false,
+            size: ControlSize::default(),
         }
     }
 
@@ -134,6 +141,13 @@ impl<T: Clone + PartialEq + 'static> Disableable for Select<T> {
     }
 }
 
+impl<T: Clone + PartialEq + 'static> ControlSized for Select<T> {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
 /// Stateful select component that manages the option popup.
 ///
 /// Create using [`Select`] and wrap in an Entity:
@@ -151,6 +165,7 @@ pub struct SelectState<T: Clone + PartialEq + 'static> {
     on_change: Option<Rc<dyn Fn(T, &mut Window, &mut App)>>,
     full_width: bool,
     disabled: bool,
+    size: ControlSize,
 }
 
 impl<T: Clone + PartialEq + 'static> EventEmitter<SelectChanged> for SelectState<T> {}
@@ -166,6 +181,7 @@ impl<T: Clone + PartialEq + 'static> SelectState<T> {
             on_change: select.on_change,
             full_width: select.full_width,
             disabled: select.disabled,
+            size: select.size,
         }
     }
 
@@ -250,6 +266,7 @@ impl<T: Clone + PartialEq + 'static> SelectState<T> {
         let menu = DropdownMenu::build(
             options,
             selected_index,
+            self.size,
             move |index, window, cx| {
                 if let Some(value) = values.get(index).cloned() {
                     if let Some(on_change) = &on_change {
@@ -288,6 +305,7 @@ impl<T: Clone + PartialEq + 'static> SelectState<T> {
         let full_width = self.full_width;
         let disabled = self.disabled;
         let theme = cx.theme();
+        let metrics = theme.control(self.size);
 
         let border_color = if disabled {
             theme.border_subtle()
@@ -314,16 +332,20 @@ impl<T: Clone + PartialEq + 'static> SelectState<T> {
                     .flex()
                     .items_center()
                     .justify_between()
-                    .gap_2()
-                    .px_2()
-                    .py_1()
-                    .min_w(px(100.))
+                    // A declared height. The trigger used to be padding plus a
+                    // line box, which is why it could not line up with
+                    // anything.
+                    .h(metrics.height)
+                    .gap(metrics.gap)
+                    .px(metrics.padding_x)
+                    .min_w(MIN_TRIGGER_WIDTH)
                     .when(full_width, |this| this.w_full())
                     .bg(theme.input_bg())
                     .border_1()
                     .border_color(border_color)
-                    .rounded_sm()
-                    .text_xs()
+                    .rounded(metrics.radius)
+                    .text_size(metrics.text_size)
+                    .line_height(metrics.line_height)
                     .text_color(text_color)
                     .when(disabled, |this| this.cursor_not_allowed().opacity(0.65))
                     .when(!disabled, |this| {
@@ -337,7 +359,7 @@ impl<T: Clone + PartialEq + 'static> SelectState<T> {
                     .child(
                         div().flex().items_center().justify_center().child(
                             Icons::chevron_down()
-                                .size(px(12.))
+                                .size(metrics.text_size)
                                 .text_color(theme.fg_muted()),
                         ),
                     ),

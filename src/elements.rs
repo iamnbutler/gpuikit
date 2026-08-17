@@ -42,6 +42,215 @@ pub mod typography;
 #[cfg(test)]
 mod control_size_tests;
 
+/// `docs/component-triage.md` is the decision record for #59's deferred
+/// components: a verdict per component, with the surviving ones carrying a
+/// ready-to-file issue body under `docs/issues/`.
+///
+/// #59 went stale because nothing connected it to the crate. These tests are
+/// that connection. They parse the verdict table and fail the build when the
+/// document stops describing what is actually here.
+///
+/// They live in the lib rather than `tests/`, and read the document with
+/// `include_str!`, for the same reason `showcase_coverage` does:
+/// `cargo test --lib` is the command that works in a constrained environment.
+#[cfg(test)]
+mod triage_coverage {
+    use std::fs;
+    use std::path::PathBuf;
+
+    const TRIAGE: &str = include_str!("../docs/component-triage.md");
+    const ELEMENTS: &str = include_str!("elements.rs");
+
+    /// The number of entries on #59's list, as this repository recorded it:
+    /// the 21 rows of `todo.md`'s two deferred lists plus the 8 that had
+    /// already shipped. The test's job is to stop a row being deleted to avoid
+    /// deciding, so this should only change if #59 is re-read and found to have
+    /// a different number of entries.
+    const ENTRIES_IN_59: usize = 29;
+
+    /// The split the document states in prose. Restated here on purpose:
+    /// editing the table without editing the prose fails.
+    const EXPECTED: [(&str, usize); 3] = [("Shipped", 8), ("Issue", 10), ("Rejected", 11)];
+
+    /// An issue body shorter than this is a stub, and #146 asked for complete
+    /// ones — prior art, references, crate gaps, the a11y answer, sizing and
+    /// the showcase requirement do not fit in less.
+    const MIN_ISSUE_BYTES: usize = 1500;
+
+    fn repo_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    }
+
+    /// The verdict table, as `(component, verdict, where)`.
+    ///
+    /// Anchored on an HTML comment rather than on "the first table", because
+    /// the document has five other tables and picking the wrong one would make
+    /// every assertion below meaningless rather than failing.
+    fn verdict_rows() -> Vec<(String, String, String)> {
+        let start = TRIAGE
+            .find("<!-- verdict-table -->")
+            .expect("docs/component-triage.md no longer anchors its verdict table");
+
+        TRIAGE[start..]
+            .lines()
+            .skip_while(|line| !line.starts_with('|'))
+            .take_while(|line| line.starts_with('|'))
+            .filter_map(|line| {
+                let cells: Vec<&str> = line.trim_matches('|').split('|').map(str::trim).collect();
+                if cells.len() != 3 || cells[0] == "Component" || cells[0].starts_with("---") {
+                    return None;
+                }
+                Some((
+                    cells[0].to_string(),
+                    cells[1].to_string(),
+                    cells[2].to_string(),
+                ))
+            })
+            .collect()
+    }
+
+    /// A `` `path` `` cell, unwrapped.
+    fn backticked(cell: &str) -> Option<&str> {
+        cell.strip_prefix('`')?.strip_suffix('`')
+    }
+
+    #[test]
+    fn every_entry_in_59_has_exactly_one_verdict() {
+        let rows = verdict_rows();
+
+        assert_eq!(
+            rows.len(),
+            ENTRIES_IN_59,
+            "the verdict table has {} rows but #59 had {ENTRIES_IN_59} entries — a row was \
+             added or, more likely, deleted to avoid deciding about it",
+            rows.len(),
+        );
+
+        for (component, verdict, _) in &rows {
+            assert!(
+                EXPECTED.iter().any(|(name, _)| name == verdict),
+                "`{component}` has verdict `{verdict}`, which is not one of the three. There \
+                 is deliberately no fourth verdict — see the document"
+            );
+        }
+
+        for (verdict, expected) in EXPECTED {
+            let actual = rows.iter().filter(|(_, v, _)| v == verdict).count();
+            assert_eq!(
+                actual, expected,
+                "the table has {actual} {verdict} rows but the document says {expected} in \
+                 prose. If a verdict legitimately changed, move both"
+            );
+        }
+    }
+
+    #[test]
+    fn every_shipped_row_names_a_real_module() {
+        for (component, verdict, location) in verdict_rows() {
+            if verdict != "Shipped" {
+                continue;
+            }
+
+            let path = backticked(&location)
+                .unwrap_or_else(|| panic!("`{component}` is Shipped but names no module"));
+            let module = path
+                .strip_prefix("src/elements/")
+                .and_then(|name| name.strip_suffix(".rs"))
+                .unwrap_or_else(|| {
+                    panic!("`{component}` is Shipped but `{path}` is not a src/elements module")
+                });
+
+            assert!(
+                ELEMENTS.contains(&format!("pub mod {module};")),
+                "`{component}` is Shipped as `{path}`, but src/elements.rs declares no \
+                 `pub mod {module};`"
+            );
+        }
+    }
+
+    #[test]
+    fn surviving_components_have_an_issue_written() {
+        for (component, verdict, location) in verdict_rows() {
+            if verdict != "Issue" {
+                continue;
+            }
+
+            let path = backticked(&location)
+                .unwrap_or_else(|| panic!("`{component}` has an Issue verdict but names no file"));
+            let full = repo_root().join(path);
+            let body = fs::read_to_string(&full).unwrap_or_else(|error| {
+                panic!("`{component}` names `{path}`, which cannot be read: {error}")
+            });
+
+            assert!(
+                body.len() >= MIN_ISSUE_BYTES,
+                "`{component}`'s issue body at `{path}` is {} bytes — #146 asked for complete \
+                 issue bodies, not placeholders",
+                body.len(),
+            );
+        }
+    }
+
+    #[test]
+    fn every_written_issue_is_reachable_from_the_triage() {
+        let dir = repo_root().join("docs/issues");
+        let mut found = 0;
+
+        for entry in fs::read_dir(&dir).expect("docs/issues is readable") {
+            let path = entry.expect("directory entry is readable").path();
+            if path.extension().is_none_or(|ext| ext != "md") {
+                continue;
+            }
+            found += 1;
+
+            let name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .expect("issue file has a name");
+            assert!(
+                TRIAGE.contains(&format!("docs/issues/{name}")),
+                "`docs/issues/{name}` is not reachable from docs/component-triage.md — an \
+                 issue nothing points at is the shape of thing #59 was"
+            );
+        }
+
+        // A scan that finds nothing reports no orphans, which is
+        // indistinguishable from a clean tree. Ten surviving components plus
+        // three prerequisites; the floor only has to be non-trivial.
+        assert!(
+            found >= 10,
+            "only {found} issue bodies found under {} — check how the tree is being located \
+             before trusting a green result",
+            dir.display(),
+        );
+    }
+
+    #[test]
+    fn every_rejection_is_argued_in_prose() {
+        let start = TRIAGE
+            .find("## The rejections, argued")
+            .expect("the triage no longer argues its rejections");
+        let rejections = &TRIAGE[start..];
+        let end = rejections
+            .find("\n## Prerequisites")
+            .expect("the rejections section is never closed");
+        let rejections = &rejections[..end];
+
+        for (component, verdict, _) in verdict_rows() {
+            if verdict != "Rejected" {
+                continue;
+            }
+
+            assert!(
+                rejections.contains(&format!("**{component}.**")),
+                "`{component}` is Rejected in the table but has no paragraph in the \
+                 rejections section. A rejection asserted in a table cell is a deferral \
+                 with better manners"
+            );
+        }
+    }
+}
+
 /// The showcase is where a component is looked at, so an element with no page
 /// in it is an element nobody sees. These two tests cross-check this file
 /// against `examples/showcase.rs`, so a new element module fails the build

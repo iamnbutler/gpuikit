@@ -71,4 +71,7 @@ at your option.
 
 Nearly 40 components including: Accordion, Alert, Avatar, Badge, Breadcrumb, Button, Card, Checkbox, Collapsible, Dialog, Dropdown, Field, Input, Popover, Progress, Radio Group, Scroll Area, Select, Slider, Switch, Tabs, Textarea, Toast, Toggle, Tooltip, and more.
 
-See [todo.md](todo.md) for the full list and roadmap.
+See [todo.md](todo.md) for the full list, and
+[docs/component-triage.md](docs/component-triage.md) for a decision — shipped,
+issue, or rejected with a reason — on every component that was once on the
+deferred roster.

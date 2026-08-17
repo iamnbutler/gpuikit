@@ -107,6 +107,14 @@ opt-level = 3
 opt-level = 0
 debug = 2
 
+# Dependencies — gpui above all — are compiled once and then only linked, so
+# optimizing them costs nothing on an incremental build of this crate and is
+# the difference between a debug showcase that draws smoothly and one that
+# does not. `"*"` matches dependencies only, never this crate, so iterating
+# here compiles exactly as fast as before.
+[profile.dev.package."*"]
+opt-level = 2
+
 # Package metadata for crates.io
 [package.metadata.docs.rs]
 all-features = true

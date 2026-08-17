@@ -202,6 +202,108 @@ const ELEMENT_COVERAGE: &[(&str, &str)] = &[
     ("typography", "typography"),
 ];
 
+/// The sidebar, as data. Every entry is `(page id, label)`, and the page id has
+/// to match an arm of `Showcase::render`'s match — `ELEMENT_COVERAGE` and the
+/// tests in `src/elements.rs` are checked against those arms, not against this.
+///
+/// A `const` rather than a `vec!` rebuilt inside `render`: the rows it produces
+/// are built once, in `Showcase::new`, because `render` runs on every frame and
+/// the sidebar does not change between them.
+const NAV_SECTIONS: &[(&str, &[(&str, &str)])] = &[
+    (
+        "Input",
+        &[
+            ("button", "Button"),
+            ("toggle", "Toggle"),
+            ("selection", "Selection"),
+            ("dropdown", "Dropdown"),
+            ("slider", "Slider"),
+            ("text", "Text"),
+            ("tabs", "Tabs"),
+        ],
+    ),
+    (
+        "Display",
+        &[
+            ("avatar", "Avatar"),
+            ("badge", "Badge"),
+            ("typography", "Typography"),
+            ("loading", "Loading"),
+            ("alert", "Alert"),
+            ("tooltip", "Tooltip"),
+            ("card", "Card"),
+            ("aspect-ratio", "Aspect Ratio"),
+            ("empty", "Empty"),
+        ],
+    ),
+    (
+        "Layout",
+        &[
+            ("breadcrumb", "Breadcrumb"),
+            ("separator", "Separator"),
+            ("collapsible", "Collapsible"),
+            ("scroll-area", "Scroll Area"),
+            ("list", "List"),
+        ],
+    ),
+    (
+        "Overlay",
+        &[
+            ("popover", "Popover"),
+            ("dialog", "Dialog"),
+            ("context-menu", "Context Menu"),
+            ("toast", "Toast"),
+        ],
+    ),
+    ("Content", &[("markdown", "Markdown"), ("editor", "Editor")]),
+    ("System", &[("theme", "Theme"), ("coverage", "Coverage")]),
+];
+
+/// A prebuilt sidebar row, and the page it selects — `None` for a section
+/// header, which selects nothing.
+///
+/// `ListEntry` is `Rc`-backed, so cloning one per frame copies two pointers.
+/// Building one costs a `format!`, a couple of `SharedString`s and two boxed
+/// closures, which is why they are not rebuilt per frame.
+struct NavEntry {
+    page: Option<SharedString>,
+    entry: ListEntry,
+}
+
+/// Build the sidebar's rows once. Clicking a row writes its page id into
+/// `active_page`, which is the same cell `render` reads.
+fn nav_entries(active_page: &Rc<RefCell<SharedString>>) -> Vec<NavEntry> {
+    let mut entries = Vec::new();
+
+    for (section_label, items) in NAV_SECTIONS {
+        entries.push(NavEntry {
+            page: None,
+            entry: ListEntry::header(*section_label),
+        });
+
+        for (id, label) in *items {
+            let page = SharedString::from(*id);
+            let label = SharedString::from(*label);
+            let target = page.clone();
+            let cell = active_page.clone();
+
+            entries.push(NavEntry {
+                page: Some(page),
+                entry: ListEntry::item(
+                    SharedString::from(format!("nav-{id}")),
+                    move |_window, _cx| div().px_2().child(label.clone()).into_any_element(),
+                )
+                .on_click(move |_, window, _cx| {
+                    *cell.borrow_mut() = target.clone();
+                    window.refresh();
+                }),
+            });
+        }
+    }
+
+    entries
+}
+
 #[derive(Clone, PartialEq, Debug)]
 enum Size {
     Small,
@@ -260,6 +362,9 @@ enum Country {
 struct Showcase {
     focus_handle: FocusHandle,
     active_page: Rc<RefCell<SharedString>>,
+    /// The sidebar, built once. `render` clones these and stamps `selected` on
+    /// them rather than rebuilding 24 rows per frame.
+    nav: Vec<NavEntry>,
     click_count: usize,
     toggled_count: usize,
     size_dropdown: Entity<DropdownState<Size>>,
@@ -301,6 +406,9 @@ struct Showcase {
     dialog_example: Entity<DialogState>,
     context_menu_pinned: bool,
     context_menu_status: SharedString,
+    /// Whether the Loading page's indicators advance. Pausing them takes the
+    /// shared loading clock out of the picture without leaving the page.
+    loading_playing: bool,
 }
 
 impl Showcase {
@@ -568,9 +676,13 @@ impl Showcase {
             )
         });
 
+        let active_page = Rc::new(RefCell::new(SharedString::from("button")));
+        let nav = nav_entries(&active_page);
+
         Self {
             focus_handle: cx.focus_handle(),
-            active_page: Rc::new(RefCell::new(SharedString::from("button"))),
+            active_page,
+            nav,
             click_count: 0,
             toggled_count: 0,
             size_dropdown,
@@ -607,6 +719,7 @@ impl Showcase {
             dialog_example,
             context_menu_pinned: true,
             context_menu_status: "No action chosen yet.".into(),
+            loading_playing: true,
         }
     }
 
@@ -1331,29 +1444,53 @@ impl Showcase {
             )
     }
 
-    fn render_loading_indicator_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    /// All seven variants at once — a gallery should show them, and they now
+    /// share one clock rather than each pinning the window at the display
+    /// refresh rate. Pause stops that clock without leaving the page, so the
+    /// cost of the indicators can be told apart from the cost of everything
+    /// else here.
+    fn render_loading_indicator_page(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
+        let fg_muted = theme.fg_muted();
+        let playing = self.loading_playing;
+
         v_stack()
             .gap_2()
             .child(
-                div()
-                    .text_lg()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(theme.fg_muted())
-                    .child("LoadingIndicator"),
+                h_stack()
+                    .gap_3()
+                    .items_center()
+                    .child(
+                        div()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(fg_muted)
+                            .child("LoadingIndicator"),
+                    )
+                    .child(
+                        button("loading-play-pause", if playing { "Pause" } else { "Play" })
+                            .on_click(cx.listener(|showcase, _event, _window, cx| {
+                                showcase.loading_playing = !showcase.loading_playing;
+                                cx.notify();
+                            })),
+                    ),
             )
             .child(
                 h_stack()
                     .gap_4()
                     .items_center()
-                    .child(loading_indicator().dots())
-                    .child(loading_indicator().ellipsis())
-                    .child(loading_indicator().dash())
-                    .child(loading_indicator().star())
-                    .child(loading_indicator().triangle())
-                    .child(loading_indicator().braille())
-                    .child(loading_indicator().braille_extended()),
+                    .child(loading_indicator().dots().playing(playing))
+                    .child(loading_indicator().ellipsis().playing(playing))
+                    .child(loading_indicator().dash().playing(playing))
+                    .child(loading_indicator().star().playing(playing))
+                    .child(loading_indicator().triangle().playing(playing))
+                    .child(loading_indicator().braille().playing(playing))
+                    .child(loading_indicator().braille_extended().playing(playing)),
             )
+            .child(div().text_sm().text_color(fg_muted).child(
+                "One shared clock wakes only when a glyph changes, and only the views \
+                         showing an indicator. Paused, it stops entirely.",
+            ))
     }
 
     fn render_progress_page(&self, cx: &Context<Self>) -> impl IntoElement {
@@ -2500,81 +2637,17 @@ impl Render for Showcase {
         let border = cx.theme().border();
         let surface = cx.theme().surface();
 
-        // Build nav entries for the sidebar — grouped by section
-        let nav_sections: Vec<(&str, Vec<(&str, &str)>)> = vec![
-            (
-                "Input",
-                vec![
-                    ("button", "Button"),
-                    ("toggle", "Toggle"),
-                    ("selection", "Selection"),
-                    ("dropdown", "Dropdown"),
-                    ("slider", "Slider"),
-                    ("text", "Text"),
-                    ("tabs", "Tabs"),
-                ],
-            ),
-            (
-                "Display",
-                vec![
-                    ("avatar", "Avatar"),
-                    ("badge", "Badge"),
-                    ("typography", "Typography"),
-                    ("loading", "Loading"),
-                    ("alert", "Alert"),
-                    ("tooltip", "Tooltip"),
-                    ("card", "Card"),
-                    ("aspect-ratio", "Aspect Ratio"),
-                    ("empty", "Empty"),
-                ],
-            ),
-            (
-                "Layout",
-                vec![
-                    ("breadcrumb", "Breadcrumb"),
-                    ("separator", "Separator"),
-                    ("collapsible", "Collapsible"),
-                    ("scroll-area", "Scroll Area"),
-                    ("list", "List"),
-                ],
-            ),
-            (
-                "Overlay",
-                vec![
-                    ("popover", "Popover"),
-                    ("dialog", "Dialog"),
-                    ("context-menu", "Context Menu"),
-                    ("toast", "Toast"),
-                ],
-            ),
-            (
-                "Content",
-                vec![("markdown", "Markdown"), ("editor", "Editor")],
-            ),
-            ("System", vec![("theme", "Theme"), ("coverage", "Coverage")]),
-        ];
-
-        let mut entries: Vec<ListEntry> = Vec::new();
-        for (section_label, items) in &nav_sections {
-            entries.push(ListEntry::header(*section_label));
-            for (id, label) in items {
-                let id_owned: SharedString = SharedString::from(*id);
-                let id_for_click = id_owned.clone();
-                let label_owned: SharedString = SharedString::from(*label);
-                let is_selected = current_page == id_owned;
-                let cell = self.active_page.clone();
-                entries.push(
-                    ListEntry::item(SharedString::from(format!("nav-{}", id)), move |_w, _cx| {
-                        div().px_2().child(label_owned.clone()).into_any_element()
-                    })
-                    .on_click(move |_, window, _cx| {
-                        *cell.borrow_mut() = id_for_click.clone();
-                        window.refresh();
-                    })
-                    .selected(is_selected),
-                );
-            }
-        }
+        // The sidebar was built once in `Showcase::new`; a frame only decides
+        // which row is highlighted.
+        let entries: Vec<ListEntry> = self
+            .nav
+            .iter()
+            .map(|nav| {
+                nav.entry
+                    .clone()
+                    .selected(nav.page.as_ref() == Some(&current_page))
+            })
+            .collect();
 
         let sidebar = v_stack()
             .w(px(200.))

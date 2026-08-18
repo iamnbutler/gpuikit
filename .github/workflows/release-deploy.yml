@@ -1,6 +1,19 @@
 # Release Deploy Workflow
 # Triggered by the release workflow or tag pushes
 # Publishes crates to crates.io and creates GitHub releases
+#
+# Repository rule: no `${{ }}` inside a `run:` body, anywhere, ever.
+# `${{ }}` is substituted while the step's script is being *generated*, so an
+# interpolated value is part of the script rather than data the script reads —
+# a quote and a newline in a pushed tag name or a dispatch input end one
+# command and start another, and any validation written inside the same body
+# runs too late to matter. This is the workflow that runs `cargo publish`, so
+# the values it is given are judged before anything is written: bind them under
+# `env:`, read them as `"$NAME"`, and see `Validate version and tag` below,
+# which is the first step of the first job and hands both values to
+# `.github/scripts/validate-deploy-inputs.sh`.
+# `src/release_input_validation.rs` holds this file to that rule on every
+# `cargo test --lib`.
 
 name: Deploy Release
 
@@ -40,7 +53,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
 jobs:
   prepare:
@@ -50,18 +62,40 @@ jobs:
       version: ${{ steps.info.outputs.version }}
       tag: ${{ steps.info.outputs.tag }}
     steps:
-      - name: Determine version and tag
+      # This job had no checkout: nothing in it read the repository. The
+      # validator below is a file in this repository, so it needs one.
+      # Deliberately without a `ref:` — the two checkouts further down deploy a
+      # tag and so check that tag out, but this one cannot, because the tag is
+      # the thing being judged.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate version and tag
         id: info
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            # Extract from pushed tag
-            TAG="${{ github.ref_name }}"
+          if [ "$EVENT_NAME" = "push" ]; then
+            # Extract from the pushed tag
+            TAG="$REF_NAME"
             VERSION="${TAG#v}"
           else
             # Use workflow inputs
-            TAG="${{ inputs.tag }}"
-            VERSION="${{ inputs.version }}"
+            TAG="$INPUT_TAG"
+            VERSION="$INPUT_VERSION"
           fi
+
+          # Judged before the writes below, not after. $GITHUB_OUTPUT is a file
+          # of `name=value` lines, so an unjudged version carrying a newline
+          # sets further step outputs of its own on the way past — a ref of
+          # `v1.2.3` then `version=9.9.9` writes two `version=` lines. GitHub
+          # runs this body under `bash -e`, which is what stops the script here
+          # when the validator rejects, and what carries its 1-vs-2 exit code
+          # out to the step.
+          .github/scripts/validate-deploy-inputs.sh "$VERSION" "$TAG"
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=$TAG" >> $GITHUB_OUTPUT
@@ -73,6 +107,11 @@ jobs:
     runs-on: ubuntu-latest
     # Skip if manually triggered with skip_publish
     if: ${{ github.event_name != 'workflow_dispatch' || !inputs.skip_publish }}
+    # The credential belongs to the job that publishes, and to no other. It sat
+    # at workflow level until now, which put it in the environment of `prepare`
+    # — the job that handles an unjudged tag name — for no reason.
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
     steps:
       - name: Checkout repository
@@ -99,8 +138,9 @@ jobs:
             ${{ runner.os }}-cargo-registry-
 
       - name: Verify package version
+        env:
+          EXPECTED: ${{ needs.prepare.outputs.version }}
         run: |
-          EXPECTED="${{ needs.prepare.outputs.version }}"
           ACTUAL=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
 
           if [ "$EXPECTED" != "$ACTUAL" ]; then
@@ -122,8 +162,10 @@ jobs:
         run: cargo publish --dry-run
 
       - name: Publish to crates.io
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          echo "Publishing gpuikit v${{ needs.prepare.outputs.version }} to crates.io..."
+          echo "Publishing gpuikit v$VERSION to crates.io..."
           cargo publish
           echo "Successfully published to crates.io!"
 
@@ -156,16 +198,23 @@ jobs:
         continue-on-error: true
 
       - name: Generate release notes if not available
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           if [ ! -f RELEASE_NOTES.md ]; then
             echo "Generating release notes from git log..."
-            TAG="${{ needs.prepare.outputs.tag }}"
-            PREV_TAG=$(git describe --tags --abbrev=0 ${TAG}^ 2>/dev/null || echo "")
+            PREV_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")
 
+            # Same shape as release.yml's own release-notes step: the link is
+            # computed in the branch that knows whether there is a previous tag,
+            # rather than in a nested expansion inside the heredoc.
             if [ -z "$PREV_TAG" ]; then
-              COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges ${TAG})
+              COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges "$TAG")
+              CHANGELOG_LINK="First release"
             else
-              COMMITS=$(git log ${PREV_TAG}..${TAG} --pretty=format:"- %s (%h)" --no-merges)
+              COMMITS=$(git log "${PREV_TAG}..${TAG}" --pretty=format:"- %s (%h)" --no-merges)
+              CHANGELOG_LINK="https://github.com/${REPOSITORY}/compare/${PREV_TAG}...${TAG}"
             fi
 
             cat > RELEASE_NOTES.md << EOF
@@ -173,7 +222,7 @@ jobs:
 
           ${COMMITS:-No changes recorded}
 
-          **Full Changelog**: ${PREV_TAG:+https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG}}${PREV_TAG:-First release}
+          **Full Changelog**: ${CHANGELOG_LINK}
           EOF
           fi
 
@@ -190,10 +239,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Summary
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version**: ${{ needs.prepare.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag**: ${{ needs.prepare.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: $TAG" >> $GITHUB_STEP_SUMMARY
           echo "- **crates.io**: [gpuikit](https://crates.io/crates/gpuikit)" >> $GITHUB_STEP_SUMMARY
-          echo "- **GitHub Release**: [${{ needs.prepare.outputs.tag }}](https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare.outputs.tag }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Release**: [$TAG](https://github.com/${REPOSITORY}/releases/tag/${TAG})" >> $GITHUB_STEP_SUMMARY

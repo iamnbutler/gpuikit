@@ -12,11 +12,9 @@
 # `Validate custom_version` below). `src/release_input_validation.rs` holds
 # this file to that rule on every `cargo test --lib`.
 #
-# The rule is a repository rule, not a rule about this file — but only this
-# file satisfies it today. `.github/workflows/release-deploy.yml` still
-# interpolates into five `run:` bodies, including free-form `version` and `tag`
-# inputs that nothing validates, and is deliberately out of scope here and
-# untested; it is tracked separately. Do not copy its shape.
+# The rule is a repository rule, not a rule about this file.
+# `.github/workflows/release-deploy.yml` — the workflow this one hands the
+# release to — is held to it too, by the same tests.
 
 name: Release
 

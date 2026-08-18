@@ -119,6 +119,87 @@ jobs:
         with:
           ref: ${{ needs.prepare.outputs.tag }}
 
+      # The guard #171 added to `release.yml`, in the workflow that actually
+      # publishes. `release-deploy.yml` reaches `cargo publish` by three doors —
+      # a `workflow_call` from `release.yml`, a `workflow_dispatch`, and a
+      # `push:` of any tag matching the pattern above — and only the first of
+      # them passed under a guard that lives in the other file.
+      #
+      # Placed right after the checkout and before the toolchain install: it
+      # needs `CHANGELOG.md` at the tag, and a wrong version should cost a
+      # second rather than several minutes of apt and cargo.
+      #
+      # The script does not exist at any tag cut before it landed, so this step
+      # has to decide what an *absent* script means, and it decides against a
+      # version floor. Below the floor, absent means "this tag predates the
+      # guard": publish, and say in the log that nothing was checked. At or
+      # above the floor it means the guard was removed from a tree that should
+      # carry it: refuse.
+      #
+      # FLOOR is a boundary between two eras, not a number to keep current —
+      # raising it re-opens the door for every version below the new value. Nor
+      # can the floor be dropped by fetching the script from some other ref so
+      # that it is always present: at v0.3.0 the topmost changelog heading is
+      # 0.2.0, and at both v0.5.0 and v0.5.1 it is 0.4.0, so three of the five
+      # existing tags would *fail* this guard rather than merely lack it. What
+      # is missing at those refs is the invariant, not the file.
+      #
+      # What this does not protect against, stated so that a green run is not
+      # read as an assurance it never made: the script run here is the
+      # checked-out tag's own copy, so a tag that edits it to `exit 0` passes.
+      # That is not closable from here and is not worth trying to close —
+      # `cargo publish` below executes the same tree's build.rs in this same
+      # job, so arbitrary code from the tag runs regardless, and anyone able to
+      # push a tag can reach crates.io by other means. This is a guard against
+      # a mistake, not a control against whoever pushed the tag. Deleting the
+      # script at a tag is the one adjacent case that *is* covered: it lands in
+      # the absent branch below, and every tag from here on is at or above
+      # FLOOR, so it refuses.
+      - name: Verify CHANGELOG.md names the version being published
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          GUARD=.github/scripts/verify-release-version.sh
+
+          # The first release that carries the guard: above v0.7.0, the newest
+          # existing tag, and equal to the version Cargo.toml is preparing.
+          FLOOR=0.8.0
+
+          # `-f` rather than `-x`, and `bash "$GUARD"` rather than executing it:
+          # a mode bit lost across an arbitrary checkout would otherwise be
+          # reported by the branch below as "the guard was removed", which is a
+          # different and false claim. Exiting with the script's own status
+          # keeps its 1 (mismatch) and 2 (wired up wrong) distinct, and does not
+          # depend on this body running under `bash -e`.
+          if [ -f "$GUARD" ]; then
+            bash "$GUARD" "$VERSION" || exit $?
+            exit 0
+          fi
+
+          # `sort -V`, not a string compare: as strings, `0.10.0` sorts below
+          # `0.9.0`. The pre-release suffix is dropped first so that
+          # `0.8.0-beta.1` belongs to the 0.8.0 era rather than after it.
+          BASE="${VERSION%%-*}"
+          OLDEST="$(printf '%s\n%s\n' "$BASE" "$FLOOR" | sort -V | head -1)"
+
+          if [ "$BASE" != "$FLOOR" ] && [ "$OLDEST" = "$BASE" ]; then
+            echo "::warning::Not checked: $VERSION is below the guard floor of $FLOOR and $GUARD does not exist at this tag, so nothing verified that CHANGELOG.md names $VERSION."
+            echo "Not checked: $GUARD is absent from the tree being published, and $VERSION is below the floor of $FLOOR."
+            echo "This is the recovery path a workflow_dispatch exists for: an old tag, whose own tree never carried the guard. Publishing anyway."
+            exit 0
+          fi
+
+          echo "Error: $GUARD is missing from the tree being published." >&2
+          echo "" >&2
+          echo "  version being published : $VERSION" >&2
+          echo "  guard floor             : $FLOOR" >&2
+          echo "" >&2
+          echo "Every release at or above $FLOOR carries this script. Its absence here" >&2
+          echo "means it was deleted, or that this is not the tree it should be, and" >&2
+          echo "nothing has checked that CHANGELOG.md names $VERSION. Refusing to" >&2
+          echo "publish a version that cannot be unpublished." >&2
+          exit 1
+
       - name: Install system dependencies
         run: |
           sudo apt-get update

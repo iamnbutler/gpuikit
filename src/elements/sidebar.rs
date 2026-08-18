@@ -44,14 +44,14 @@
 
 use gpui::{
     anchored, deferred, div, point, prelude::*, px, AnyElement, App, ClickEvent, Div, ElementId,
-    IntoElement, ParentElement, Pixels, Rems, RenderOnce, Role, SharedString, Stateful, Styled,
-    Svg, Window,
+    FocusHandle, IntoElement, ParentElement, Pixels, Rems, RenderOnce, Role, SharedString,
+    Stateful, Styled, Svg, Window,
 };
 
 use crate::a11y::{A11y, Announce};
 use crate::element_id::scoped;
 use crate::icons::Icons;
-use crate::theme::{ActiveTheme, ControlMetrics, ControlSize, Themeable};
+use crate::theme::{focus_ring, ActiveTheme, ControlMetrics, ControlSize, Themeable};
 use crate::traits::accessible::Accessible;
 use crate::traits::clickable::Clickable;
 use crate::traits::control_sized::ControlSized;
@@ -523,6 +523,7 @@ pub struct SidebarTrigger {
     disabled: bool,
     size: ControlSize,
     handler: Option<ClickHandler>,
+    focus_handle: Option<FocusHandle>,
 }
 
 impl SidebarTrigger {
@@ -536,7 +537,15 @@ impl SidebarTrigger {
             disabled: false,
             size: ControlSize::default(),
             handler: None,
+            focus_handle: None,
         }
+    }
+
+    /// Focus this trigger through a handle the caller owns. Optional for the
+    /// same reason [`crate::elements::button::Button::focus_handle`] is.
+    pub fn focus_handle(mut self, handle: FocusHandle) -> Self {
+        self.focus_handle = Some(handle);
+        self
     }
 
     /// Mirror the glyph for a sidebar docked to the other edge.
@@ -578,13 +587,25 @@ impl SidebarTrigger {
 /// control that changes the state.
 impl Accessible for SidebarTrigger {
     fn a11y(&self) -> A11y {
-        A11y::new(Role::Button)
+        let a11y = A11y::new(Role::Button)
             .name(
                 self.label
                     .clone()
                     .unwrap_or_else(|| "Toggle sidebar".into()),
             )
-            .expanded(self.state.is_expanded())
+            .expanded(self.state.is_expanded());
+
+        // The same answer `Button` gives, for the same reason: a control that
+        // announces a role a keyboard cannot reach is the defect
+        // `crate::a11y`'s section 4 exists for, and a disabled one leaves the
+        // tab order because gpui has no `aria_disabled` to announce instead.
+        if self.disabled {
+            a11y.not_focusable("a disabled trigger has nothing for a keyboard to do")
+        } else if let Some(handle) = self.focus_handle.clone() {
+            a11y.focus_handle(handle)
+        } else {
+            a11y.focusable()
+        }
     }
 }
 
@@ -614,6 +635,7 @@ impl RenderOnce for SidebarTrigger {
             .items_center()
             .justify_center()
             .rounded(metrics.radius)
+            .focus_visible(|style| style.shadow(focus_ring(theme.accent())))
             .when(disabled, |this| this.cursor_not_allowed())
             .when(!disabled, |this| {
                 this.cursor_pointer()
@@ -698,6 +720,32 @@ mod tests {
                 "the state belongs on the control that changes it"
             );
         }
+    }
+
+    /// The trigger is a `Role::Button`, so `crate::a11y`'s section 4 requires
+    /// it to answer the focus question — and answering it wrong is the defect
+    /// that section exists for.
+    #[test]
+    fn the_trigger_takes_focus_and_a_disabled_one_declines_it() {
+        assert!(sidebar_trigger("nav-toggle", SidebarState::Expanded)
+            .a11y()
+            .is_focusable());
+
+        let disabled = sidebar_trigger("nav-toggle", SidebarState::Expanded)
+            .disabled(true)
+            .a11y();
+        assert!(!disabled.is_focusable());
+        assert!(disabled.focus_declined_because().is_some());
+        assert!(!disabled.is_missing_a_focus_decision());
+    }
+
+    /// The panel is a landmark, so it is never asked the question.
+    #[test]
+    fn the_region_is_not_asked_about_keyboard_focus() {
+        assert!(!sidebar("app-nav")
+            .label("Navigation")
+            .a11y()
+            .is_missing_a_focus_decision());
     }
 
     #[test]

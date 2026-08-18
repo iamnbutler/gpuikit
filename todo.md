@@ -87,12 +87,18 @@ decision, and adopt-or-delete for `src/traits/portal.rs`). All three are
 settled: the portal trait is deleted and the convention that replaces it is
 [docs/overlays.md](docs/overlays.md); the role convention is `src/a11y.rs`
 — an element implements `traits::accessible::Accessible` and applies the `A11y`
-it returns with `.announce(a11y)`, with `Button` as the worked example; and the
+it returns with `.announce(a11y)`, with `Button` as the worked example, and
+since #173 that same call also applies the element's keyboard-focus decision,
+so a role a screen reader hears and a keyboard cannot reach is a
+`debug_assert!` rather than a shipped defect; and the
 naming decision is [docs/menus-and-listboxes.md](docs/menus-and-listboxes.md) —
 `Dropdown` was `Select` under a second name, so it is deleted, `Select` took
 the union of the two APIs, and the popup they shared is now private. `Table`
 still reports no accessibility roles, but now for its own reason rather than a
-missing decision: its cells need derived ids before they can carry one.
+missing decision: its cells need derived ids before they can carry one — and
+that reason, along with one for every other unadopted element, is now
+`a11y::ELEMENTS_WITHOUT_A_ROLE` rather than prose, checked in both directions
+so the list can only shrink.
 
 The lists that used to live here are gone deliberately. Restating a roster in a
 second, uncheckable place is how the old one stayed alive for a year after the

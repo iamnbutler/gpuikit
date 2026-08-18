@@ -9,6 +9,19 @@
 > build if anything under `src/` calls gpui's `.role()` / `.aria_*()` builders
 > outside that module. What follows is the issue as it was written, with the
 > answers appended.
+>
+> **Since then.** Section 4 of that module — "How the keyboard reaches it" — is
+> the answer to the companion gap this issue's own text flagged: a role and a
+> focus decision that live in two places drift, so `announce` *applies* the
+> focus answer alongside the role, and a control role that says nothing about
+> focus is a `debug_assert!` in the same shape as the missing-name one.
+> `Select` is the first element adopted after the convention, and it is the one
+> that had to take the breaking change question 2 predicted — `ComboBox` needs
+> a name, a select's visible text is its value, and gpui has no `labelled_by`
+> builder, so the name is a constructor argument. The rollout order in question
+> 5 is no longer prose: `a11y::ELEMENTS_WITHOUT_A_ROLE` names every module that
+> still declares nothing and why, checked in both directions so the list can
+> only shrink.
 
 ## The problem
 

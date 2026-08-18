@@ -10,8 +10,28 @@ pub mod control;
 
 pub use control::{ControlMetrics, ControlScale, ControlSize, TrackMetrics};
 
-use gpui::{hsla, App, Global, Hsla, SharedString};
+use gpui::{hsla, px, App, BoxShadow, Global, Hsla, Pixels, SharedString};
 use std::sync::Arc;
+
+/// How thick the ring around a keyboard-focused control is.
+///
+/// One number, in one place, so every control that grows a ring grows the same
+/// one.
+pub const FOCUS_RING_WIDTH: Pixels = px(2.);
+
+/// The ring a control draws when the keyboard reaches it.
+///
+/// A **spread shadow rather than a border**, on purpose: a border changes the
+/// control's box, so arriving focus would resize it and reflow its neighbours.
+/// A spread shadow is painted outside the bounds and moves nothing.
+///
+/// Apply it through gpui's `focus_visible`, not `focus` — that is the
+/// `:focus-visible` rule, so clicking a control does not leave a ring behind
+/// it. `crate::a11y` is what makes the control focusable in the first place;
+/// this is only what it looks like.
+pub fn focus_ring(color: Hsla) -> Vec<BoxShadow> {
+    vec![BoxShadow::new(px(0.), px(0.), color).spread_radius(FOCUS_RING_WIDTH)]
+}
 
 /// Core theme trait that defines the color contract for UI components.
 ///

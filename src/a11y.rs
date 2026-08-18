@@ -14,7 +14,7 @@
 //!
 //! impl Accessible for Button {
 //!     fn a11y(&self) -> A11y {
-//!         A11y::new(Role::Button).name(self.label.clone())
+//!         A11y::new(Role::Button).name(self.label.clone()).focusable()
 //!     }
 //! }
 //!
@@ -83,7 +83,9 @@
 //!
 //! As fields of [`A11y`], applied by [`Announce::announce`] — `toggled`,
 //! `selected`, `expanded`, `value`, `orientation`, `level`,
-//! `position_in_set`. **State goes on the element that changes it**, which is
+//! `position_in_set`, `size_of_set`. The last two travel together: a position
+//! with no size announces "3" out of nowhere, and gpui's `aria_size_of_set` is
+//! what makes it "3 of 8". **State goes on the element that changes it**, which is
 //! not always the element it is about: `Sidebar` reports `aria-expanded` on
 //! `SidebarTrigger`, because the trigger is the control a screen reader user
 //! operates, and the panel is the thing that happens as a result.
@@ -109,7 +111,71 @@
 //! neither exists. When gpui grows `aria_disabled` / `aria_sort`, adding them
 //! is a local change to this file.
 //!
-//! # 4. How it is tested
+//! # 4. How the keyboard reaches it
+//!
+//! [`A11y::focusable`], [`A11y::focus_handle`] and [`A11y::not_focusable`] —
+//! and [`Announce::announce`] *applies* the answer rather than leaving the
+//! element to honour it.
+//!
+//! That is the load-bearing part. A role and a focus decision that live in two
+//! places drift, and the way they drift is the bug this section exists for:
+//! `Button` announced `Role::Button` for a release and could not take keyboard
+//! focus, so a screen reader was told about a control a keyboard could not
+//! reach. Making the announcement the thing that mints the focus handle and
+//! registers the tab stop means the two cannot disagree — there is no second
+//! call an element can forget.
+//!
+//! For every role in [`role_requires_keyboard_focus`], saying nothing is a
+//! `debug_assert!`, the counterpart of section 2's missing-name one.
+//! **Declining is not silence**: [`A11y::not_focusable`] takes a reason, and
+//! `announce` does not assert on it. `Button` declines when it is disabled,
+//! which is the weaker of the two ARIA-sanctioned answers and is forced by
+//! gpui having no `aria_disabled` (section 3) — a disabled control is out of
+//! the tab order rather than a focusable control that announces why.
+//!
+//! Two things about gpui that this rests on, both discovered the hard way:
+//!
+//! - **The caller does not have to supply a [`FocusHandle`].**
+//!   `Interactivity::request_layout` mints one for a focusable element and
+//!   stores it in that element's element state, "which lives as long as frames
+//!   contain an element with this id". A `RenderOnce` control is therefore the
+//!   same focus target across frames without anything above it holding state,
+//!   which is why [`A11y::focus_handle`] is optional rather than required and
+//!   why no existing `button(…)` call site had to change.
+//!   `focus_survives_a_redraw` in `elements::button` pins it.
+//! - **Focusable is not tabbable.** `focusable()` mints a handle whose
+//!   `tab_stop` is `false`, and `TabStopMap::next` walks straight past a node
+//!   that is not a stop. Worse, `track_focus` does *not* push the element's
+//!   `tab_stop` onto the handle — only the minted-handle path does — so a
+//!   caller-supplied handle has to be made a stop on the handle itself. Both
+//!   paths below say `.tab_stop(true)`, and deleting either one fails a test.
+//!
+//! Enter and Space activation is gpui's: a focused element with a click
+//! listener synthesises a click from a matched key *down* and key *up*. Tab
+//! had no binding at all — gpui ships `Window::focus_next` / `focus_prev` and
+//! binds neither — so [`bind_focus_keys`] installs [`FocusNext`] and
+//! [`FocusPrevious`], and [`crate::init`] calls it. The listener for those
+//! actions is [`FocusNavigation::moves_focus_on_tab`], which `announce` puts
+//! on every control it makes focusable.
+//!
+//! **Tab does nothing until something is focused**, and putting
+//! `moves_focus_on_tab()` on "the app's root element" is not enough on its
+//! own: with no focus, gpui falls back to the dispatch node belonging to its
+//! own wrapper around the root view, which is *above* the root element. The
+//! listener has to sit on an element that tracks a handle something actually
+//! focuses — `examples/showcase.rs` is the worked example.
+//!
+//! The binding carries **no key context**. An earlier `!Input` predicate looks
+//! right and is not: `KeyBindingContextPredicate::depth_of` returns `None` for
+//! an empty context stack, and a focus path of plain `div`s has no key
+//! contexts at all, so the binding would be disabled exactly where it is
+//! needed. What keeps Tab inside a focused text input instead is binding
+//! order: `crate::init` installs the focus keys *before*
+//! `input::bind_input_keys`, gpui prefers the later binding at equal context
+//! depth, and only an element `announce` made focusable listens for
+//! [`FocusNext`] anyway.
+//!
+//! # 5. How it is tested
 //!
 //! By rendering a component and calling the two [`gpui::Element`] methods gpui
 //! itself calls — `a11y_role` and `write_a11y_info` — on the element that
@@ -140,24 +206,50 @@
 //! apply it in [`Announce::announce`]; the scan will not accept a local
 //! `.aria_…()` call, and that is the point.
 //!
+//! **`announced` cannot see focus.** It calls two [`gpui::Element`] methods and
+//! never lays out or paints, so the handle gpui mints during `request_layout`
+//! and the tab stop it registers during paint are both invisible to it. What
+//! an element *declares* is tested through
+//! [`Accessible`](crate::traits::accessible::Accessible); that the declaration
+//! reaches the tab order is tested by drawing a real window and pressing a real
+//! key, which `elements::button`'s tests do. Drawing a role-carrying,
+//! mouse-listening element needs a real *view*, not `VisualTestContext::draw` —
+//! registering a mouse listener reads `Window::current_view` — which is the
+//! note `elements::sidebar`'s harness already carries.
+//!
 //! What the scan cannot see is a hand-written [`gpui::Element`] writing an
 //! `accesskit::Node` itself — `src/markdown/selectable_text.rs` does, because
 //! a text run is not a `div` and never passes through a builder. That is the
 //! one place in the crate outside this convention, and it has its own tests.
 //!
-//! # 5. The rollout
+//! # 6. The rollout
 //!
-//! `Button` is the worked example, and `Sidebar` — which shipped a role ahead
-//! of this decision — has been migrated onto it, as its own issue said it
-//! would have to be. Nothing else is swept: the state fields are proven
-//! against a bare `div` in this module's tests rather than by touching thirty
-//! elements. The order the follow-on work wants is `IconButton` (which forces
-//! the "name as a constructor argument" half of section 2), then
+//! `Button` is the worked example; `Sidebar` — which shipped a role ahead of
+//! this decision — has been migrated onto it; `Splitter` arrived carrying one;
+//! and `Select` is the first element adopted *after* the convention, which is
+//! why it is the one that had to take the breaking change section 2 predicted
+//! (`ComboBox` needs a name, and a select's visible text is its value, so the
+//! name is a constructor argument).
+//!
+//! The rest is **not** prose any more. [`ELEMENTS_WITHOUT_A_ROLE`] names every
+//! element module that still declares nothing, with the reason — what it would
+//! announce, or what has to exist first — and
+//! `tests::every_element_module_declares_a_role` checks it in both directions:
+//! a module that is silent and unlisted fails, and so does a listed module
+//! that has since been adopted. The list can only shrink, which is the
+//! property a rollout order held in a doc comment did not have.
+//!
+//! The order the follow-on work still wants is `IconButton` first — it forces
+//! the "name as a constructor argument" half of section 2 and is the first
+//! element that will meet both of this module's assertions at once — then
 //! `Checkbox` / `Switch` / `Toggle`, `Slider` / `Progress`, `Tabs` / `List`,
 //! `Accordion` / `Collapsible`, the overlays, and `Table` last, since it needs
 //! derived cell ids first.
 
-use gpui::{Orientation, Role, SharedString, StatefulInteractiveElement, Toggled};
+use gpui::{
+    actions, App, FocusHandle, InteractiveElement, KeyBinding, Orientation, Role, SharedString,
+    StatefulInteractiveElement, Toggled,
+};
 
 /// What an element announces: a role, a name, and whatever state goes with the
 /// role.
@@ -179,6 +271,31 @@ pub struct A11y {
     orientation: Option<Orientation>,
     level: Option<usize>,
     position_in_set: Option<usize>,
+    size_of_set: Option<usize>,
+    focus: Focus,
+}
+
+/// Whether an element takes keyboard focus, and how — section 4 of the module
+/// docs.
+///
+/// Private, because it is answered through [`A11y::focusable`],
+/// [`A11y::focus_handle`] and [`A11y::not_focusable`] and read back through
+/// [`A11y::is_focusable`] and [`A11y::focus_declined_because`]. What matters
+/// outside this module is that all three states are distinguishable: silence
+/// is not a decision, and [`Announce::announce`] asserts on it.
+#[derive(Clone, Debug, Default, PartialEq)]
+enum Focus {
+    /// Nobody has answered. For a role in [`role_requires_keyboard_focus`]
+    /// this is the bug section 4 exists for.
+    #[default]
+    Undecided,
+    /// The element is a tab stop. `None` lets gpui mint the [`FocusHandle`]
+    /// and keep it in the element's own element state, which is what a
+    /// `RenderOnce` control wants; `Some` is for an element that already owns
+    /// one.
+    Takes(Option<FocusHandle>),
+    /// The element deliberately stays out of the tab order, for this reason.
+    Declines(SharedString),
 }
 
 /// The value a control reports, as distinct from its name.
@@ -219,6 +336,8 @@ impl A11y {
             orientation: None,
             level: None,
             position_in_set: None,
+            size_of_set: None,
+            focus: Focus::Undecided,
         }
     }
 
@@ -296,6 +415,49 @@ impl A11y {
         self
     }
 
+    /// How many siblings there are in total — what turns
+    /// [`position_in_set`](A11y::position_in_set)'s "3" into "3 of 8".
+    ///
+    /// A position with no size announces a number out of nowhere, so the two
+    /// are worth setting together even though neither is required.
+    pub fn size_of_set(mut self, size: usize) -> Self {
+        self.size_of_set = Some(size);
+        self
+    }
+
+    /// This element is a keyboard tab stop, and gpui should mint and keep the
+    /// [`FocusHandle`] for it.
+    ///
+    /// The right answer for a `RenderOnce` control: gpui stores the handle in
+    /// the element's element state, keyed on the element id, so the control is
+    /// the same focus target across frames without a caller holding anything.
+    /// See section 4 of the module docs.
+    pub fn focusable(mut self) -> Self {
+        self.focus = Focus::Takes(None);
+        self
+    }
+
+    /// The same, for an element that already owns a [`FocusHandle`] — a
+    /// `Render` entity, or a control with its own key handlers.
+    ///
+    /// [`Announce::announce`] makes the handle a tab stop, because
+    /// `track_focus` does not carry the element's `tab_stop` onto the handle
+    /// the way the minted path does.
+    pub fn focus_handle(mut self, handle: FocusHandle) -> Self {
+        self.focus = Focus::Takes(Some(handle));
+        self
+    }
+
+    /// This element stays out of the tab order, because `why`.
+    ///
+    /// The reason is required on purpose: it is what distinguishes a decision
+    /// from a call someone made to silence the assertion. `announce` asserts
+    /// against silence, not against "no".
+    pub fn not_focusable(mut self, why: impl Into<SharedString>) -> Self {
+        self.focus = Focus::Declines(why.into());
+        self
+    }
+
     /// The role this announcement reports.
     pub fn role(&self) -> Role {
         self.role
@@ -317,6 +479,27 @@ impl A11y {
                 .name
                 .as_ref()
                 .is_some_and(|name| !name.trim().is_empty())
+    }
+
+    /// Whether this announcement takes keyboard focus.
+    pub fn is_focusable(&self) -> bool {
+        matches!(self.focus, Focus::Takes(_))
+    }
+
+    /// Why this element declined keyboard focus, if it declined it.
+    pub fn focus_declined_because(&self) -> Option<&SharedString> {
+        match &self.focus {
+            Focus::Declines(why) => Some(why),
+            _ => None,
+        }
+    }
+
+    /// Whether this announcement's role needs a focus decision and has none.
+    ///
+    /// [`Announce::announce`] asserts on this in debug builds — the
+    /// counterpart of [`is_missing_a_required_name`](A11y::is_missing_a_required_name).
+    pub fn is_missing_a_focus_decision(&self) -> bool {
+        role_requires_keyboard_focus(self.role) && matches!(self.focus, Focus::Undecided)
     }
 }
 
@@ -365,6 +548,299 @@ pub fn role_requires_a_name(role: Role) -> bool {
     )
 }
 
+/// Whether a role promises a control a keyboard user can operate, so that
+/// announcing it without taking focus reaches a screen reader and not a
+/// keyboard.
+///
+/// The counterpart of [`role_requires_a_name`], and the same kind of list: it
+/// is public so an element or its test can consult the same one, and it is
+/// expected to grow.
+///
+/// Three groups are deliberately **not** on it:
+///
+/// - **The composite-item roles** — `MenuItem`, `MenuItemCheckBox`,
+///   `MenuItemRadio`, `Tab`, `TreeItem`, `ListBoxOption`. These are arrow-key
+///   targets inside a composite that owns the one tab stop, so no per-item rule
+///   can be right: making each item a tab stop is exactly the mistake the ARIA
+///   authoring practices call out. They join the list when this crate has a
+///   roving-focus convention, which is a separate decision — `Tabs`, `List`,
+///   `ContextMenu` and `Select`'s popup all want it and none of them has it.
+/// - **`Role::Splitter`.** `src/elements/splitter.rs` is keyboard-reachable
+///   today, but through a raw `tab_index(0)` on its band rather than through
+///   this convention — it landed alongside this change and could not see it.
+///   Adopting it is filed as iamnbutler/gpuikit#181; adding the arm before
+///   that element declares a focus decision would only turn its announcement
+///   into a panic. A decline written down is the difference between a gap and
+///   an oversight.
+/// - **Landmarks and containers** — `Complementary`, `Document`, `Group`.
+///   These are read, not operated.
+pub fn role_requires_keyboard_focus(role: Role) -> bool {
+    matches!(
+        role,
+        Role::Button
+            // A dialog's Enter key resolves to this one, so it is the most
+            // focus-requiring control in the set.
+            | Role::DefaultButton
+            | Role::CheckBox
+            | Role::Switch
+            | Role::RadioButton
+            | Role::Link
+            | Role::Slider
+            | Role::SpinButton
+            | Role::ComboBox
+            | Role::EditableComboBox
+            | Role::TextInput
+            | Role::MultilineTextInput
+            | Role::SearchInput
+            | Role::NumberInput
+            | Role::PasswordInput
+            | Role::DateInput
+    )
+}
+
+actions!(
+    a11y,
+    [
+        /// Move keyboard focus to the next tab stop.
+        FocusNext,
+        /// Move keyboard focus to the previous tab stop.
+        FocusPrevious,
+    ]
+);
+
+/// Bind Tab and Shift-Tab to [`FocusNext`] and [`FocusPrevious`].
+///
+/// gpui ships `Window::focus_next` and `Window::focus_prev` and binds neither,
+/// so without this Tab does nothing at all. [`crate::init`] calls it, and calls
+/// it **before** `input::bind_input_keys` on purpose: gpui prefers the
+/// later-registered binding at equal context depth, which is what keeps Tab
+/// inside a focused text input. Swapping the two takes Tab out of every input
+/// in the crate.
+///
+/// The bindings carry no key context. See section 4 of the module docs for why
+/// a `!Input` predicate looks right and is not.
+pub fn bind_focus_keys(cx: &mut App) {
+    cx.bind_keys([
+        KeyBinding::new("tab", FocusNext, None),
+        KeyBinding::new("shift-tab", FocusPrevious, None),
+    ]);
+}
+
+/// Listens for [`FocusNext`] / [`FocusPrevious`] and moves focus.
+///
+/// [`Announce::announce`] puts this on every control it makes focusable, so a
+/// consumer never calls it for a gpuikit element. What a consumer *does* need
+/// it for is the cold start: with nothing focused, gpui dispatches to the node
+/// belonging to its own wrapper around the root view, above the root element,
+/// so the first Tab reaches no listener. Putting this on the element that
+/// tracks the handle the app focuses at startup is what makes that first Tab
+/// work — `examples/showcase.rs` is the worked example.
+pub trait FocusNavigation: InteractiveElement {
+    /// Answer Tab and Shift-Tab on this element.
+    fn moves_focus_on_tab(self) -> Self {
+        self.on_action(|_: &FocusNext, window, cx| window.focus_next(cx))
+            .on_action(|_: &FocusPrevious, window, cx| window.focus_prev(cx))
+    }
+}
+
+impl<E: InteractiveElement> FocusNavigation for E {}
+
+/// Every element module that does **not** yet declare a role, and why.
+///
+/// Section 6's rollout order was prose, which is a list nothing reads.
+/// `tests::every_element_module_declares_a_role` reads this one: a module in
+/// `src/elements.rs` that neither implements
+/// [`Accessible`](crate::traits::accessible::Accessible) nor appears here
+/// fails the build, and so does an entry for a module that has since been
+/// adopted. So the list can only shrink, and the gap it describes cannot go
+/// back to being invisible.
+///
+/// A reason says what the module *would* announce, or what has to exist
+/// first. "Not done yet" is not a reason, and the test enforces a minimum
+/// length to say so.
+pub const ELEMENTS_WITHOUT_A_ROLE: &[(&str, &str)] = &[
+    (
+        "accordion",
+        "would be a set of Group headers with `expanded`, once Collapsible answers the same \
+         question — the two share a mechanism and should be adopted together",
+    ),
+    (
+        "alert",
+        "would be Role::Alert (or AlertDialog for the modal shape), which needs the live-region \
+         decision this convention has not taken",
+    ),
+    (
+        "aspect_ratio",
+        "a layout wrapper with no semantics of its own: it would announce nothing, and saying so \
+         needs a `Role::GenericContainer` escape gpui rejects outright",
+    ),
+    (
+        "avatar",
+        "would be Role::Image with a required name, and section 1's `Img` escape hatch says it \
+         first needs a `div().id(…)` around the image",
+    ),
+    (
+        "badge",
+        "decorative text beside the thing it counts; it wants an `aria-describedby` relationship \
+         gpui has no builder for, not a role of its own",
+    ),
+    (
+        "breadcrumb",
+        "would be Role::Navigation around a Role::List of Role::Link, so it needs the composite \
+         roles and the link naming rule together",
+    ),
+    (
+        "button_group",
+        "would be Role::Group with an orientation, and its children are already Buttons — it is \
+         waiting on nothing but its turn behind `icon_button`",
+    ),
+    (
+        "card",
+        "a surface, not a control: it would be Role::Group, and only once it can be named by its \
+         own header rather than by an argument",
+    ),
+    (
+        "checkbox",
+        "would be Role::CheckBox with `toggled` and a required name, and is next after \
+         `icon_button` in section 6's order",
+    ),
+    (
+        "collapsible",
+        "would report `expanded` on its trigger the way SidebarTrigger does; adopted together \
+         with `accordion`, which shares the mechanism",
+    ),
+    (
+        "context_menu",
+        "would be Role::Menu over Role::MenuItem rows, which are composite-item roles — they \
+         need the roving-focus convention `role_requires_keyboard_focus` names",
+    ),
+    (
+        "dialog",
+        "would be Role::Dialog with a required name and `modal`; gpui has no `aria_modal` \
+         builder, and a dialog that announces itself unmodal is worse than one that waits",
+    ),
+    (
+        "empty",
+        "an empty-state illustration with a heading and a message: it would announce a \
+         Role::Group named by its own heading, which is the naming rule `card` is also waiting on",
+    ),
+    (
+        "field",
+        "the element that most wants `labelled_by`, which gpui has no builder for — a Field's \
+         whole job is naming the control beside it",
+    ),
+    (
+        "icon_button",
+        "would be Role::Button with the name as a required constructor argument, which is the \
+         breaking change section 2 describes and the first of section 6's rollout",
+    ),
+    (
+        "input",
+        "would be Role::TextInput and its siblings with a `value`; it owns its own FocusHandle \
+         already, which is exactly what `A11y::focus_handle` takes",
+    ),
+    (
+        "kbd",
+        "renders a key name as decoration; it would want accesskit's `keyboard_shortcut` on the \
+         control it describes, not a role of its own",
+    ),
+    (
+        "label",
+        "would be Role::Label, and gpui already mints one for `text!` — adopting it needs the \
+         duplicate-node question section 1 raises answered first",
+    ),
+    (
+        "list",
+        "would be Role::List over Role::ListItem, and its selectable rows are composite-item \
+         roles waiting on the roving-focus convention",
+    ),
+    (
+        "loading_indicator",
+        "would be Role::ProgressIndicator with no numeric value, which needs the \
+         indeterminate-progress decision `progress` also wants",
+    ),
+    (
+        "popover",
+        "would be a named Role::Group with `expanded` on its trigger; it owns focus by hand \
+         today and adopting it means moving that onto `A11y::focus_handle`",
+    ),
+    (
+        "progress",
+        "would be Role::ProgressIndicator with a bounded number value; the indeterminate case \
+         has no answer yet, and `A11yValue::Number` requires all four bounds",
+    ),
+    (
+        "radio_group",
+        "would be Role::RadioGroup over Role::RadioButton rows, the clearest case of the \
+         roving-focus convention this crate does not have",
+    ),
+    (
+        "scroll_area",
+        "a scroll container gpui already describes through its own scroll properties; a role \
+         here would add a node without adding information",
+    ),
+    (
+        "separator",
+        "would be Role::Splitter with an orientation and no interaction, which is the one \
+         `splitter.rs` already reports — the two need reconciling before either moves",
+    ),
+    (
+        "slider",
+        "would be Role::Slider with a bounded number value and a required name, which is the \
+         `A11yValue::Number` case section 3 was written for",
+    ),
+    (
+        "switch",
+        "would be Role::Switch with `toggled` and a required name; adopted alongside `checkbox` \
+         and `toggle`, which share the shape",
+    ),
+    (
+        "table",
+        "its own module docs already say it: gpui has no `aria_sort` builder, and a table needs \
+         derived cell ids before its cells can carry roles at all — section 6 puts it last",
+    ),
+    (
+        "tabs",
+        "would be Role::TabList over Role::Tab, composite-item roles that need the roving-focus \
+         convention before a per-item rule can be right",
+    ),
+    (
+        "text_field",
+        "would be Role::TextInput with a `value` and a required name; it owns a FocusHandle \
+         already, so adopting it is a move onto `A11y::focus_handle`",
+    ),
+    (
+        "textarea",
+        "would be Role::MultilineTextInput; same shape as `text_field`, and the two should be \
+         adopted in one change so their focus handling matches",
+    ),
+    (
+        "toast",
+        "would be Role::Alert in a live region, which is the live-region decision `alert` is \
+         also waiting on — both should be taken once",
+    ),
+    (
+        "toggle",
+        "would be Role::Button with `toggled`, or Role::Switch depending on the answer \
+         `checkbox` and `switch` settle between them",
+    ),
+    (
+        "toggle_group",
+        "would be Role::Group over toggles, so it cannot be adopted before `toggle` has decided \
+         what one of its children announces",
+    ),
+    (
+        "tooltip",
+        "accesskit has a `tooltip` property on the described control rather than a role, and \
+         this crate's tooltip is an `AnyView` with no string to read — see section 2",
+    ),
+    (
+        "typography",
+        "would be Role::Heading with a `level` and Role::Paragraph; gpui mints label nodes for \
+         text already, so this needs the duplicate-node question answered with `label`",
+    ),
+];
+
 /// Applies an [`A11y`] to the element that carries it.
 ///
 /// Blanket-implemented for every `StatefulInteractiveElement`, which is gpui's
@@ -378,8 +854,9 @@ pub trait Announce: StatefulInteractiveElement {
     /// # Panics
     ///
     /// In debug builds, if the role needs an accessible name (see
-    /// [`role_requires_a_name`]) and none was given. Release builds announce
-    /// the nameless element rather than aborting.
+    /// [`role_requires_a_name`]) and none was given, or if it needs a keyboard
+    /// focus decision (see [`role_requires_keyboard_focus`]) and none was
+    /// taken. Release builds announce the element rather than aborting.
     #[track_caller]
     fn announce(self, a11y: A11y) -> Self {
         debug_assert!(
@@ -387,6 +864,15 @@ pub trait Announce: StatefulInteractiveElement {
             "{:?} announces itself by name, and this one has none. Give it the element's \
              own visible text where it has any, or take the name as a constructor argument \
              where it does not — see `a11y`'s module docs, section 2. Not the tooltip.",
+            a11y.role(),
+        );
+        debug_assert!(
+            !a11y.is_missing_a_focus_decision(),
+            "{:?} is a control a keyboard user operates, and this one says nothing about \
+             keyboard focus. Call `.focusable()` (or `.focus_handle(handle)` if the element \
+             owns one), or `.not_focusable(\"why\")` if it genuinely stays out of the tab \
+             order — see `a11y`'s module docs, section 4. Announcing a role a keyboard \
+             cannot reach is the defect that section exists for.",
             a11y.role(),
         );
 
@@ -401,9 +887,30 @@ pub trait Announce: StatefulInteractiveElement {
             orientation,
             level,
             position_in_set,
+            size_of_set,
+            focus,
         } = a11y;
 
         let mut element = self.role(role);
+
+        // Applied here rather than left to the element: a focus decision an
+        // element has to honour separately is one that can silently disagree
+        // with the element's own `div`. Section 4.
+        match focus {
+            // `focusable()` alone mints a handle whose `tab_stop` is false, and
+            // `TabStopMap::next` walks straight past it.
+            Focus::Takes(None) => {
+                element = element.focusable().tab_stop(true).moves_focus_on_tab();
+            }
+            // `track_focus` does *not* push the element's `tab_stop` onto the
+            // handle, so a caller-supplied one has to be made a stop itself.
+            Focus::Takes(Some(handle)) => {
+                element = element
+                    .track_focus(&handle.tab_stop(true))
+                    .moves_focus_on_tab();
+            }
+            Focus::Undecided | Focus::Declines(_) => {}
+        }
 
         if let Some(name) = name {
             element = element.aria_label(name);
@@ -444,6 +951,9 @@ pub trait Announce: StatefulInteractiveElement {
         }
         if let Some(position) = position_in_set {
             element = element.aria_position_in_set(position);
+        }
+        if let Some(size) = size_of_set {
+            element = element.aria_size_of_set(size);
         }
 
         element
@@ -532,7 +1042,7 @@ pub(crate) mod test_support {
 mod tests {
     use super::test_support::announced_element;
     use super::*;
-    use gpui::{accesskit, div, prelude::*, Orientation, Role, Toggled};
+    use gpui::{accesskit, div, Orientation, Role, Toggled};
     use std::fs;
     use std::path::{Path, PathBuf};
 
@@ -541,7 +1051,7 @@ mod tests {
         let announced = announced_element(
             div()
                 .id("save")
-                .announce(A11y::new(Role::Button).name("Save")),
+                .announce(A11y::new(Role::Button).name("Save").focusable()),
         );
 
         assert_eq!(announced.role, Some(Role::Button));
@@ -593,7 +1103,9 @@ mod tests {
                     .number_value(70., 0., 100., 5.)
                     .orientation(Orientation::Horizontal)
                     .level(2)
-                    .position_in_set(3),
+                    .position_in_set(3)
+                    .size_of_set(8)
+                    .focusable(),
             ),
         );
 
@@ -611,14 +1123,18 @@ mod tests {
         assert_eq!(node.orientation(), Some(Orientation::Horizontal));
         assert_eq!(node.level(), Some(2));
         assert_eq!(node.position_in_set(), Some(3));
+        assert_eq!(node.size_of_set(), Some(8));
     }
 
     #[test]
     fn a_text_value_reaches_the_node() {
         let announced = announced_element(
-            div()
-                .id("timezone")
-                .announce(A11y::new(Role::ComboBox).name("Timezone").text_value("UTC")),
+            div().id("timezone").announce(
+                A11y::new(Role::ComboBox)
+                    .name("Timezone")
+                    .text_value("UTC")
+                    .focusable(),
+            ),
         );
 
         let node = announced.node.expect("a combo box with an id is a node");
@@ -633,9 +1149,11 @@ mod tests {
     #[test]
     fn a_click_listener_is_what_offers_the_click_action() {
         let inert = announced_element(
-            div()
-                .id("inert")
-                .announce(A11y::new(Role::Button).name("Save")),
+            div().id("inert").announce(
+                A11y::new(Role::Button)
+                    .name("Save")
+                    .not_focusable("this one is only here to have no click listener"),
+            ),
         );
         assert!(!inert.supports(accesskit::Action::Click));
     }
@@ -730,6 +1248,185 @@ mod tests {
              move, not a local call. See the `a11y` module docs.",
             offenders.join("\n")
         );
+    }
+
+    // --- section 4: the keyboard ---
+
+    #[test]
+    fn the_focus_rule_covers_the_roles_a_keyboard_operates() {
+        assert!(role_requires_keyboard_focus(Role::Button));
+        assert!(
+            role_requires_keyboard_focus(Role::DefaultButton),
+            "a dialog's Enter key resolves to the default button, so it is the most \
+             focus-requiring control in the set"
+        );
+        assert!(role_requires_keyboard_focus(Role::ComboBox));
+        assert!(role_requires_keyboard_focus(Role::TextInput));
+
+        // Composite items are arrow-key targets inside a composite that owns
+        // the one tab stop. They join the list with a roving-focus convention.
+        assert!(!role_requires_keyboard_focus(Role::ListBoxOption));
+        assert!(!role_requires_keyboard_focus(Role::MenuItem));
+        assert!(!role_requires_keyboard_focus(Role::Tab));
+        assert!(!role_requires_keyboard_focus(Role::TreeItem));
+
+        // Declined in writing rather than absent by accident: see the
+        // function's docs and iamnbutler/gpuikit#181.
+        assert!(!role_requires_keyboard_focus(Role::Splitter));
+
+        // Landmarks are read, not operated.
+        assert!(!role_requires_keyboard_focus(Role::Complementary));
+    }
+
+    /// The three states are distinguishable, and only silence is a bug.
+    #[test]
+    fn a_focus_decision_is_taken_declined_or_missing() {
+        let undecided = A11y::new(Role::Button).name("Save");
+        assert!(!undecided.is_focusable());
+        assert_eq!(undecided.focus_declined_because(), None);
+        assert!(undecided.is_missing_a_focus_decision());
+
+        let takes = undecided.clone().focusable();
+        assert!(takes.is_focusable());
+        assert!(!takes.is_missing_a_focus_decision());
+
+        let declines = undecided.clone().not_focusable("it is disabled");
+        assert!(!declines.is_focusable());
+        assert_eq!(
+            declines.focus_declined_because(),
+            Some(&"it is disabled".into())
+        );
+        assert!(
+            !declines.is_missing_a_focus_decision(),
+            "the assertion is against silence, not against \"no\""
+        );
+
+        // A role nobody operates never has to answer.
+        assert!(!A11y::new(Role::Complementary).is_missing_a_focus_decision());
+    }
+
+    #[test]
+    #[should_panic(expected = "says nothing about keyboard focus")]
+    fn a_button_that_says_nothing_about_focus_is_a_bug() {
+        let _ = div()
+            .id("mute")
+            .announce(A11y::new(Role::Button).name("Save"));
+    }
+
+    /// The counterpart: declining is a decision, so it announces normally.
+    #[test]
+    fn a_declined_control_still_announces() {
+        let announced = announced_element(
+            div().id("off").announce(
+                A11y::new(Role::Button)
+                    .name("Save")
+                    .not_focusable("it is disabled"),
+            ),
+        );
+
+        assert_eq!(announced.role, Some(Role::Button));
+        assert_eq!(announced.name(), Some("Save"));
+    }
+
+    /// A caller-supplied handle is made a tab stop on the *handle*, because
+    /// `track_focus` does not carry the element's `tab_stop` onto it.
+    #[gpui::test]
+    fn a_supplied_handle_is_made_a_tab_stop(cx: &mut gpui::TestAppContext) {
+        let handle = cx.update(|cx| cx.focus_handle());
+        assert!(!handle.tab_stop, "gpui mints handles that are not stops");
+
+        let a11y = A11y::new(Role::Button)
+            .name("Save")
+            .focus_handle(handle.clone());
+        assert!(a11y.is_focusable());
+
+        // What reaches the tab order is checked by drawing — see
+        // `elements::button`'s keyboard tests. What is checked here is that the
+        // announcement carries the caller's handle rather than minting one.
+        let _ = div().id("save").announce(a11y);
+    }
+
+    /// The coverage guard: `src/elements.rs`'s `pub mod` list, checked in both
+    /// directions against [`ELEMENTS_WITHOUT_A_ROLE`], so the excuse list can
+    /// only shrink.
+    ///
+    /// Modelled on `elements::overlay_coverage::every_overlay_is_written_down`,
+    /// which is this crate's existing shape for holding a list to the tree.
+    #[test]
+    fn every_element_module_declares_a_role() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let elements =
+            fs::read_to_string(root.join("src/elements.rs")).expect("src/elements.rs is readable");
+
+        let modules: Vec<String> = elements
+            .lines()
+            .filter_map(|line| {
+                line.trim()
+                    .strip_prefix("pub mod ")?
+                    .strip_suffix(';')
+                    .map(str::to_string)
+            })
+            .collect();
+
+        // The same corpus floor the builder scan carries, for the same reason:
+        // a scan that finds nothing to scan reports no offenders.
+        assert!(
+            modules.len() > 20,
+            "only {} element module(s) found in src/elements.rs, so this guards nothing — \
+             check how the source tree is being located before trusting a green result",
+            modules.len(),
+        );
+
+        let mut silent = Vec::new();
+        let mut adopted = Vec::new();
+
+        for module in &modules {
+            let source = fs::read_to_string(root.join(format!("src/elements/{module}.rs")))
+                .unwrap_or_else(|error| panic!("src/elements/{module}.rs is unreadable: {error}"));
+
+            let declares = source
+                .lines()
+                .any(|line| line.contains("Accessible for") && line.contains("impl"));
+            let excused = ELEMENTS_WITHOUT_A_ROLE
+                .iter()
+                .any(|(name, _)| name == module);
+
+            if !declares && !excused {
+                silent.push(module.clone());
+            }
+            if declares && excused {
+                adopted.push(module.clone());
+            }
+        }
+
+        assert!(
+            silent.is_empty(),
+            "these element modules neither implement `Accessible` nor say why not: {}\n\n\
+             Adopt the module into `crate::a11y` — one `impl Accessible`, one `.announce(…)` \
+             — or add it to `ELEMENTS_WITHOUT_A_ROLE` with a reason saying what it would \
+             announce or what has to exist first.",
+            silent.join(", "),
+        );
+        assert!(
+            adopted.is_empty(),
+            "these element modules implement `Accessible` but are still excused in \
+             `ELEMENTS_WITHOUT_A_ROLE`: {}. Delete their entries — the list only shrinks.",
+            adopted.join(", "),
+        );
+
+        for (module, reason) in ELEMENTS_WITHOUT_A_ROLE {
+            assert!(
+                modules.iter().any(|name| name == module),
+                "`ELEMENTS_WITHOUT_A_ROLE` excuses `{module}`, which src/elements.rs declares \
+                 no `pub mod` for"
+            );
+            assert!(
+                reason.len() >= 40,
+                "`{module}`'s reason is {} characters. A reason says what the module would \
+                 announce or what has to exist first — \"not done yet\" is not one",
+                reason.len(),
+            );
+        }
     }
 
     fn rust_files(dir: &Path) -> Vec<PathBuf> {

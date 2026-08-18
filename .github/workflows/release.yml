@@ -1,6 +1,22 @@
 # Release Workflow
 # Triggered manually via workflow_dispatch to create a new release
 # Bumps versions, creates tags, and triggers the deploy workflow
+#
+# Repository rule: no `${{ }}` inside a `run:` body, anywhere, ever.
+# `${{ }}` is substituted while the step's script is being *generated*, so an
+# interpolated value is part of the script rather than data the script reads —
+# a quote and a newline in a workflow_dispatch input end one command and start
+# another, and any validation written inside the same body runs too late to
+# matter. Bind the value under `env:` and read it as `"$NAME"`, and validate a
+# free-form input in a step of its own before anything uses it (see
+# `Validate custom_version` below). `src/release_input_validation.rs` holds
+# this file to that rule on every `cargo test --lib`.
+#
+# The rule is a repository rule, not a rule about this file — but only this
+# file satisfies it today. `.github/workflows/release-deploy.yml` still
+# interpolates into five `run:` bodies, including free-form `version` and `tag`
+# inputs that nothing validates, and is deliberately out of scope here and
+# untested; it is tracked separately. Do not copy its shape.
 
 name: Release
 
@@ -46,6 +62,19 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # First thing after the checkout, which is what puts the script on disk,
+      # and so before `cargo install cargo-edit`: a typo in a dispatch is
+      # answered in seconds rather than after a toolchain install.
+      #
+      # No `if:` on purpose. The script accepts the empty value — that is what
+      # every version_type dispatch sends — and a line in the log saying which
+      # way this release is being computed reads better than a skipped step.
+      - name: Validate custom_version
+        env:
+          CUSTOM_VERSION: ${{ inputs.custom_version }}
+        run: |
+          .github/scripts/validate-custom-version.sh "$CUSTOM_VERSION"
+
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
@@ -66,24 +95,23 @@ jobs:
 
       - name: Calculate new version
         id: bump
+        env:
+          CURRENT: ${{ steps.current.outputs.version }}
+          CUSTOM_VERSION: ${{ inputs.custom_version }}
+          VERSION_TYPE: ${{ inputs.version_type }}
         run: |
-          CURRENT="${{ steps.current.outputs.version }}"
-
-          if [ -n "${{ inputs.custom_version }}" ]; then
-            # Use custom version if provided
-            NEW_VERSION="${{ inputs.custom_version }}"
-            # Validate semver format
-            if ! echo "$NEW_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
-              echo "Error: Invalid version format. Expected semver (e.g., 1.2.3 or 1.2.3-beta.1)"
-              exit 1
-            fi
+          if [ -n "$CUSTOM_VERSION" ]; then
+            # Already judged by the Validate custom_version step above, which
+            # is the only place that can judge it: a check written here would
+            # run inside a script the value had already been pasted into.
+            NEW_VERSION="$CUSTOM_VERSION"
           else
             # Calculate version based on bump type
             IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
             # Strip any pre-release suffix from PATCH
             PATCH=$(echo "$PATCH" | sed 's/-.*//')
 
-            case "${{ inputs.version_type }}" in
+            case "$VERSION_TYPE" in
               major)
                 NEW_VERSION="$((MAJOR + 1)).0.0"
                 ;;
@@ -104,15 +132,17 @@ jobs:
       # check what would be released, so it has to report a wrong version
       # rather than stay silent about it.
       - name: Verify the version is the one being released
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
+          TAG: ${{ steps.bump.outputs.tag }}
         run: |
-          .github/scripts/verify-release-version.sh "${{ steps.bump.outputs.version }}"
+          .github/scripts/verify-release-version.sh "$NEW_VERSION"
 
           # Separable from the changelog check above, and self-contained: this
           # block can be deleted without touching anything else. A tag that
           # already exists means this version was released once already, and
           # `git tag -a` below would fail after Cargo.toml had been written.
           # `actions/checkout` runs with fetch-depth: 0, so the tags are here.
-          TAG="${{ steps.bump.outputs.tag }}"
           if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
             echo "Error: $TAG already exists. A published version cannot be reused," >&2
             echo "even after 'cargo yank' — pick the next one." >&2
@@ -121,14 +151,18 @@ jobs:
 
       - name: Update Cargo.toml version
         if: ${{ !inputs.dry_run }}
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
         run: |
-          cargo set-version ${{ steps.bump.outputs.version }}
-          echo "Updated Cargo.toml to version ${{ steps.bump.outputs.version }}"
+          cargo set-version "$NEW_VERSION"
+          echo "Updated Cargo.toml to version $NEW_VERSION"
 
       - name: Generate release notes
         id: release_notes
+        env:
+          TAG: ${{ steps.bump.outputs.tag }}
+          REPOSITORY: ${{ github.repository }}
         run: |
-          TAG="${{ steps.bump.outputs.tag }}"
           PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
           echo "Generating release notes..."
@@ -139,8 +173,8 @@ jobs:
             CHANGELOG_LINK="First release"
           else
             # Get commits since last tag
-            COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
-            CHANGELOG_LINK="https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG}"
+            COMMITS=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges)
+            CHANGELOG_LINK="https://github.com/${REPOSITORY}/compare/${PREV_TAG}...${TAG}"
           fi
 
           # Create release notes file
@@ -157,20 +191,26 @@ jobs:
 
       - name: Commit version bump
         if: ${{ !inputs.dry_run }}
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
         run: |
           git add Cargo.toml
           # Cargo.toml may already carry the target version — a release prepared
           # in a PR makes `cargo set-version` a no-op, and `git commit` with an
           # empty stage exits 1 and would abort the release before the tag.
           git diff --cached --quiet || \
-            git commit -m "chore: bump version to ${{ steps.bump.outputs.version }}"
+            git commit -m "chore: bump version to $NEW_VERSION"
 
       - name: Create and push tag
         if: ${{ !inputs.dry_run }}
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
+          TAG: ${{ steps.bump.outputs.tag }}
+          BRANCH: ${{ github.ref_name }}
         run: |
-          git tag -a "${{ steps.bump.outputs.tag }}" -m "Release ${{ steps.bump.outputs.version }}"
-          git push origin HEAD:${{ github.ref_name }}
-          git push origin "${{ steps.bump.outputs.tag }}"
+          git tag -a "$TAG" -m "Release $NEW_VERSION"
+          git push origin "HEAD:$BRANCH"
+          git push origin "$TAG"
 
       - name: Upload release notes artifact
         uses: actions/upload-artifact@v4
@@ -180,13 +220,18 @@ jobs:
           retention-days: 1
 
       - name: Summary
+        env:
+          PREVIOUS_VERSION: ${{ steps.current.outputs.version }}
+          NEW_VERSION: ${{ steps.bump.outputs.version }}
+          TAG: ${{ steps.bump.outputs.tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Previous Version**: ${{ steps.current.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **New Version**: ${{ steps.bump.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag**: ${{ steps.bump.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Dry Run**: ${{ inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous Version**: $PREVIOUS_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **New Version**: $NEW_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: $TAG" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dry Run**: $DRY_RUN" >> $GITHUB_STEP_SUMMARY
 
   deploy:
     name: Deploy Release

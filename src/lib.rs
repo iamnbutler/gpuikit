@@ -83,6 +83,16 @@ pub use icons::Icons as DefaultIcons;
 #[cfg(test)]
 mod release_version_guard;
 
+/// Tests for the rule that keeps `release.yml`'s `workflow_dispatch` inputs out
+/// of its shell — no `${{ }}` inside a `run:` body, and free-form inputs judged
+/// in a step of their own before anything uses them.
+///
+/// No runtime code, and nothing outside a test build. Covers `release.yml`
+/// only; `release-deploy.yml` has the same defect and is tracked separately.
+/// See its own docs.
+#[cfg(test)]
+mod release_input_validation;
+
 /// Embedded assets for gpuikit (icons, fonts, etc.)
 #[derive(RustEmbed)]
 #[folder = "assets"]

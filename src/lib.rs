@@ -74,8 +74,10 @@ pub mod editor;
 
 pub use icons::Icons as DefaultIcons;
 
-/// Tests for the release workflow's version guard — that the version
-/// `release.yml` would publish is the one `CHANGELOG.md` names.
+/// Tests for the release workflows' version guard — that the version either of
+/// them would publish is the one `CHANGELOG.md` names. `release.yml` computes
+/// the version; `release-deploy.yml` is the one that runs `cargo publish`, and
+/// it is reachable without `release.yml` having run at all, so both carry it.
 ///
 /// No runtime code, and nothing outside a test build: the module exists
 /// because `cargo test --lib` is the only thing in this repository that can

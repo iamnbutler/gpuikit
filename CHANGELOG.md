@@ -302,6 +302,21 @@ All notable changes to this project will be documented in this file.
   paste nor loses the date. An unchecked claim in prose is how the missing
   attribution went unnoticed in the first place
 
+### Fixed
+
+- **`Slider` keeps the drag after the pointer leaves the track.** The movement
+  and the release are registered on the *window* now, from the `canvas` paint
+  closure that already measures the track — the pattern `Splitter` and `Input`
+  established. Only the press stays on the track div, because a press always
+  starts there. Before this, all three were plain `div` listeners, and a `div`
+  listener only fires while its hitbox is hovered: a drag that left the track
+  froze the thumb at the edge instead of pinning it to the end of the range,
+  and a button released outside the track was never delivered at all, leaving
+  `is_dragging` stuck `true` and the thumb wearing its dragging border. A move
+  with no button held now ends the drag too, which covers the release the
+  window never saw — the pointer left the *window* with the button down, or
+  another handler swallowed the mouse-up. The public API is unchanged
+
 ## [0.8.0] - 2026-08-17
 
 The release that makes streaming markdown depend on a published version rather

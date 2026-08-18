@@ -202,9 +202,44 @@ All notable changes to this project will be documented in this file.
   instead of staying silent, and it also refuses a tag that already exists.
   The supported flow is #170's: prepare the release in a pull request, then
   dispatch with `custom_version: x.y.z`
+- `.github/scripts/validate-custom-version.sh`, and a `Validate custom_version`
+  step in `release.yml` that runs it immediately after the checkout — before
+  `cargo install cargo-edit`, so a typo is answered in seconds rather than
+  after a toolchain install. `Calculate new version` used to interpolate
+  `${{ inputs.custom_version }}` straight into its own `run:` body and then
+  validate the result two lines below, which cannot work: `${{ }}` is
+  substituted while the step's script is being *generated*, so the value was
+  already part of the script by the time the check meant to judge it ran, and a
+  value carrying a quote and a newline put its second line outside the `if`
+  entirely. The grammar accepted is unchanged
+  (`1.2.3`, or `1.2.3-beta.1`) — `verify-release-version.sh` and `CHANGELOG.md`'s
+  `## [x.y.z]` headings are matched against the result, so widening it would
+  desynchronise them — but the check is now bash `[[ =~ ]]` rather than
+  `grep -qE`, because `grep` judges one line at a time and so passed anything
+  whose first line was a version. The empty value is accepted, since that is
+  what every `version_type` dispatch sends. No new inputs, and the step carries
+  no `if:`
+- `src/release_input_validation.rs`, nine tests holding `release.yml` to the
+  rule on every `cargo test --lib`: no `${{ }}` in any `run:` body, the
+  custom_version input only ever an `env:` binding, the validator ordered ahead
+  of every step that uses or writes the version, and the validator's own
+  answers — including that it reports a usage error (2) separately from a
+  rejected version (1). The `run:`-body parser is itself tested against a
+  fixture, so a parser that silently stopped matching cannot report success.
+  **The module covers `release.yml` only**: `release-deploy.yml`, which runs
+  `cargo publish` with `CARGO_REGISTRY_TOKEN` set for every job, has the same
+  defect in five `run:` blocks and is tracked separately
 
 ### Changed
 
+- Every `run:` block in `release.yml` takes its outside values from `env:`
+  bindings (`CURRENT`, `CUSTOM_VERSION`, `VERSION_TYPE`, `NEW_VERSION`, `TAG`,
+  `BRANCH`, `REPOSITORY`, `PREVIOUS_VERSION`, `DRY_RUN`) rather than `${{ }}`
+  interpolation, and a comment at the top of the file states the rule for the
+  next person adding an input. Behaviour is unchanged; the one incidental
+  repair is that `cargo set-version ${{ ... }}` was unquoted and is now
+  `cargo set-version "$NEW_VERSION"`. The rule is a repository rule, but
+  `release-deploy.yml` does not satisfy it yet
 - `Button`, `SidebarTrigger` and `Select`'s trigger take keyboard focus when
   they are enabled, and decline it — **with a stated reason** — when they are
   disabled. Tab now moves focus between gpuikit controls, and a disabled control

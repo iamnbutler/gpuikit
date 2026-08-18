@@ -83,12 +83,22 @@
 //!
 //! As fields of [`A11y`], applied by [`Announce::announce`] — `toggled`,
 //! `selected`, `expanded`, `value`, `orientation`, `level`,
-//! `position_in_set`, `size_of_set`. The last two travel together: a position
+//! `position_in_set`, `size_of_set`, `active_descendant`. `position_in_set`
+//! and `size_of_set` travel together: a position
 //! with no size announces "3" out of nowhere, and gpui's `aria_size_of_set` is
 //! what makes it "3 of 8". **State goes on the element that changes it**, which is
 //! not always the element it is about: `Sidebar` reports `aria-expanded` on
 //! `SidebarTrigger`, because the trigger is the control a screen reader user
 //! operates, and the panel is the thing that happens as a result.
+//!
+//! **`active_descendant` is the odd one and knows it.** It is a plain `bool`
+//! rather than an `Option<bool>`, it is set on the *descendant* rather than on
+//! the container that owns the focus, and it is the one field no test in this
+//! crate can read back off a node. All three are consequences of how gpui
+//! spells the property, and all three are argued at
+//! [`A11y::active_descendant`] rather than here — including which failures its
+//! guard catches and which it does not. Read that before adding a second
+//! caller.
 //!
 //! Two properties this convention deliberately *cannot* express, both because
 //! gpui cannot:
@@ -272,6 +282,9 @@ pub struct A11y {
     level: Option<usize>,
     position_in_set: Option<usize>,
     size_of_set: Option<usize>,
+    /// A plain `bool`, unlike every other state field here. See
+    /// [`A11y::active_descendant`].
+    active_descendant: bool,
     focus: Focus,
 }
 
@@ -337,6 +350,7 @@ impl A11y {
             level: None,
             position_in_set: None,
             size_of_set: None,
+            active_descendant: false,
             focus: Focus::Undecided,
         }
     }
@@ -425,6 +439,67 @@ impl A11y {
         self
     }
 
+    /// This element is the one a composite widget's keyboard has got to, while
+    /// real focus stays on the container — `aria-activedescendant`.
+    ///
+    /// A listbox popup that owns focus and moves a *highlight* between its rows
+    /// has no second focus to give the highlighted row; this is how the row is
+    /// announced as the current one anyway. `src/elements/select.rs` is the
+    /// worked example, and today the only caller.
+    ///
+    /// # It is set on the descendant, not on the container
+    ///
+    /// The web property names the item *from* the container. gpui inverts it:
+    /// `aria_active_descendant()` goes on the item, takes no argument, and is
+    /// honoured only while a focused **ancestor** of that item is on the node
+    /// stack. Two things follow, and both are load-bearing:
+    ///
+    /// - The APG arrangement where focus stays on a combo box trigger and
+    ///   points into a popup beside it **cannot be expressed**. A sibling is
+    ///   not an ancestor, so the claim would be dropped in silence. Focus goes
+    ///   on the popup, and the row inside it makes the claim.
+    /// - Only one node may claim it per frame, the claiming node may not be the
+    ///   focused one, and it must be in the tree. gpui `debug_assert!`s on all
+    ///   three, so a caller that highlights two rows at once aborts.
+    ///
+    /// # Why a `bool` and not an `Option<bool>`
+    ///
+    /// Every other state field here is an `Option`, because "said nothing" and
+    /// "said false" are different announcements. Here they are not: gpui's
+    /// builder takes no argument, so there is no call that says *not* the
+    /// active descendant. `Some(false)` would be a state this crate could hold
+    /// and never report, which is the failure section 3 of the module docs is
+    /// about. Absent is the only "no".
+    ///
+    /// # What guards this field, and what does not
+    ///
+    /// This is the one state field `tests::every_state_field_reaches_the_node`
+    /// excludes, because the property is applied at paint time behind
+    /// `window.a11y.is_active()` and no test platform in this crate switches
+    /// accessibility on — so nothing here can read the applied node back. Be
+    /// precise about what stands in its place:
+    ///
+    /// - The exhaustive `let A11y { … } = a11y` destructure in
+    ///   [`Announce::announce`] catches **a new field going unhandled**: adding
+    ///   one without applying it is a compile error.
+    ///   `tests::an_active_descendant_is_declared_rather_than_read_back` catches
+    ///   the field disappearing from the builder or the reader.
+    /// - Neither catches **a wrong apply**. Change the apply to call
+    ///   `aria_active_descendant()` unconditionally, ignoring the bool, and
+    ///   every test in this crate still passes; the escaping failure is gpui's
+    ///   two-nodes-in-one-frame panic at run time, in an app with
+    ///   accessibility on. That is why the apply is written as the single
+    ///   narrowest form — `if active_descendant { … }`, nothing else — so the
+    ///   one line a reader has to check is one line.
+    ///
+    /// A field that silently does nothing is worse than an absent one; a field
+    /// whose guard is weaker than it looks is the same hazard one level up, and
+    /// this paragraph is the only place a reader meets it.
+    pub fn active_descendant(mut self, active_descendant: bool) -> Self {
+        self.active_descendant = active_descendant;
+        self
+    }
+
     /// This element is a keyboard tab stop, and gpui should mint and keep the
     /// [`FocusHandle`] for it.
     ///
@@ -479,6 +554,14 @@ impl A11y {
                 .name
                 .as_ref()
                 .is_some_and(|name| !name.trim().is_empty())
+    }
+
+    /// Whether this element claims to be its container's active descendant.
+    ///
+    /// Reads back what [`active_descendant`](A11y::active_descendant) was told.
+    /// It cannot read back what gpui did with it — see that method.
+    pub fn is_active_descendant(&self) -> bool {
+        self.active_descendant
     }
 
     /// Whether this announcement takes keyboard focus.
@@ -888,6 +971,7 @@ pub trait Announce: StatefulInteractiveElement {
             level,
             position_in_set,
             size_of_set,
+            active_descendant,
             focus,
         } = a11y;
 
@@ -954,6 +1038,13 @@ pub trait Announce: StatefulInteractiveElement {
         }
         if let Some(size) = size_of_set {
             element = element.aria_size_of_set(size);
+        }
+        // The whole of the apply, deliberately in one narrow shape: gpui's
+        // builder takes no argument, so this `if` is the only thing that says
+        // "not the active descendant", and no test in this crate can observe
+        // the applied node. See `A11y::active_descendant`.
+        if active_descendant {
+            element = element.aria_active_descendant();
         }
 
         element
@@ -1090,6 +1181,18 @@ mod tests {
 
     /// Every state field, in one element, so a field that is added to [`A11y`]
     /// but forgotten in [`Announce::announce`] fails here.
+    ///
+    /// **`active_descendant` is excluded, and this is the whole of why.** gpui
+    /// applies it at paint time behind `window.a11y.is_active()`, which no test
+    /// platform in this crate switches on, so there is no node to read it back
+    /// off — asserting it here would assert nothing. What stands in its place
+    /// is weaker than this test, and the substitution is stated rather than
+    /// implied: the exhaustive `let A11y { … } = a11y` destructure in
+    /// [`Announce::announce`] makes a *new* field going unhandled a compile
+    /// error, and [`an_active_descendant_is_declared_rather_than_read_back`]
+    /// holds the builder and the reader in place. Neither notices a *wrong*
+    /// apply — dropping the `if` and calling gpui's builder unconditionally
+    /// passes everything here. See [`A11y::active_descendant`].
     #[test]
     fn every_state_field_reaches_the_node() {
         let announced = announced_element(
@@ -1124,6 +1227,56 @@ mod tests {
         assert_eq!(node.level(), Some(2));
         assert_eq!(node.position_in_set(), Some(3));
         assert_eq!(node.size_of_set(), Some(8));
+    }
+
+    /// The active descendant is the one piece of state this crate declares and
+    /// cannot read back, so what a test can hold is the declaration: a default
+    /// `A11y` does not claim it, `active_descendant(true)` does,
+    /// `active_descendant(false)` returns to not claiming, and an element
+    /// carrying the claim still announces everything else normally.
+    ///
+    /// That last assertion is the point. `announce` consumes the whole `A11y`,
+    /// and the claim is the only field applied through a gpui builder that
+    /// takes no argument; a mistake there would most likely show up as the
+    /// rest of the announcement going missing, which this *can* see.
+    #[test]
+    fn an_active_descendant_is_declared_rather_than_read_back() {
+        let quiet = A11y::new(Role::ListBoxOption).name("Option 2");
+        assert!(
+            !quiet.is_active_descendant(),
+            "a row claims the active descendant only when it is told to"
+        );
+
+        let claiming = quiet.clone().active_descendant(true);
+        assert!(claiming.is_active_descendant());
+        assert!(
+            !claiming
+                .clone()
+                .active_descendant(false)
+                .is_active_descendant(),
+            "`false` is how a row stops claiming it, and there is no third state"
+        );
+
+        // Absent is the only "no": gpui's builder takes no argument, so
+        // `Option<bool>` would carry a `Some(false)` that could never be
+        // reported. See `A11y::active_descendant`.
+        assert_eq!(
+            quiet,
+            claiming.clone().active_descendant(false),
+            "not claiming it and having stopped claiming it are the same announcement"
+        );
+
+        let announced = announced_element(
+            div()
+                .id("row")
+                .announce(claiming.position_in_set(2).size_of_set(3)),
+        );
+        let node = announced
+            .node
+            .expect("a listbox option with an id is a node");
+        assert_eq!(node.label(), Some("Option 2"));
+        assert_eq!(node.position_in_set(), Some(2));
+        assert_eq!(node.size_of_set(), Some(3));
     }
 
     #[test]

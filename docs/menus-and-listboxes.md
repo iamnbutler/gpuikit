@@ -104,10 +104,27 @@ They do not share a row type, a popup type, a keyboard model, or a state
 struct, and they should not:
 
 - a listbox row is a **value**, is marked when it is the chosen one, and its
-  keyboard model is "move the selection";
+  keyboard model is "move the highlight, then commit it to the value";
 - a menu row is an **action**, is never marked afterwards, and its keyboard
   model is "move the highlight, then invoke" — with separators, disabled rows
   and eventually submenus, none of which mean anything in a listbox.
+
+Those two sentences are one word apart and the word is the whole difference.
+Both families move a highlight; only a listbox has somewhere to *put* it
+afterwards. That is why a listbox draws two things at once — a check on the
+chosen row, a fill on the highlighted one — and a menu never needs to: a menu's
+highlight is the only current thing there is.
+
+**The two families also wire their keyboards differently**, and that is worth
+recording because it looks like an inconsistency and is not one yet.
+`select.rs` binds gpui *actions* in a `Listbox` key context
+(`select::bind_select_keys`, called from `gpuikit::init`); `context_menu.rs`
+reads a raw `on_key_down`. gpui dispatches bound actions **before** key-down
+listeners, so the raw handler loses any key an enclosing element has bound — a
+context menu inside a `Dialog` gives up Escape to the dialog and closes the
+wrong thing. The listbox is the one that is right; the menu has the same defect
+and its own fix to come. Nothing here says the two must converge on one
+mechanism, only that a new popup in either family should copy the listbox.
 
 ## 4. The migration
 

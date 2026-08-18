@@ -63,6 +63,40 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **The select popup answers the keyboard.** Up and Down move a highlight
+  through the options and wrap at each end, Home and End jump to the ends, Enter
+  or Space chooses the highlighted option and closes, Escape closes without
+  choosing, Tab and Shift-Tab close and move focus on, and typing a printable
+  character jumps to the next option whose label starts with it — press the same
+  letter again to walk the options that share it. Every close the keyboard asked
+  for hands the trigger back its focus. 0.8.0 shipped a select that announced
+  `ComboBox` / `ListBox` / `ListBoxOption` to a screen reader and then moved
+  keyboard focus into a popup with nothing to do in it; this is the other half
+  of that pair
+- The **highlight** is a new state, distinct from the **choice**. The choice is
+  the control's value and persists; the highlight is where the keyboard has got
+  to and dies with the popup. The popup opens with the highlight on the chosen
+  row — or on the first row when nothing is chosen — and hovering a row moves the
+  same highlight rather than drawing a second one
+- `elements::select::bind_select_keys(cx)`, `elements::select::LISTBOX_CONTEXT`
+  and the `select::{HighlightNext, HighlightPrevious, HighlightFirst,
+  HighlightLast, ChooseHighlighted, DismissListbox}` actions. `gpuikit::init`
+  calls `bind_select_keys`, so an app that calls `init` needs nothing; an app
+  that assembles its own keymap has to include it, which is why it is public.
+  The keys are actions rather than a raw `on_key_down` because gpui dispatches
+  bound actions first — a raw Escape handler would lose the key to `Dialog`'s
+  own binding whenever a select sat inside a dialog. Tab is the exception and is
+  deliberately *not* a binding: it is an action listener on the popup, because
+  `a11y`'s context-less `tab` binding outranks every scoped one
+- `A11y::active_descendant(bool)`, `A11y::is_active_descendant()` and the
+  `aria-activedescendant` apply in `Announce::announce` — the highlighted row
+  claims it, which is how a screen reader is told which row the keyboard is on
+  while focus sits on the popup. It is the odd field on `A11y`: a plain `bool`
+  rather than an `Option<bool>` (gpui's builder takes no argument, so `Some(false)`
+  would be a state the crate could hold and never report), set on the descendant
+  rather than the container, and the one field no test in this crate can read
+  back off a node. All three, and exactly what its guard does and does not
+  catch, are documented at the field
 - `docs/menus-and-listboxes.md` — the decision record for the above, plus the
   convention that keeps it: the sentence that separates the two families ("a
   listbox offers *values* to choose between, and the choice persists; a menu
@@ -232,6 +266,18 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **The chosen option in an open select now shows a check mark instead of a
+  filled row.** Before, the row you had chosen was the one painted in the accent
+  colour. Now every row reserves a small slot on its left, the chosen row shows
+  a check in it, and the accent fill marks the row the keyboard or the pointer
+  is currently on. Two states arrived where there had been one — what you chose,
+  and where you are — and one filled row could not say both. This is the only
+  part of the keyboard work a consumer sees whether or not they use a keyboard,
+  and it follows the fixed-width check slot `context_menu.rs` already draws its
+  toggled items with. If the visual is reworked later, the property that has to
+  survive is that **the highlighted row and the chosen row stay distinguishable
+  when they are different rows** — that state is the whole reason the keyboard
+  model exists
 - Every `run:` block in `release.yml` takes its outside values from `env:`
   bindings (`CURRENT`, `CUSTOM_VERSION`, `VERSION_TYPE`, `NEW_VERSION`, `TAG`,
   `BRANCH`, `REPOSITORY`, `PREVIOUS_VERSION`, `DRY_RUN`) rather than `${{ }}`

@@ -130,5 +130,14 @@ pub fn init(cx: &mut App) {
     a11y::bind_focus_keys(cx);
     input::bind_input_keys(cx, None);
     elements::dialog::bind_dialog_keys(cx);
+    // After `bind_focus_keys`, and after `bind_dialog_keys`. Binding
+    // precedence is by key-context depth with ties broken by registration
+    // order, and a binding with no context counts as the deepest — so these
+    // `Listbox`-scoped bindings can never outrank `a11y`'s context-less Tab
+    // (the popup answers Tab with an action listener instead) and always
+    // outrank `Dialog`'s Escape, which is what lets a select inside a dialog
+    // close its own popup. Registering last is belt and braces for the second
+    // half of that. See `elements::select`'s `# The keyboard`.
+    elements::select::bind_select_keys(cx);
     elements::toast::init(cx);
 }

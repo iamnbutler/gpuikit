@@ -31,9 +31,23 @@ use crate::utils::element_manager::ElementManagerExt;
 use gpui::{
     canvas, div, prelude::*, px, rems, App, Bounds, Context, DispatchPhase, ElementId,
     EventEmitter, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    ParentElement, Pixels, Point, Render, SharedString, Styled, Window,
+    ParentElement, Pixels, Point, Rems, Render, SharedString, Styled, Window,
 };
 use std::ops::RangeInclusive;
+
+/// The thumb's diameter — the one place it is written down.
+///
+/// The thumb is drawn at this size and `value_from_position` insets the usable
+/// track by half of it at each end, so the two are the same length by
+/// construction rather than by two literals agreeing. They only agreed at
+/// gpui's default 16px rem before: the inset was a hardcoded `px(6.)` while the
+/// thumb was `rems(0.75)`, which skewed the mapping at any other rem size.
+///
+/// **Both `render` and `value_from_position` must keep reading this.** If one
+/// of them goes back to a literal the drawn thumb and the mapping's inset can
+/// disagree again, and nothing in the test module catches it — the tests
+/// exercise the mapping only, never the painted thumb's bounds.
+const THUMB_SIZE: Rems = rems(0.75);
 
 /// Event emitted when the slider value changes
 pub struct SliderChanged {
@@ -110,12 +124,12 @@ impl Slider {
         }
     }
 
-    fn value_from_position(&self, position: Point<Pixels>) -> f32 {
+    fn value_from_position(&self, position: Point<Pixels>, rem_size: Pixels) -> f32 {
         let Some(bounds) = self.track_bounds else {
             return self.value;
         };
 
-        let thumb_radius = px(6.);
+        let thumb_radius = THUMB_SIZE.to_pixels(rem_size) / 2.;
         let usable_width = bounds.size.width - thumb_radius * 2.;
         let relative_x = (position.x - bounds.origin.x - thumb_radius).max(px(0.));
         let percentage = (relative_x / usable_width).clamp(0., 1.);
@@ -135,7 +149,7 @@ impl Slider {
     fn on_mouse_down(
         &mut self,
         event: &MouseDownEvent,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         if self.disabled {
@@ -150,7 +164,7 @@ impl Slider {
         // mouse-down over an id'd hitbox, so a simulated press repaints either
         // way and cannot tell the two apart.
         cx.notify();
-        let new_value = self.value_from_position(event.position);
+        let new_value = self.value_from_position(event.position, window.rem_size());
         self.set_value(new_value, cx);
     }
 
@@ -165,7 +179,12 @@ impl Slider {
     }
 
     /// The movement, from the window rather than the track.
-    fn on_drag_move(&mut self, event: &MouseMoveEvent, cx: &mut Context<Self>) {
+    fn on_drag_move(
+        &mut self,
+        event: &MouseMoveEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if !self.is_dragging {
             return;
         }
@@ -179,7 +198,7 @@ impl Slider {
             self.end_drag(cx);
             return;
         }
-        let new_value = self.value_from_position(event.position);
+        let new_value = self.value_from_position(event.position, window.rem_size());
         self.set_value(new_value, cx);
     }
 
@@ -203,7 +222,7 @@ impl Render for Slider {
         let disabled = self.disabled;
 
         let track_height = rems(0.25);
-        let thumb_size = rems(0.75);
+        let thumb_size = THUMB_SIZE;
 
         let track_color = theme.surface_secondary();
         let fill_color = if disabled {
@@ -297,11 +316,13 @@ impl Render for Slider {
                                 // see the module docs.
                                 window.on_mouse_event({
                                     let entity = entity.clone();
-                                    move |event: &MouseMoveEvent, phase, _window, cx| {
+                                    move |event: &MouseMoveEvent, phase, window, cx| {
                                         if phase != DispatchPhase::Bubble {
                                             return;
                                         }
-                                        entity.update(cx, |this, cx| this.on_drag_move(event, cx));
+                                        entity.update(cx, |this, cx| {
+                                            this.on_drag_move(event, window, cx)
+                                        });
                                     }
                                 });
 
@@ -385,6 +406,13 @@ mod tests {
     /// The track is `rems(0.75)` tall and is the slider's only row, since these
     /// sliders show no label and no value.
     const TRACK_Y: f32 = 6.;
+    /// The rem size `the_mapping_holds_at_a_non_default_rem_size` draws at, and
+    /// the thumb radius that follows from it: `rems(0.75) * 32 / 2`.
+    const BIG_REM_SIZE: f32 = 32.;
+    const BIG_THUMB_RADIUS: f32 = 12.;
+    // These three restate the geometry by hand on purpose. A test that derived
+    // its expected x from `THUMB_SIZE` would agree with any value the constant
+    // took, including a wrong one, and so would pin nothing.
 
     struct Harness {
         slider: Entity<Slider>,
@@ -408,6 +436,11 @@ mod tests {
     /// The x that maps to `value` on the 0..=100 slider below.
     fn x_for(value: f32) -> Pixels {
         px(TRACK_LEFT + THUMB_RADIUS + (TRACK_WIDTH - THUMB_RADIUS * 2.) * value / 100.)
+    }
+
+    /// The same, for a slider drawn at `BIG_REM_SIZE`.
+    fn big_x_for(value: f32) -> Pixels {
+        px(TRACK_LEFT + BIG_THUMB_RADIUS + (TRACK_WIDTH - BIG_THUMB_RADIUS * 2.) * value / 100.)
     }
 
     fn at(x: Pixels) -> Point<Pixels> {
@@ -639,6 +672,48 @@ mod tests {
             drawn.read_with(cx, |count, _| *count) > before,
             "a press that does not move the value drew no new frame, so the \
              thumb keeps its idle border while it is being dragged"
+        );
+    }
+
+    /// The thumb is sized in rems, so the inset `value_from_position` takes off
+    /// each end of the track has to be read at the rem size the thumb is drawn
+    /// at. It used to be a hardcoded `px(6.)`, which is only right at gpui's
+    /// default 16px rem.
+    ///
+    /// Note the 75 and the 25: the centre of the track maps to the centre of
+    /// the range under *any* thumb radius, so a test that pressed at 50 would
+    /// pass with the defect intact. Under the old literal these two x's read
+    /// 73.40 and 26.60.
+    #[gpui::test]
+    fn the_mapping_holds_at_a_non_default_rem_size(cx: &mut TestAppContext) {
+        let (cx, slider, _drawn) = scenario(cx, false);
+
+        // `set_rem_size` only assigns the field — unlike `set_scale_factor` it
+        // does not invalidate the window — so the refresh is what makes the
+        // thumb genuinely 24px on the next frame. The assertions below would
+        // hold without it, because the fix reads the rem size when the event is
+        // handled and the track's bounds are set in `px` and do not move; but
+        // then they would be checking a frame that was never drawn.
+        cx.update(|window, _cx| {
+            window.set_rem_size(px(BIG_REM_SIZE));
+            window.refresh();
+        });
+        cx.run_until_parked();
+
+        press(cx, big_x_for(75.));
+        let value = value_of(cx, &slider);
+        assert!(
+            (value - 75.).abs() < 1e-3,
+            "at a {BIG_REM_SIZE}px rem, a press three quarters along the track \
+             gave {value}, not 75"
+        );
+
+        drag_to(cx, big_x_for(25.));
+        let value = value_of(cx, &slider);
+        assert!(
+            (value - 25.).abs() < 1e-3,
+            "at a {BIG_REM_SIZE}px rem, a drag to one quarter along the track \
+             gave {value}, not 25"
         );
     }
 }

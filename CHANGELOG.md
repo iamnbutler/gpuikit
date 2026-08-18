@@ -350,6 +350,15 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **`Slider`'s value maths reads the thumb radius at the rem size the thumb is
+  drawn at.** `value_from_position` inset the usable track by a hardcoded
+  `px(6.)` while `render` drew the thumb at `rems(0.75)` — the same length only
+  at gpui's default 16px rem. At any other rem size the value-to-position
+  mapping skewed, worst towards the ends of the track: at a 32px rem, a press
+  three quarters along the track set 73.4 instead of 75. Both now read one
+  private `THUMB_SIZE` constant, resolved against `Window::rem_size()` when the
+  event is handled, so the drawn thumb and the inset cannot disagree. The
+  public API is unchanged
 - **`Slider` keeps the drag after the pointer leaves the track.** The movement
   and the release are registered on the *window* now, from the `canvas` paint
   closure that already measures the track — the pattern `Splitter` and `Input`

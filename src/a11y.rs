@@ -594,6 +594,15 @@ impl A11y {
 /// adopted. A role that is missing from it is not *forbidden* a name; it is
 /// only not forced to have one, which is right for a landmark or a container
 /// that is named by its contents (`Role::Complementary`, `Role::Document`).
+///
+/// The rot is *quiet*, because the list feeds a `debug_assert!` rather than a
+/// return value an element reads: dropping an arm takes a name requirement with
+/// it and breaks nothing else. So every arm is pinned, one assertion per reason,
+/// by `tests::the_name_rule_covers_the_roles_that_are_nothing_without_one` —
+/// along with the three absences this crate has argued for in writing
+/// (`Role::Complementary`, `Role::Document` above, and `Role::ListBox` in
+/// `src/elements/select.rs`). Adding an arm means adding it there too, with the
+/// argument for it as the assertion's message.
 pub fn role_requires_a_name(role: Role) -> bool {
     matches!(
         role,
@@ -1311,15 +1320,130 @@ mod tests {
         assert!(!inert.supports(accesskit::Action::Click));
     }
 
+    /// Every arm of [`role_requires_a_name`], one assertion per reason, so a
+    /// role cannot fall off the list without a failure that says why it was on
+    /// it.
+    ///
+    /// The list feeds a `debug_assert!`, so its rot is quiet: dropping an arm
+    /// takes an element's name requirement with it and breaks no other test.
+    /// Membership here is **exhaustive** over the list — all 28 arms — because
+    /// a sample would leave the roles it does not name able to fall off exactly
+    /// as the named ones can.
+    ///
+    /// **Non-membership is not exhaustive, and that is the asymmetry to know
+    /// about.** The three absences asserted below are the ones this crate has
+    /// argued for in writing; adding some *other* role to the list — `Group`,
+    /// say — still passes here. That is deliberate. Nothing in this crate has
+    /// argued about `Group` and the name rule, and an assertion with no
+    /// argument behind it is the failure mode this module is organised
+    /// against. What catches a wrong *addition* is the review that adds it.
     #[test]
-    fn the_naming_rule_covers_the_roles_that_name_themselves() {
-        assert!(role_requires_a_name(Role::Button));
-        assert!(role_requires_a_name(Role::CheckBox));
-        // A landmark is named by what it contains, so a name is welcome but
-        // not compulsory.
-        assert!(!role_requires_a_name(Role::Complementary));
-        assert!(!role_requires_a_name(Role::Document));
+    fn the_name_rule_covers_the_roles_that_are_nothing_without_one() {
+        for role in [
+            Role::Button,
+            Role::DefaultButton,
+            Role::CheckBox,
+            Role::Switch,
+            Role::RadioButton,
+            Role::Link,
+        ] {
+            assert!(
+                role_requires_a_name(role),
+                "{role:?} is a single control whose whole announcement is name + role + \
+                 state, so without a name a screen reader reads out its state and never \
+                 says what it acts on"
+            );
+        }
 
+        for role in [
+            Role::MenuItem,
+            Role::MenuItemCheckBox,
+            Role::MenuItemRadio,
+            Role::ListBoxOption,
+            Role::Tab,
+            Role::TreeItem,
+        ] {
+            assert!(
+                role_requires_a_name(role),
+                "{role:?} is an item inside a composite: the composite is named once and \
+                 every item still has to say which one it is, so a nameless item is an \
+                 unidentifiable row in an otherwise navigable list"
+            );
+        }
+
+        for role in [
+            Role::Slider,
+            Role::SpinButton,
+            Role::ProgressIndicator,
+            Role::Meter,
+        ] {
+            assert!(
+                role_requires_a_name(role),
+                "{role:?} announces a number, and a number with no name is a quantity of \
+                 nothing — the name is the only part that says what is being measured"
+            );
+        }
+
+        assert!(
+            role_requires_a_name(Role::Splitter),
+            "a divider between two panes has no visible text of its own to borrow a name \
+             from, so its name is a constructor argument — see `src/elements/splitter.rs`"
+        );
+
+        for role in [
+            Role::ComboBox,
+            Role::EditableComboBox,
+            Role::TextInput,
+            Role::MultilineTextInput,
+            Role::SearchInput,
+            Role::NumberInput,
+            Role::PasswordInput,
+            Role::DateInput,
+        ] {
+            assert!(
+                role_requires_a_name(role),
+                "{role:?} takes or chooses a value, and its own contents are the value \
+                 rather than the label, so the name is the only thing that says what is \
+                 being typed or chosen"
+            );
+        }
+
+        for role in [Role::Dialog, Role::AlertDialog] {
+            assert!(
+                role_requires_a_name(role),
+                "{role:?} takes over the screen, and its name is what a screen reader \
+                 announces on arrival to say what was interrupted for"
+            );
+        }
+
+        assert!(
+            role_requires_a_name(Role::Image),
+            "an image's name is its alternative text, which is the whole of what a screen \
+             reader has to go on"
+        );
+
+        // The absences, each argued for somewhere in writing rather than
+        // merely unlisted.
+        for role in [Role::Complementary, Role::Document] {
+            assert!(
+                !role_requires_a_name(role),
+                "{role:?} is named by what it contains, so a name is welcome but not \
+                 compulsory — see this function's own docs"
+            );
+        }
+
+        assert!(
+            !role_requires_a_name(Role::ListBox),
+            "`src/elements/select.rs` argues this exclusion in writing: the listbox is \
+             named by the trigger beside it, so forcing a name on it would make every \
+             select announce its label twice"
+        );
+    }
+
+    /// The three states a required name can be in, and only silence and blank
+    /// are bugs.
+    #[test]
+    fn a_required_name_is_absent_blank_or_given() {
         assert!(A11y::new(Role::Button).is_missing_a_required_name());
         assert!(A11y::new(Role::Button)
             .name("  ")

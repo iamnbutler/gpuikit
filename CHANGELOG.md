@@ -42,6 +42,24 @@ All notable changes to this project will be documented in this file.
   `dropdown-option` become `select-listbox` / `select-option`, and the test-only
   selectors become `gpuikit-select-trigger` / `gpuikit-select-popup`. These are
   internal, but a consumer that had pinned a test to one would notice
+- **`select()` and `Select::new()` take the accessible name as their second
+  argument**: `select(id, name, options)`. `Role::ComboBox` is in
+  `a11y::role_requires_a_name`, so an honest role for the trigger forces a
+  name, and every naming source that convention allows was unavailable here — a
+  select's visible text is its *value* (naming the control after it would
+  rename the control every time the user changed it), the placeholder
+  disappears the moment a choice is made and defaults to "Select…", and gpui has
+  no `labelled_by` builder, so a `Field` or `Label` beside the control cannot
+  name it. A required constructor argument is what `src/a11y.rs`'s section 2
+  prescribes for this case; it was written for `IconButton` and `Select` got
+  there first. `select("country", vec![…])` becomes
+  `select("country", "Country", vec![…])`
+- **`gpuikit::traits::visual_focus` is deleted**, with the `VisualFocus` trait
+  and the `FocusStyle` enum in it. It had no implementors anywhere in this
+  crate and could not usefully gain one: it requires `gpui::Focusable`, which a
+  `RenderOnce` control cannot implement. `theme::focus_ring` is now this
+  crate's answer to the same question, and carrying both would be a second fork
+  of one decision
 
 ### Added
 
@@ -54,6 +72,67 @@ All notable changes to this project will be documented in this file.
   migration table, and what would reopen it. It also reserves the freed name:
   a future menu-of-actions-from-a-trigger is `DropdownMenu`, built on
   `context_menu.rs`'s items rather than on `Select`
+- **Keyboard focus is part of the role announcement.** `A11y` gains
+  `focusable()`, `focus_handle(handle)` and `not_focusable(why)`, and
+  `Announce::announce` *applies* the answer — `focusable().tab_stop(true)`, or
+  `track_focus(&handle.tab_stop(true))` for a caller's handle — in the same call
+  that reports the role, so the two cannot drift apart. `Button` announced
+  `Role::Button` and could not take keyboard focus, which promised a screen
+  reader a control a keyboard could not reach; that is what this closes.
+  For every role in the new `a11y::role_requires_keyboard_focus`, saying
+  nothing is a `debug_assert!` — the counterpart of the missing-name one.
+  `not_focusable` takes a reason on purpose: it is what distinguishes a
+  decision from a call someone made to silence the assertion
+- `a11y::role_requires_keyboard_focus` — the standalone control roles
+  (`Button`, `DefaultButton`, `CheckBox`, `Switch`, `RadioButton`, `Link`,
+  `Slider`, `SpinButton`, the combo boxes and the text inputs). The
+  composite-item roles (`MenuItem*`, `Tab`, `TreeItem`, `ListBoxOption`) are
+  deliberately excluded — they are arrow-key targets inside a composite that
+  owns the one tab stop, so no per-item rule can be right — and so is
+  `Role::Splitter`, which is keyboard-reachable today through its own
+  `tab_index(0)` rather than through this convention. Both declines are written
+  into the function's docs
+- `a11y::bind_focus_keys`, `a11y::FocusNext` / `FocusPrevious`, and
+  `a11y::FocusNavigation::moves_focus_on_tab`. gpui ships `Window::focus_next`
+  / `focus_prev` and binds neither, so Tab did nothing at all; `gpuikit::init`
+  now installs the bindings, **before** `input::bind_input_keys`, which is what
+  keeps Tab inside a focused text input. `announce` puts the listener on every
+  control it makes focusable; an app puts it on the element it focuses at
+  startup so that the *first* Tab works, which `examples/showcase.rs` now
+  demonstrates
+- `theme::focus_ring(color)` and `theme::FOCUS_RING_WIDTH` — one definition of
+  the ring a keyboard-focused control draws. A spread `BoxShadow` rather than a
+  border, so arriving focus does not resize the control and reflow its
+  neighbours, applied through gpui's `focus_visible` so that clicking a control
+  does not leave a ring behind it. `Button`, `SidebarTrigger` and `Select`'s
+  trigger all draw it
+- `Select` declares its roles, the first element adopted after the convention:
+  the trigger announces `Role::ComboBox` with its name, `expanded`, and — as
+  its *value* — the label of the chosen option; the popup announces
+  `Role::ListBox` named after the control it dropped out of; and each row
+  announces `Role::ListBoxOption` with `selected`, its position and the size of
+  the set. The trigger is a tab stop, and Enter or Space opens the popup. The
+  popup still has **no keyboard model** — no arrow keys, no Escape, no roving
+  focus between options — and reports no `aria-activedescendant`, because that
+  property names the row keyboard focus is virtually on and there is no such
+  row yet. Both arrive together, as a follow-up
+- `A11y::size_of_set`, which gpui's `aria_size_of_set` had not been modelled
+  for. It is what turns `position_in_set`'s "3" into "3 of 8"
+- `a11y::ELEMENTS_WITHOUT_A_ROLE` and
+  `a11y::tests::every_element_module_declares_a_role` — the rollout order, as
+  something a test counts rather than prose. Every `pub mod` in
+  `src/elements.rs` must either implement `Accessible` or name itself in that
+  list with a reason saying what it would announce or what has to exist first,
+  checked in both directions so the list can only shrink. It starts at 36
+  entries, which is the finding rather than the bloat: only `Button`,
+  `Sidebar`, `Splitter` and now `Select` are adopted, and the gap was
+  previously invisible. Modelled on `overlay_coverage::every_overlay_is_written_down`
+- `Button::focus_handle` and `SidebarTrigger::focus_handle`, for a caller that
+  has to move focus *to* one of them. Optional, and most callers want nothing:
+  gpui mints a handle for a focusable element and keeps it in that element's own
+  element state, so a `RenderOnce` control is the same focus target across
+  frames without anything above it holding state. `focus_survives_a_redraw`
+  pins it, and it is why no existing `button(…)` call site changed
 - `mod family_coverage` in `src/elements.rs` holds that document to the crate,
   in the shape `triage_coverage` and `overlay_coverage` already use: every row
   of the family table names a real `pub mod` and one of the two families, **no
@@ -126,6 +205,17 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- `Button`, `SidebarTrigger` and `Select`'s trigger take keyboard focus when
+  they are enabled, and decline it — **with a stated reason** — when they are
+  disabled. Tab now moves focus between gpuikit controls, and a disabled control
+  is not a tab stop; those are the two behavioural changes a consumer could
+  notice. A disabled control leaving the tab order is the weaker of the two
+  ARIA-sanctioned answers, and is forced by gpui still having no `aria_disabled`
+  to announce the other with
+- `src/a11y.rs`'s module docs grow a section 4, "How the keyboard reaches it",
+  and the old sections 4 and 5 renumber to 5 and 6. Section 6 no longer states
+  the rollout order in prose — `ELEMENTS_WITHOUT_A_ROLE` is the checked form of
+  it
 - `Sidebar` and `SidebarTrigger`, which shipped roles ahead of the convention,
   are migrated onto it — as their issue said they would be if the convention
   chose differently. Behaviour is unchanged: the panel still reports

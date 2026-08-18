@@ -264,7 +264,7 @@ impl InputSandbox {
                 SampleText::ALL.iter().map(|s| (*s, s.label())).collect();
 
             SelectState::new(
-                select("sample-select", options)
+                select("sample-select", "Sample text", options)
                     .selected(initial_sample)
                     .on_change(move |sample: SampleText, _window, cx| {
                         multiline_input_for_select.update(cx, |input, cx| {
@@ -283,7 +283,7 @@ impl InputSandbox {
         let default_font_for_select = default_font.clone();
         let font_select = cx.new(|_cx| {
             SelectState::new(
-                select("font-select", font_options)
+                select("font-select", "Font", font_options)
                     .selected(default_font_for_select)
                     .full_width(true),
             )
@@ -296,7 +296,7 @@ impl InputSandbox {
 
         let weight_select = cx.new(|_cx| {
             SelectState::new(
-                select("weight-select", weight_options)
+                select("weight-select", "Font weight", weight_options)
                     .selected(FontWeightOption::Normal)
                     .full_width(true),
             )

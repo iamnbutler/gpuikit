@@ -113,6 +113,11 @@ pub fn assets() -> resource::ResourceSource<Assets> {
 pub fn init(cx: &mut App) {
     theme::init(cx);
     utils::element_manager::init(cx);
+    // Before `bind_input_keys`, and the order is load-bearing: both bind Tab,
+    // gpui prefers the later-registered binding at equal context depth, and
+    // that is what keeps Tab inside a focused text input rather than moving
+    // focus out of it. See `a11y`'s module docs, section 4.
+    a11y::bind_focus_keys(cx);
     input::bind_input_keys(cx, None);
     elements::dialog::bind_dialog_keys(cx);
     elements::toast::init(cx);

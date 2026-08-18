@@ -7,6 +7,7 @@ use gpui::{
     WindowOptions,
 };
 use gpui_platform;
+use gpuikit::a11y::FocusNavigation;
 use gpuikit::input::InputState;
 use gpuikit::markdown::{preprocessing_available, Markdown, MarkdownElement};
 use gpuikit::theme::{ActiveTheme, GlobalTheme, Theme, Themeable};
@@ -631,6 +632,7 @@ impl Showcase {
             SelectState::new(
                 select(
                     "size-select",
+                    "Size",
                     vec![
                         (Size::Small, "Small"),
                         (Size::Medium, "Medium"),
@@ -645,6 +647,7 @@ impl Showcase {
             SelectState::new(
                 select(
                     "priority-select",
+                    "Priority",
                     vec![
                         (Priority::Low, "Low"),
                         (Priority::Normal, "Normal"),
@@ -660,6 +663,7 @@ impl Showcase {
             SelectState::new(
                 select(
                     "theme-select",
+                    "Theme",
                     vec![
                         (ThemeChoice::GruvboxDark, "Gruvbox Dark"),
                         (ThemeChoice::GruvboxLight, "Gruvbox Light"),
@@ -690,6 +694,7 @@ impl Showcase {
             SelectState::new(
                 select(
                     "country-select",
+                    "Country",
                     vec![
                         (Country::US, "United States"),
                         (Country::UK, "United Kingdom"),
@@ -889,6 +894,7 @@ impl Showcase {
                 SelectState::new(
                     select(
                         SharedString::from(format!("control-row-select-{}", size.name())),
+                        "Size",
                         vec![(Size::Small, "Small"), (Size::Medium, "Medium")],
                     )
                     .selected(Size::Medium)
@@ -3819,6 +3825,16 @@ impl Render for Showcase {
         };
 
         h_stack()
+            // The cold-start case, worked. `gpuikit::init` binds Tab, and
+            // `a11y::announce` puts the listener on every control it makes
+            // focusable — but with *nothing* focused gpui dispatches to the
+            // node belonging to its own wrapper around this view, above this
+            // element, so the very first Tab would reach no listener at all.
+            // Tracking the handle `main` focuses at startup and answering Tab
+            // here is what makes it work. See `gpuikit::a11y`, section 4.
+            .id("showcase-root")
+            .track_focus(&self.focus_handle)
+            .moves_focus_on_tab()
             .bg(bg)
             .text_color(fg)
             .size_full()

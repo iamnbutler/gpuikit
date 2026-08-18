@@ -336,6 +336,69 @@ mod tests {
         state.read_with(cx, |state, _| state.content().to_string())
     }
 
+    /// Tab types a tab into a focused text input; it does not move focus out
+    /// of one.
+    ///
+    /// Two bindings answer `tab`: `a11y::FocusNext`, which `crate::init`
+    /// installs first, and `input::Tab`, which it installs second. gpui sorts
+    /// matched bindings by context depth and then by *descending* registration
+    /// index, and offers the dispatcher each in turn until one is consumed — so
+    /// the later-registered `input::Tab` is tried first and the focused
+    /// textarea consumes it, and `FocusNext` is never dispatched.
+    ///
+    /// The harness is built so that this is not vacuous. Swapping the two calls
+    /// in `crate::init` fails it, which needs three things present at once: a
+    /// `FocusNext` listener *above* the input in the dispatch path (the root
+    /// `div`, standing in for an app's own root), somewhere else for focus to
+    /// go (the button, which `announce` makes a tab stop), and an input that
+    /// really would consume `input::Tab`. Take any one away and the mutation
+    /// passes.
+    ///
+    /// `Textarea` is not on `a11y`'s adoption list yet, so nothing inside it
+    /// registers a `FocusNext` listener of its own.
+    #[gpui::test]
+    fn tab_stays_inside_a_focused_text_input(cx: &mut TestAppContext) {
+        use crate::a11y::FocusNavigation;
+        use crate::elements::button::button;
+        use gpui::{div, InteractiveElement, ParentElement};
+
+        cx.update(crate::init);
+
+        let state = cx.update(|cx| cx.new(InputState::new_multiline));
+        state.update(cx, |state, cx| state.set_content("ab".to_string(), cx));
+
+        let for_render = state.clone();
+        let cx = focused_input_window(cx, &state, move |_window, cx| {
+            div()
+                .id("root")
+                .moves_focus_on_tab()
+                .child(textarea(&for_render, cx))
+                .child(button("elsewhere", "Elsewhere").on_click(|_, _, _| {}))
+                .into_any_element()
+        });
+        cx.run_until_parked();
+
+        let focused_before = cx.update(|window, cx| window.focused(cx));
+        assert!(
+            focused_before.is_some(),
+            "the textarea was never focused, so this measures nothing"
+        );
+
+        cx.simulate_keystrokes("tab");
+        cx.run_until_parked();
+
+        assert_eq!(
+            cx.update(|window, cx| window.focused(cx)),
+            focused_before,
+            "Tab moved focus out of a focused text input. `crate::init` binds the focus keys \
+             before `input::bind_input_keys` precisely so that it does not"
+        );
+        assert!(
+            state.read_with(cx, |state, _| state.content().contains('\t')),
+            "Tab did not reach the input's own handler"
+        );
+    }
+
     #[gpui::test]
     fn each_textarea_renders_under_its_own_state(cx: &mut TestAppContext) {
         cx.update(crate::theme::init);

@@ -65,7 +65,7 @@ impl Toolbar {
             toggle: cx.new(|_cx| toggle("tg", true).control_size(size)),
             select: cx.new(|_cx| {
                 SelectState::new(
-                    select("sel", vec![(0u8, "Zero"), (1u8, "One")])
+                    select("sel", "Number", vec![(0u8, "Zero"), (1u8, "One")])
                         .selected(0u8)
                         .control_size(size),
                 )

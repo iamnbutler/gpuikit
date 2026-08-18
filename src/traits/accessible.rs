@@ -15,7 +15,7 @@ use crate::a11y::A11y;
 /// ```ignore
 /// impl Accessible for Button {
 ///     fn a11y(&self) -> A11y {
-///         A11y::new(Role::Button).name(self.label.clone())
+///         A11y::new(Role::Button).name(self.label.clone()).focusable()
 ///     }
 /// }
 ///

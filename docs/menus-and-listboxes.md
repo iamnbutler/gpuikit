@@ -50,9 +50,14 @@ which is a constructor argument, not a component.
   popup goes, which is a fact about placement that `docs/overlays.md` already
   owns. Every other element here is named for what it is for.
 - **It is the accessibility vocabulary.** accesskit's roles are `ListBox` and
-  `ListBoxOption`; the platform's own name for this control is a select. When
-  `docs/issues/element-roles-convention.md`'s answer reaches this element, the
-  role it reports and the name of the file it lives in will agree.
+  `ListBoxOption`; the platform's own name for this control is a select.
+  `docs/issues/element-roles-convention.md`'s answer has since reached this
+  element, and the roles it reports and the name of the file it lives in agree:
+  the trigger is a `ComboBox` (which is how ARIA maps a select-only combobox),
+  the popup a `ListBox`, and each row a `ListBoxOption`. Not Chromium's native
+  `MenuListPopup` / `MenuListOption` mapping — this document had already stated
+  the crate's vocabulary, and `docs/issues/combobox.md` asks for the same three
+  roles for the editable combobox that does not exist yet.
 - **It already had the larger API.** `Select` had `placeholder`, `clear()` and
   an optional selection; `Dropdown` had none of them and could not express
   "nothing chosen yet". Merging in the other direction would have meant adding
@@ -113,7 +118,7 @@ struct, and they should not:
 
 | Was | Is |
 | --- | --- |
-| `dropdown(id, options, value)` | `select(id, options).selected(value)` |
+| `dropdown(id, options, value)` | `select(id, name, options).selected(value)` |
 | `DropdownState::new(…)` | `SelectState::new(…)` |
 | `DropdownChanged` | `SelectChanged` |
 | `state.selected` (a `T`) | `state.selected` (an `Option<T>`) |
@@ -123,6 +128,17 @@ struct, and they should not:
 Every other method carried over unchanged: `on_change`, `full_width`,
 `disabled`, `control_size`, `is_open`, `is_disabled`, `set_disabled`. `Select`
 adds `placeholder` and `clear`, which a `Dropdown` could not express.
+
+`select()` and `Select::new()` have since gained a second argument, the
+accessible **name**: `select(id, name, options)`. It is required rather than
+optional because `Role::ComboBox` is in `a11y::role_requires_a_name` and every
+naming source that convention allows was unavailable here. A select's visible
+text is its *value*, so naming the control after it would rename the control
+every time the user changed it; the placeholder disappears the moment a choice
+is made, and defaults to "Select…"; and gpui has no `labelled_by` builder, so a
+`Field` or `Label` beside the control cannot name it either. A required
+constructor argument is what section 2 of `src/a11y.rs` prescribes for exactly
+this case — it was written for `IconButton`, and `Select` got there first.
 
 The one behaviour that changed shape rather than name is the selection itself.
 A `Dropdown` always had a value, so its popup always marked a row; a `Select`

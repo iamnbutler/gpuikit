@@ -17,4 +17,3 @@ pub mod disableable;
 pub mod labelable;
 pub mod orientable;
 pub mod selectable;
-pub mod visual_focus;

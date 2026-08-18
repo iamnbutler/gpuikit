@@ -27,6 +27,7 @@ pub mod select;
 pub mod separator;
 pub mod sidebar;
 pub mod slider;
+pub mod splitter;
 pub mod switch;
 pub mod table;
 pub mod tabs;
@@ -71,7 +72,7 @@ mod triage_coverage {
 
     /// The split the document states in prose. Restated here on purpose:
     /// editing the table without editing the prose fails.
-    const EXPECTED: [(&str, usize); 3] = [("Shipped", 11), ("Issue", 7), ("Rejected", 11)];
+    const EXPECTED: [(&str, usize); 3] = [("Shipped", 12), ("Issue", 6), ("Rejected", 11)];
 
     /// An issue body shorter than this is a stub, and #146 asked for complete
     /// ones — prior art, references, crate gaps, the a11y answer, sizing and
@@ -216,8 +217,10 @@ mod triage_coverage {
         }
 
         // A scan that finds nothing reports no orphans, which is
-        // indistinguishable from a clean tree. Ten surviving components plus
-        // three prerequisites; the floor only has to be non-trivial.
+        // indistinguishable from a clean tree. The floor only has to be
+        // non-trivial: an issue body is kept after its component ships (the
+        // triage points at it, and the argument in it is the argument for the
+        // shape that shipped), so this number falls only when one is deleted.
         assert!(
             found >= 10,
             "only {found} issue bodies found under {} — check how the tree is being located \
@@ -249,6 +252,82 @@ mod triage_coverage {
                  with better manners"
             );
         }
+    }
+
+    /// The document's whole contract is that its claims are machine-checked,
+    /// and the claim it was missing — *who took these verdicts* — was prose
+    /// nothing read. iamnbutler/gpuikit#152 is that omission; this test is the
+    /// thing that stops it recurring, and it goes slightly beyond that issue's
+    /// literal ask for exactly that reason.
+    ///
+    /// Three things: the attribution section exists and comes before the table
+    /// it is about, it still says the rejections are proposed rather than
+    /// settled, and its counts are the same counts `EXPECTED` enforces — so a
+    /// verdict that legitimately changes moves both, and neither can drift
+    /// alone.
+    #[test]
+    fn the_verdicts_say_who_took_them() {
+        let ratification = TRIAGE
+            .find("<!-- ratification -->")
+            .expect("docs/component-triage.md no longer anchors its attribution section");
+        let table = TRIAGE
+            .find("<!-- verdict-table -->")
+            .expect("docs/component-triage.md no longer anchors its verdict table");
+
+        assert!(
+            ratification < table,
+            "the attribution comes after the table it is about, so a reader meets the \
+             verdicts before being told who took them"
+        );
+
+        // To the next heading, so a later section cannot satisfy this by
+        // accident.
+        let section = &TRIAGE[ratification..];
+        let end = section[1..]
+            .find("\n## Provenance")
+            .expect("the attribution section is never closed");
+        let section = &section[..end];
+
+        // Whitespace-collapsed, because the phrase is prose and prose wraps.
+        let flowed = section.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            flowed.contains("proposed and not ratified"),
+            "the attribution no longer says the rejections are proposed rather than \
+             ratified, which is the one thing it exists to say"
+        );
+
+        for (verdict, expected) in EXPECTED {
+            let stated = format!("**{expected} {verdict}**");
+            assert!(
+                flowed.contains(&stated),
+                "the attribution section does not say `{stated}`. It restates the verdict \
+                 counts on purpose: editing the table without editing it fails here"
+            );
+        }
+    }
+
+    /// #59 was closed `COMPLETED` on 2026-03-25, five months before this
+    /// document existed. A draft of the closing section carried a
+    /// ready-to-paste comment and its own counts — a pending action that
+    /// cannot happen, and the only numbers in a machine-checked document that
+    /// no test reached. Both are gone, and this is what keeps them gone.
+    #[test]
+    fn the_59_section_does_not_promise_an_action_nobody_can_take() {
+        assert!(
+            TRIAGE.contains("## What became of #59"),
+            "the document no longer says what became of #59, which is the thing it \
+             replaced"
+        );
+        assert!(
+            !TRIAGE.contains("Ready to paste"),
+            "a ready-to-paste closing comment is back. #59 has been closed since \
+             2026-03-25; there is nothing to paste it on"
+        );
+        assert!(
+            TRIAGE.contains("2026-03-25"),
+            "the #59 section no longer says when #59 was closed, which is the fact that \
+             makes the rest of it true"
+        );
     }
 }
 

@@ -30,15 +30,46 @@ survives contact with reality by never being read. A component is either here,
 worth writing an issue for, or turned down for a reason that could later stop
 being true.
 
+<!-- ratification -->
+
+## Who took these verdicts, and which of them are binding
+
+Not every claim in this document is the same *kind* of claim, and the table
+below flattens three of them into one column. Read it this way:
+
+- The **12 Shipped** rows are facts. Each names a module, and
+  `triage_coverage` in `src/elements.rs` fails the build if that module is not
+  really declared. Nobody has to take these on trust.
+- The **6 Issue** rows are proposals, and cheap ones: each is a written issue
+  body under `docs/issues/`, and writing one commits nobody to building it. The
+  bodies were filed separately under the maintainer's authorisation.
+- The **11 Rejected** rows are **one agent's reading of this crate, proposed
+  and not ratified.** They were taken while writing #146's deliverable, against
+  the crate as it stood, and no maintainer has signed off on a single one of
+  them.
+
+The reasons in "The rejections, argued" below are written flat and unhedged, on
+purpose: a rejection that hedges is the "deferred / maybe / someday" this
+document exists to replace, and a reason you cannot disagree with is not a
+reason. What was missing was never doubt about the arguments — it was who made
+them. This section is that, and it does not soften a single one.
+
+**How to ratify.** Read a rejection, and either say so in the pull request that
+adopts it or edit its paragraph here. When the rejections are ratified, replace
+this section's third bullet with who ratified them and when. Until then, treat
+a Rejected row as an argument to attack rather than as a decision that has been
+taken.
+
 ## Provenance: why #59 stopped meaning anything
 
 Three things are checkable, and all three hold:
 
-- **Its entries shipped without it noticing.** Ten rows below are Shipped —
+- **Its entries shipped without it noticing.** Twelve rows below are Shipped —
   eight when this triage was first taken (#146 counted seven; re-reading the
   list against `src/elements/` found one more, which is itself the point), plus
-  Table and Data Table, built since as one module. Nothing moved any of the
-  first eight off the deferred list, because nothing connected the list to the
+  Table and Data Table, built since as one module, plus Sidebar and Resizable,
+  built since against their own issue bodies. Nothing moved any of the first
+  eight off the deferred list, because nothing connected the list to the
   crate.
 - **Its blockers expired.** #59 deferred most of its roster on missing
   infrastructure. Overlays, focus, keyboard dispatch, virtualised lists and —
@@ -85,10 +116,11 @@ Both now exist, in `src/a11y.rs` and `docs/overlays.md`.
 | Accessibility roles | Resolved, and now written down | `src/a11y.rs`: an element implements `traits::accessible::Accessible` and applies the `A11y` it returns with one `.announce(a11y)`. `Button` is the worked example, `sidebar.rs` — which shipped ahead of the convention — has been migrated onto it, and `a11y::tests::no_element_calls_gpuis_a11y_builders_directly` fails the build if anything under `src/` calls gpui's builders directly. The decision record is that module's docs; `docs/issues/element-roles-convention.md` records it against the questions it was asked |
 
 The rows that were unresolved when this triage was taken are why it produces
-thirteen issue files for what is now eight surviving components: three of them
-are prerequisites rather than components, and two — `table.md` and
-`data-table.md` — have since been discharged by one module. All three
-prerequisites are now settled: `overlays.md` by deleting the trait it was about,
+thirteen issue files for what is now six surviving components: three of them
+are prerequisites rather than components, and four have since been built —
+`table.md` and `data-table.md` by one module, `sidebar.md`, and `resizable.md`
+by `src/elements/splitter.rs`. All three prerequisites are now settled:
+`overlays.md` by deleting the trait it was about,
 `element-roles-convention.md` by `src/a11y.rs`, and `menu-vs-listbox-naming.md`
 by merging `Dropdown` into `Select`. Two of the three no longer have a body
 under `docs/issues/` at all — a settled question becomes a document in `docs/`,
@@ -137,7 +169,7 @@ source and read it, not trust a name in a table.
 | Combobox | Issue | `docs/issues/combobox.md` |
 | Table | Shipped | `src/elements/table.rs` |
 | Data Table | Shipped | `src/elements/table.rs` |
-| Resizable | Issue | `docs/issues/resizable.md` |
+| Resizable | Shipped | `src/elements/splitter.rs` |
 | Sidebar | Shipped | `src/elements/sidebar.rs` |
 | Calendar | Issue | `docs/issues/calendar.md` |
 | Date Picker | Issue | `docs/issues/date-picker.md` |
@@ -197,6 +229,35 @@ What was built, against the two issue bodies:
   a sorted `ColumnHeader` cannot report its direction and that is an upstream
   ask; and `role()` still needs an id, so the roles wait on derived cell ids.
   The roles the element needs are named in its module docs.
+
+## One row, another name
+
+The **Resizable** row is Shipped and names `src/elements/splitter.rs`. The row
+keeps #59's name because the table's contract is one row per #59 entry, and
+`Resizable` is what #59 called it; the *module* is called something else, and
+that is deliberate.
+
+`docs/issues/resizable.md` — kept, because the argument in it is the argument
+for the shape that shipped — says the part that is genuinely a toolkit element
+is the splitter: one divider, two panes, a drag, a floor under each side, a
+keyboard equivalent. Everything above that is an application's layout model.
+"Resizable" names a *property* almost anything can have; `Splitter` names the
+thing that was built. Three more reasons the name is not a matter of taste:
+
+- `Role::Splitter` is accesskit's own variant, and the element reports it.
+- WAI-ARIA calls the pattern **Window Splitter**, and the element implements
+  that pattern's keyboard contract.
+- This crate has already paid once for a module whose name described something
+  it was not — see [`docs/menus-and-listboxes.md`](menus-and-listboxes.md) and
+  the deleted `Dropdown`.
+
+The line above, "**Resizable** becomes a two-pane splitter rather than a pane
+tree", already said this in prose before anything was built. The module now
+agrees with it, with the role it reports, and with the pattern it implements.
+
+Not built, and named here so the next person does not go looking: a pane tree,
+nested groups, persisted layout, a collapse gesture, or any notion of more than
+two panes. Three panes is two splitters, nested by the caller.
 
 ## The rejections, argued
 
@@ -323,7 +384,11 @@ are now settled, and their answers are `src/a11y.rs`,
 - `docs/issues/table.md` hard-blocked `data-table.md`. **Discharged**: both are
   built, as one module — see "Two rows, one module" above.
 - `docs/issues/calendar.md`, and the date-type decision in it, hard-blocks `date-picker.md`.
-- `docs/issues/resizable.md` blocks the resizable edge of `sidebar.md`.
+- `docs/issues/resizable.md` blocked the resizable edge of `Sidebar`.
+  **Discharged** — `src/elements/splitter.rs` exists. `Sidebar` is not migrated
+  onto it: its own issue said it could ship without one, and adopting a
+  splitter changes that element's API. That is its own decision, not a
+  consequence of this one.
 - `docs/issues/confirmation-dialog.md` needs a destructive `ButtonVariant`, which does not
   exist — `src/elements/button.rs` has only `Filled`, with its own `// todo`.
 
@@ -335,13 +400,17 @@ document's other tables are not mistaken for it — and fails the build when the
 document stops describing the crate:
 
 - the table has one row per #59 entry, and the verdict split matches the
-  11 Shipped / 7 Issue / 11 Rejected stated in prose here;
+  12 Shipped / 6 Issue / 11 Rejected stated in prose here;
 - every Shipped row names a `src/elements/<module>.rs` that is really declared;
 - every Issue row names a file under `docs/issues/` that exists and is not a
   stub;
 - every file under `docs/issues/` is reachable from this document;
 - every Rejected row is argued in the section above, not just asserted in a
-  cell.
+  cell;
+- the attribution section above still says who took the verdicts, still says
+  the rejections are proposed rather than ratified, and still states the same
+  three counts the table has — because an unchecked claim in prose is exactly
+  how this document's missing attribution went unnoticed in the first place.
 
 A sibling `overlay_coverage` module does the same for
 [`docs/overlays.md`](overlays.md): every `src/elements/` module that calls
@@ -360,25 +429,25 @@ editing the prose fails. If a verdict legitimately changes, both move together.
 If a component ships, its row moves to Shipped and must then name its module —
 the test will demand it.
 
-## Closing note for #59
+## What became of #59
 
-Ready to paste:
+**#59 is closed, and this document is what replaced it.** It was closed
+`COMPLETED` on 2026-03-25, five months before this file existed, so there is no
+note to post and nothing left to gate: whoever closed it did so without a
+replacement, which is exactly the failure "Provenance" above describes. The
+substance is there — #59 was shadcn/ui's roster rather than a decision, and it
+went stale because nothing connected it to the crate.
 
-> Closing in favour of [`docs/component-triage.md`](../docs/component-triage.md),
-> which gives every entry on this list a verdict: 10 have shipped (8 already
-> had when the triage was taken; `Table` and `Data Table` have since been built
-> as one module), 11 are rejected with a reason and a named revisit trigger,
-> and 8 have a ready-to-file issue body under `docs/issues/` (plus three
-> prerequisites the triage surfaced, all three since settled — an element role
-> convention, by `src/a11y.rs`; a menu-vs-listbox naming decision, by merging
-> `Dropdown` into `Select` in favour of
-> [`docs/menus-and-listboxes.md`](../docs/menus-and-listboxes.md); and
-> adopt-or-delete for `src/traits/portal.rs`, by deleting it in favour of
-> [`docs/overlays.md`](../docs/overlays.md)).
->
-> This list was shadcn/ui's roster rather than a decision, and it went stale
-> because nothing connected it to the crate. The replacement is checked by
-> tests in `src/elements.rs`: a Shipped row has to name a module that exists,
-> an Issue row has to name an issue body that exists, and a Rejected row has to
-> be argued in prose. If one of the rejections is wrong, argue with the
-> paragraph — that is what it is there for.
+What is different now is that the replacement is checked. A Shipped row has to
+name a module that exists, an Issue row has to name an issue body that exists,
+and a Rejected row has to be argued in prose; "What keeps this honest" above
+says which test does which. If one of the rejections is wrong, argue with the
+paragraph — that is what it is there for, and per the attribution section none
+of them has been ratified yet.
+
+An earlier draft of this section carried a ready-to-paste closing comment with
+its own counts in it. It is gone rather than corrected: it asserted a pending
+action on an issue that had been closed for months, and its counts were the one
+part of a machine-checked document that no test reached. Counts live in the
+attribution section and in the verdict table, where `triage_coverage` can see
+them.

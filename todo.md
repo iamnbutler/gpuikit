@@ -33,6 +33,8 @@
 - Separator
 - Sidebar
 - Slider
+- Splitter (a two-pane divider, not a pane tree — see
+  [docs/component-triage.md](docs/component-triage.md))
 - Switch
 - Table (sorting, filtering and selection are one element — see
   [docs/component-triage.md](docs/component-triage.md))

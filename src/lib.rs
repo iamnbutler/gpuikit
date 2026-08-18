@@ -74,6 +74,15 @@ pub mod editor;
 
 pub use icons::Icons as DefaultIcons;
 
+/// Tests for the release workflow's version guard — that the version
+/// `release.yml` would publish is the one `CHANGELOG.md` names.
+///
+/// No runtime code, and nothing outside a test build: the module exists
+/// because `cargo test --lib` is the only thing in this repository that can
+/// check a workflow before it runs for real. See its own docs.
+#[cfg(test)]
+mod release_version_guard;
+
 /// Embedded assets for gpuikit (icons, fonts, etc.)
 #[derive(RustEmbed)]
 #[folder = "assets"]

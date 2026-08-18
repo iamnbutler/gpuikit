@@ -344,6 +344,10 @@ pub fn role_requires_a_name(role: Role) -> bool {
             | Role::Tab
             | Role::TreeItem
             | Role::Slider
+            // A divider between two panes has no visible text of its own to
+            // borrow a name from, so its name is a constructor argument —
+            // `src/elements/splitter.rs` takes one, the way `IconButton` does.
+            | Role::Splitter
             | Role::SpinButton
             | Role::ComboBox
             | Role::EditableComboBox

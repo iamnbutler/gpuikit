@@ -1,5 +1,17 @@
 # Resizable: a draggable splitter between two panes
 
+> **Shipped.** Built as `src/elements/splitter.rs` — the module is `splitter`
+> and the type is `Splitter`; `docs/component-triage.md` §"One row, another
+> name" argues that name. This file is kept rather than deleted: the triage
+> points at it, and the argument below is the argument for the shape that
+> shipped. Read it as the record of *why* the element is this small, not as
+> outstanding work.
+>
+> Not built, deliberately: a pane tree, nested groups, persisted layout, a
+> collapse gesture, `Disableable`, and the WAI-ARIA pattern's optional
+> enter-collapses-the-pane. `Sidebar` is not migrated onto it either — that
+> changes `Sidebar`'s API and is its own decision.
+
 ## What it is
 
 Two panes with a draggable divider between them. **Not** a general pane tree —

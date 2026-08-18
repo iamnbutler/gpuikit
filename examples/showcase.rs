@@ -40,6 +40,7 @@ use gpuikit::{
         separator::separator,
         sidebar::{sidebar, sidebar_trigger, SidebarEdge, SidebarState},
         slider::{slider, Slider},
+        splitter::splitter,
         switch::{switch, Switch},
         table::{table, CellAlign, Column, Row, SortDescriptor, SortDirection},
         tabs::{tab, tabs, Tabs},
@@ -209,6 +210,7 @@ const ELEMENT_COVERAGE: &[(&str, &str)] = &[
     ("separator", "separator"),
     ("sidebar", "sidebar"),
     ("slider", "slider"),
+    ("splitter", "splitter"),
     ("switch", "toggle"),
     ("table", "table"),
     ("tabs", "tabs"),
@@ -269,6 +271,7 @@ const NAV_SECTIONS: &[NavSection] = &[
             ("breadcrumb", "Breadcrumb"),
             ("separator", "Separator"),
             ("sidebar", "Sidebar"),
+            ("splitter", "Splitter"),
             ("collapsible", "Collapsible"),
             ("scroll-area", "Scroll Area"),
             ("list", "List"),
@@ -546,6 +549,12 @@ struct Showcase {
     /// Forces the demo panel to draw as a drawer whatever the window width is,
     /// so the transition can be seen without resizing.
     demo_overlay: bool,
+    /// The three splitter demos' ratios. They live here rather than in the
+    /// element on purpose — that is the whole design, and the Reset button on
+    /// the page is what makes it visible.
+    split_side_by_side: f32,
+    split_stacked: f32,
+    split_rungs: [f32; 3],
     click_count: usize,
     toggled_count: usize,
     size_select: Entity<SelectState<Size>>,
@@ -964,6 +973,9 @@ impl Showcase {
             demo_edge: SidebarEdge::Left,
             demo_width: 13.75,
             demo_overlay: false,
+            split_side_by_side: 0.4,
+            split_stacked: 0.35,
+            split_rungs: [0.5; 3],
             click_count: 0,
             toggled_count: 0,
             size_select,
@@ -2092,6 +2104,163 @@ impl Showcase {
                     .child(div().text_sm().child("Content above"))
                     .child(separator())
                     .child(div().text_sm().child("Content below")),
+            )
+    }
+
+    fn render_splitter_page(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+        let border = theme.border();
+        let fg_muted = theme.fg_muted();
+        let surface = theme.surface_secondary();
+
+        // A pane, so the three demos below are about the divider rather than
+        // about what is on either side of it.
+        let filled = move |label: &'static str, tint: Hsla| {
+            div()
+                .size_full()
+                .bg(tint)
+                .p_2()
+                .text_sm()
+                .text_color(fg_muted)
+                .child(label)
+        };
+
+        let boxed = move |height: f32, child: gpui::AnyElement| {
+            div()
+                .h(px(height))
+                .w_full()
+                .border_1()
+                .border_color(border)
+                .rounded_md()
+                .overflow_hidden()
+                .child(child)
+        };
+
+        v_stack()
+            .gap_6()
+            .child(
+                v_stack()
+                    .gap_1()
+                    .child(
+                        div()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child("Splitter"),
+                    )
+                    .child(div().text_sm().text_color(fg_muted).child(
+                        "One divider, two panes, a floor under each side. The ratio is the \
+                         caller's — this page keeps all three of them, which is why Reset \
+                         can exist at all.",
+                    )),
+            )
+            .child(
+                v_stack()
+                    .gap_2()
+                    .child(
+                        h_stack()
+                            .gap_2()
+                            .items_center()
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child("Side by side"),
+                            )
+                            .child(div().text_xs().text_color(fg_muted).child(format!(
+                                "{:.0}% / {:.0}%",
+                                self.split_side_by_side * 100.,
+                                (1. - self.split_side_by_side) * 100.,
+                            )))
+                            .child(button("splitter-reset", "Reset").on_click(cx.listener(
+                                |this, _, _window, cx| {
+                                    this.split_side_by_side = 0.4;
+                                    cx.notify();
+                                },
+                            ))),
+                    )
+                    .child(boxed(
+                        220.,
+                        splitter("splitter-demo", "Files and editor", self.split_side_by_side)
+                            .min_start(px(120.))
+                            .min_end(px(160.))
+                            .start(filled("Files", surface))
+                            .end(filled("Editor", theme.surface()))
+                            .on_resize(cx.listener(|this, ratio: &f32, _window, cx| {
+                                this.split_side_by_side = *ratio;
+                                cx.notify();
+                            }))
+                            .into_any_element(),
+                    )),
+            )
+            .child(
+                v_stack()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child("Stacked"),
+                    )
+                    .child(boxed(
+                        220.,
+                        splitter("splitter-stacked", "Output and console", self.split_stacked)
+                            .horizontal()
+                            .min_start(px(48.))
+                            .min_end(px(48.))
+                            .start(filled("Output", surface))
+                            .end(filled("Console", theme.surface()))
+                            .on_resize(cx.listener(|this, ratio: &f32, _window, cx| {
+                                this.split_stacked = *ratio;
+                                cx.notify();
+                            }))
+                            .into_any_element(),
+                    )),
+            )
+            .child(
+                v_stack()
+                    .gap_2()
+                    .child(
+                        v_stack()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child("One per rung"),
+                            )
+                            .child(div().text_xs().text_color(fg_muted).child(
+                                "The band you can grab is 6 / 8 / 12px — twice the rung's \
+                                 gap. The line it draws is the same 1px hairline either way.",
+                            )),
+                    )
+                    .children(
+                        ControlSize::ALL
+                            .into_iter()
+                            .enumerate()
+                            .map(|(index, size)| {
+                                v_stack()
+                                    .gap_1()
+                                    .child(div().text_xs().text_color(fg_muted).child(size.name()))
+                                    .child(boxed(
+                                        72.,
+                                        splitter(
+                                            SharedString::from(format!("splitter-rung-{index}")),
+                                            format!("{} splitter", size.name()),
+                                            self.split_rungs[index],
+                                        )
+                                        .control_size(size)
+                                        .start(filled("Start", surface))
+                                        .end(filled("End", theme.surface()))
+                                        .on_resize(cx.listener(
+                                            move |this, ratio: &f32, _window, cx| {
+                                                this.split_rungs[index] = *ratio;
+                                                cx.notify();
+                                            },
+                                        ))
+                                        .into_any_element(),
+                                    ))
+                            }),
+                    ),
             )
     }
 
@@ -3629,6 +3798,7 @@ impl Render for Showcase {
             "breadcrumb" => self.render_breadcrumb_page(cx).into_any_element(),
             "separator" => self.render_separator_page(cx).into_any_element(),
             "sidebar" => self.render_sidebar_page(window, cx).into_any_element(),
+            "splitter" => self.render_splitter_page(cx).into_any_element(),
             "collapsible" => v_stack()
                 .gap_8()
                 .child(self.render_collapsible_page(cx))

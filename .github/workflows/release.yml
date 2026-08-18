@@ -100,6 +100,25 @@ jobs:
           echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "New version: $NEW_VERSION"
 
+      # No `if:` on purpose. A dry run is the run someone does precisely to
+      # check what would be released, so it has to report a wrong version
+      # rather than stay silent about it.
+      - name: Verify the version is the one being released
+        run: |
+          .github/scripts/verify-release-version.sh "${{ steps.bump.outputs.version }}"
+
+          # Separable from the changelog check above, and self-contained: this
+          # block can be deleted without touching anything else. A tag that
+          # already exists means this version was released once already, and
+          # `git tag -a` below would fail after Cargo.toml had been written.
+          # `actions/checkout` runs with fetch-depth: 0, so the tags are here.
+          TAG="${{ steps.bump.outputs.tag }}"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Error: $TAG already exists. A published version cannot be reused," >&2
+            echo "even after 'cargo yank' — pick the next one." >&2
+            exit 1
+          fi
+
       - name: Update Cargo.toml version
         if: ${{ !inputs.dry_run }}
         run: |

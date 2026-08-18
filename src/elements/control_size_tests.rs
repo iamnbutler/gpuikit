@@ -3,8 +3,12 @@
 //! These live in their own file rather than in any one element's because the
 //! property they assert is not any one element's: a row of controls has to be
 //! one height, and no element can check that from inside itself. They render
-//! one of every control into a real test window and read the laid-out height
-//! of each box back.
+//! a row of controls that are on the scale into a real test window and read
+//! the laid-out height of each box back.
+//!
+//! "On the scale" is narrower than "in the crate", and deliberately so — see
+//! [`CONTROLS`] and [`every_sized_control_on_a_row_is_the_same_height`] for
+//! which elements are left out and why.
 
 use gpui::{div, prelude::*, px, Context, Entity, Pixels, Render, TestAppContext, Window};
 
@@ -25,6 +29,10 @@ use crate::traits::control_sized::ControlSized;
 
 /// The controls the row draws, in the order it draws them. Each name is also
 /// the `debug_selector` its box is measured through.
+///
+/// Nine of the crate's sixteen `ControlSized` implementors. The other seven,
+/// and the six elements that are not on the scale at all, are enumerated on
+/// [`every_sized_control_on_a_row_is_the_same_height`].
 const CONTROLS: &[&str] = &[
     "button",
     "icon-button",
@@ -37,7 +45,8 @@ const CONTROLS: &[&str] = &[
     "text-field",
 ];
 
-/// A toolbar: one of every control that can share a row, on one row.
+/// A toolbar: one of every control *on the scale* that can share a row, on
+/// one row. Not one of every control in the crate — see [`CONTROLS`].
 struct Toolbar {
     size: ControlSize,
     checkbox: Entity<Checkbox>,
@@ -121,9 +130,46 @@ fn measure_row(cx: &mut TestAppContext, size: ControlSize) -> Vec<(&'static str,
         .collect()
 }
 
-/// The whole point of the scale, as one assertion.
+/// The whole point of the scale, as one assertion — over the nine controls
+/// [`CONTROLS`] names, which is **not** every control in the crate.
+///
+/// The name says "sized" rather than "control" because both halves of that
+/// gap are real, and neither is visible from the row itself. `grep "impl
+/// ControlSized"` finds sixteen implementors; this row measures nine. Someone
+/// who adds a tenth needs to be able to tell unfinished coverage from a broken
+/// scale, and this comment is the only thing that tells them.
+///
+/// **Six elements are not on the scale at all**, and would fail here for a
+/// reason that is not a bug in the scale. None of them mentions `ControlSized`
+/// or `control_size` anywhere in its module:
+///
+/// - `elements::toggle_group`, `elements::tabs`, `elements::alert` — their
+///   height is whatever their padding plus a line box comes to
+///   (`rems(0.375)`, `rems(0.5)` and `rems(0.75)` respectively).
+/// - `elements::slider`, `elements::progress`, `elements::radio_group` — each
+///   hard-codes a track or glyph size instead: a `rems(0.75)` thumb, a
+///   `px(8.)` bar, a `rems(1.0)` radio. Not padding-derived, whatever the
+///   shorthand in iamnbutler/gpuikit#152 says.
+///
+/// **Seven more do implement `ControlSized` and are still not measured here**,
+/// which is the half that is easy to miss:
+///
+/// - `Field`, `Input` — reachable through the `text-field` entry above, which
+///   is `TextField` wrapping an `Input`; measuring them again would measure
+///   the same box twice.
+/// - `CheckboxBox` — an internal sub-part, reached through `Checkbox`.
+/// - `Textarea` — multi-line by definition, so it has no single row height to
+///   agree with; its rung sets its text metrics, not its box.
+/// - `Table`, `Sidebar`, `SidebarTrigger` — containers rather than row
+///   controls. `SidebarTrigger` is the arguable one: it is an `IconButton` in
+///   all but name and could join the row.
+///
+/// Closing the gap is separate work, tracked as iamnbutler/gpuikit#152. The
+/// three worth doing first are `Tabs`, `ToggleGroup` and `Slider`: all three
+/// genuinely do sit on a toolbar next to a `Button`, and all three are visibly
+/// off it today.
 #[gpui::test]
-fn every_control_on_a_row_is_the_same_height(cx: &mut TestAppContext) {
+fn every_sized_control_on_a_row_is_the_same_height(cx: &mut TestAppContext) {
     for size in ControlSize::ALL {
         let measured = measure_row(cx, size);
         let expected = cx.update(|cx| cx.theme().control(size).height.to_pixels(px(16.)));

@@ -88,6 +88,41 @@ All notable changes to this project will be documented in this file.
   under `src/` calls gpui's `.role()` / `.aria_*()` builders outside
   `src/a11y.rs`. If `A11y` lacks a property, the intended move is to add the
   field and apply it in `Announce::announce`
+- **`gpuikit::elements::splitter`** — a draggable divider between two panes,
+  which is `docs/issues/resizable.md`'s answer to #59's "Resizable" and
+  deliberately not a pane tree. `splitter(id, name, ratio)` plus `.start()`,
+  `.end()`, `.min_start()`, `.min_end()`, `.on_resize()`, `Orientable` and
+  `ControlSized`. The split ratio stays the caller's: the element takes the
+  current one, emits the new one, and stores nothing about where the boundary
+  sits, so a layout can still be persisted, restored or reset from outside.
+  The drawn line is `Separator`'s existing 1px hairline; the *interactive*
+  band around it is 6/8/12px off the rung, which is the difference between a
+  divider that feels good and one nobody can hit. The band reports
+  `Role::Splitter` with its position, both floors and one arrow key's worth as
+  percentages, and follows the WAI-ARIA window splitter keyboard contract
+  (axis arrows step, `home`/`end` go to the floors). Not built, on purpose: a
+  pane tree, nested groups, persisted layout, a collapse gesture,
+  `Disableable`, and enter-collapses-the-pane. Three panes is two splitters,
+  nested by the caller. `Sidebar` is **not** migrated onto it — that changes
+  `Sidebar`'s API and is its own decision
+- `Role::Splitter` joins `a11y::role_requires_a_name`. A divider has no visible
+  text to borrow a name from, so `splitter`'s name is a constructor argument,
+  exactly as `icon_button`'s is
+- `.github/scripts/verify-release-version.sh`, and one step in
+  `release.yml` that calls it: a release now refuses to run unless the version
+  it computed is the one `CHANGELOG.md`'s topmost `## [x.y.z]` heading names.
+  The two ways `release.yml` computes a version stopped agreeing when #170
+  landed 0.8.0 *into* `Cargo.toml` as a prepared release — `version_type:
+  minor`, the shape every previous release used, now computes 0.9.0 and
+  publishes it, skipping a version. This has already happened here once: the
+  tags are `v0.3.0 v0.4.0 v0.5.0 v0.5.1 v0.7.0`, and there is no `v0.6.0`
+  though the changelog has a heading for it. `cargo publish` cannot be undone
+  and a published version cannot be reused even after `cargo yank`, so the
+  previous guard — a sentence in an input's description — was not one. No new
+  inputs. The step carries no `if:`, so a dry run reports a wrong version
+  instead of staying silent, and it also refuses a tag that already exists.
+  The supported flow is #170's: prepare the release in a pull request, then
+  dispatch with `custom_version: x.y.z`
 
 ### Changed
 
@@ -104,6 +139,43 @@ All notable changes to this project will be documented in this file.
   `sort_direction` (no `aria_sort`, the finding `src/elements/table.rs` had
   recorded). Both are documented as upstream asks at the point the crate would
   use them, rather than modelled as fields that would silently do nothing
+- `docs/component-triage.md` says **who took its verdicts**. A new attribution
+  section, anchored on `<!-- ratification -->`, separates the three kinds of
+  claim the verdict table flattens into one column: the 12 Shipped rows are
+  facts a test checks, the 6 Issue rows are cheap proposals, and the 11
+  Rejected rows are one agent's reading of this crate — **proposed and not
+  ratified**. No rejection reason is softened, because the reasons were never
+  the problem; a rejection that hedges is the "deferred / maybe / someday" the
+  document exists to replace. What was missing was attribution
+- The `Closing note for #59` section is **gone**, replaced by a past-tense
+  "What became of #59". #59 was closed `COMPLETED` on 2026-03-25, five months
+  before that document existed, so the ready-to-paste comment asserted a
+  pending action nobody could take — and its counts ("10 have shipped", "8
+  have a ready-to-file issue body") were the one part of a machine-checked
+  document no test reached. Counts now live only where `triage_coverage` can
+  see them
+- `every_control_on_a_row_is_the_same_height` is renamed
+  `every_sized_control_on_a_row_is_the_same_height`, and carries the two
+  exclusion lists it was missing: the six elements that are not on the shared
+  size scale at all (`ToggleGroup`, `Tabs` and `Alert`, whose height is their
+  padding plus a line box; `Slider`, `Progress` and `RadioGroup`, which
+  hard-code a track or glyph size), and the seven that *are* `ControlSized` and
+  still are not measured (`Field`, `Input`, `Textarea`, `Table`, `Sidebar`,
+  `SidebarTrigger`, `CheckboxBox`), each with its one-line reason. Sixteen
+  implementors, nine in the row: someone adding a tenth can now tell unfinished
+  coverage from a broken scale. No behaviour changed
+- Prose counts in `docs/component-triage.md` that had drifted are corrected
+  with the `Resizable` row's move: the verdict split is **12 Shipped / 6 Issue
+  / 11 Rejected**, and `EXPECTED` in `src/elements.rs` moves with it. "Ten rows
+  below are Shipped" (stale since `Sidebar` shipped in #169) and "eight
+  surviving components" go with them, and the dependency graph's edge onto the
+  deleted `docs/issues/sidebar.md` is discharged
+- Two new tests in `src/elements.rs`'s `triage_coverage` hold the above to the
+  document: the attribution section exists, precedes the table it is about,
+  still says the rejections are proposed rather than ratified, and states the
+  same three counts `EXPECTED` enforces; and the #59 section neither promises a
+  paste nor loses the date. An unchecked claim in prose is how the missing
+  attribution went unnoticed in the first place
 
 ## [0.8.0] - 2026-08-17
 

@@ -30,6 +30,7 @@ All features are off by default.
 | `stitch` | **1.95** | Closes the syntax a partially streamed markdown document leaves open (`**bold`, `[label](htt`) before parsing, so streaming text does not flicker between literal markers and styled text. Pulls in [mdstitch](https://docs.rs/mdstitch), which declares `rust-version = "1.95.0"`. `markdown::preprocessing_available()` reports which build you got |
 | `runtime_shaders` | 1.85 | Compiles Metal shaders at runtime instead of at build time, so a macOS build needs no Xcode Metal toolchain |
 | `schema` | 1.85 | Adds the `schemars` dependency. Nothing in the crate derives `JsonSchema` yet, so today this only affects your dependency graph |
+| `examples` | 1.85 | Enables nothing in the library. It exists so that the eight example binaries — each a full link of gpui — are built only when asked for: `cargo run --example showcase --features examples`. See `examples/README.md` |
 
 ### Minimum Rust version
 

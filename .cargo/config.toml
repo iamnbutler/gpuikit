@@ -1,0 +1,22 @@
+# Keep debug info out of the linked image on Linux.
+#
+# The dev profile's `split-debuginfo` defaults to `off` on Linux, which means
+# every byte of DWARF is copied through `ld` into the linked binary. `unpacked`
+# leaves it in the object/`.dwo` files beside the binary instead, so the linker
+# never holds it. That is the other half of the fix for the OOM-killed links
+# described in `examples/README.md`; the first half is `[profile.dev] debug` in
+# `Cargo.toml`. macOS already defaults to `unpacked` for dev, and this is a
+# hard error on `windows-msvc`, so Linux is both the only platform that gains
+# and the reason this is here rather than in `[profile.dev]` — cargo profiles
+# cannot be `cfg`-gated, and a `split-debuginfo` key there would break the
+# Windows build outright.
+#
+# Precedence: cargo takes `rustflags` from *one* source. An environment that
+# exports `RUSTFLAGS` replaces this line rather than adding to it, so a
+# `RUSTFLAGS="-Cdebuginfo=2"` debugging session gets full DWARF back and also
+# loses the split — which is the intended trade for that one build.
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-Csplit-debuginfo=unpacked"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-Csplit-debuginfo=unpacked"]

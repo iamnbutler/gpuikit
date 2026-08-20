@@ -350,6 +350,43 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **`ld` is no longer OOM-killed while linking the examples.** Eight example
+  binaries live in `examples/`, and each is a full link of gpui.
+  `cargo build --all-targets` and a bare `cargo test` link all eight; cargo
+  sizes `-j` from the CPU count with no knowledge of a memory limit, so several
+  `ld` processes run at once — each holding that binary's debug info, which
+  `[profile.dev] debug = 2` made maximal — and the kernel kills one. The
+  message, `ld terminated with signal 9 [Killed]`, names no crate and no
+  symbol, so it reads as a compile error that does not exist. Three changes,
+  all build configuration and no library code: `[profile.dev]` now sets
+  `debug = "line-tables-only"`; a new `.cargo/config.toml` passes
+  `-Csplit-debuginfo=unpacked` on Linux targets, where the dev default of `off`
+  copies every byte of DWARF through the linker into the image; and every
+  `[[example]]` now carries `required-features = ["examples"]` against a
+  feature that enables nothing, so a build that did not ask for a demo does not
+  link one. `examples/context_menu.rs` is declared in `Cargo.toml` for the
+  first time, because an autodiscovered target cannot carry
+  `required-features`.
+
+  **The cost.** Debug builds keep file and line in backtraces but lose the type
+  and variable detail a debugger wants; a session that needs it asks on that
+  build alone with `RUSTFLAGS="-Cdebuginfo=2"`. Running an example now needs
+  `--features examples`, and `cargo check --all-targets` no longer type-checks
+  the examples without it — `examples/README.md` and the commands in it are
+  updated. `src/build_profile_guard.rs` holds all three settings, plus the
+  absence of a new autodiscovered example, under `cargo test --lib`.
+
+  **What this does not cover.** `cargo test --all-features` still links all
+  eight: cargo has no way to hold a feature back from `--all-features`, so the
+  gate does not apply to the command that produced the original kill on
+  `markdown_streaming`. That case rests entirely on the debug-info reductions,
+  whose magnitude here is unmeasured. If it still dies, the next levers, in
+  order: `[profile.dev.package."*"] debug = 0` — dependency debug info is the
+  bulk, and the guard test rejects only a *raised* override, so this stays
+  open — and then moving the examples into a package of their own, which is the
+  only arrangement in which no invocation of this library's own cargo commands
+  builds them at all, `--all-features` included.
+
 - **`Slider`'s value maths reads the thumb radius at the rem size the thumb is
   drawn at.** `value_from_position` inset the usable track by a hardcoded
   `px(6.)` while `render` drew the thumb at `rems(0.75)` — the same length only

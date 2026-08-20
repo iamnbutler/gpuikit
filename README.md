@@ -48,6 +48,28 @@ the background parser are unconditional, so streaming still works — a
 half-written `**bold` just flashes as literal asterisks until its closer
 arrives.
 
+## Building this repository
+
+Linking any example is a whole-program link of gpui, and it costs the same for
+the 5 KB example as for the 152 KB one. `[profile.dev.package."*"] debug = 0`
+in `Cargo.toml` is what keeps that link inside the memory a small machine has;
+`cargo build --profile dev-debuginfo` is the hatch when you want the full debug
+info back, rather than editing `[profile.dev]` and having to remember to put it
+back. `scripts/check.sh` runs the documented checks and, unlike a hand-rolled
+`cargo build | tee`, reports cargo's status rather than the pipe's.
+
+If a link is killed with `ld terminated with signal 9 [Killed]`, that is the
+OOM killer and not a compile error — cargo runs one linker per job and picks
+`-j` from the CPU count. Retry with `CARGO_BUILD_JOBS=1`.
+
+Those profile settings apply when **gpuikit is the crate being built**. Cargo
+takes profiles from the workspace root, so an app that depends on gpuikit gets
+its own; if the same link is killed in your project, set
+`[profile.dev.package."*"] debug = 0` in *your* manifest.
+
+See [examples/README.md](examples/README.md#building) for the measurements and
+the rest.
+
 ## Control sizes
 
 Controls that can share a row share one size scale. `ControlSize` names a rung

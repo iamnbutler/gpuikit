@@ -15,6 +15,13 @@ categories = ["gui", "graphics"]
 # 1.85. The declared 1.75 was never true. Dependencies declare their own, higher
 # numbers and cargo does not hold them back — see README's "Minimum Rust version".
 rust-version = "1.85"
+# Examples are listed explicitly below rather than auto-discovered. Each one is
+# a whole-program link of gpui and costs about as much memory as every other
+# one (see examples/README.md), so adding an example is a decision worth making
+# in the manifest. NOTE: with this off, an examples/<name>.rs or
+# examples/<name>/main.rs with no [[example]] block below is built by nothing at
+# all and fails silently -- src/build_memory_guard.rs asserts against that.
+autoexamples = false
 
 [lib]
 name = "gpuikit"
@@ -47,6 +54,10 @@ path = "examples/dialog_example.rs"
 [[example]]
 name = "popover_demo"
 path = "examples/popover_demo.rs"
+
+[[example]]
+name = "context_menu"
+path = "examples/context_menu.rs"
 
 [dependencies]
 # GPUI framework (from gpui-unofficial on crates.io)
@@ -111,6 +122,10 @@ opt-level = 3
 # Speed up debug builds
 [profile.dev]
 opt-level = 0
+# Full debug info for this crate's own code, deliberately. Cutting it too was
+# measured and rejected: it saved a further 158 MB at the link (960 -> 802 MB
+# peak on showcase) and cost locals in the frames a gpuikit contributor is
+# actually standing in. The dependency tier below is where the bytes were.
 debug = 2
 
 # Dependencies — gpui above all — are compiled once and then only linked, so
@@ -120,6 +135,32 @@ debug = 2
 # here compiles exactly as fast as before.
 [profile.dev.package."*"]
 opt-level = 2
+# ...and the same sentence applies to their debug info. It was nearly all of
+# what `ld` held: a link peaked at 2.7 GB for *every* example, cargo runs one
+# linker per job and picks -j from the CPU count, and on a small box the kernel
+# killed three of them. Nothing here is ever debugged inside gpui, so these
+# bytes were a cost with no matching benefit. Need them back for a session?
+# `cargo build --profile dev-debuginfo` below, rather than editing this table.
+debug = 0
+
+# The hatch. `--profile dev-debuginfo` is the full debug info back, without
+# anyone having to edit `[profile.dev]` and remember to put it back --
+# forgetting to put it back is the bug this profile exists to prevent.
+#
+#     cargo run --profile dev-debuginfo --example showcase
+#
+# Its package table restates both keys rather than inheriting them: cargo does
+# not document whether `inherits` reaches into a package-override table or
+# whether a child's table replaces the parent's, and naming both makes this
+# correct either way. `cargo build --profile dev-debuginfo --lib -v` confirms
+# dependencies get `-C opt-level=2 -C debuginfo=2`.
+[profile.dev-debuginfo]
+inherits = "dev"
+debug = 2
+
+[profile.dev-debuginfo.package."*"]
+opt-level = 2
+debug = 2
 
 # Package metadata for crates.io
 [package.metadata.docs.rs]

@@ -58,18 +58,107 @@ cargo run --example showcase --features editor   # + highlighted fences, live ed
 cargo run --example markdown_streaming --features stitch
 ```
 
-Checks, in the order they are quickest to run:
+Checks, in the order they are quickest to run — `scripts/check.sh` runs all of
+them, and `scripts/check.sh --link` additionally links every example:
 
 ```sh
 cargo fmt --check
-cargo test --lib                        # includes the two coverage guards
+cargo test --lib                        # includes the coverage and build guards
 cargo check --all-targets
 cargo check --all-targets --features editor   # about 3 minutes cold on 4 cores
 ```
 
-Note that an unqualified `cargo test` also *links* every example, and linking
-the showcase has been OOM-killed in a constrained environment. `cargo test
---lib` plus `cargo check --all-targets` covers the same ground without the
-link. `cargo check` fingerprints on file content rather than mtime, so
-`touch`ing a file does not force a re-check — a 0.2s "Finished" means nothing
-was recompiled.
+### Linking an example is a whole-program link of gpui
+
+Every example binary links the entire gpui stack, and that link costs the same
+no matter which example it is, because the bytes are gpui's and not the
+example's. Peak `ld` RSS, measured on this repository:
+
+| Example | Source | Peak `ld` before | Peak `ld` now |
+| --- | --- | --- | --- |
+| `popover_demo.rs` | 5 KB | 2687 MB | **818 MB** |
+| `showcase.rs` | 152 KB | 2730 MB | **960 MB** |
+
+A 30x spread in source size, a few percent spread in link memory. Across all
+eight examples under `--features editor` the peak ranges only from 892 MB to
+991 MB. There is no "heavy example" to fix; picking examples to trim is picking
+at random.
+
+What made the difference is `[profile.dev.package."*"] debug = 0` in
+`Cargo.toml`: debug info for dependencies was nearly all of what the linker
+held, and nothing in this repository is ever debugged inside gpui. Backtraces
+through gpui keep their function names; they lose file and line, which at the
+`opt-level = 2` those dependencies already build at were approximate anyway.
+gpuikit's own code keeps `debug = 2`: cutting that too was measured, and it
+bought a further 158 MB on `showcase` (960 -> 802 MB) in exchange for the
+locals in the frames a gpuikit contributor is actually standing in. Not worth
+it once the dependency tier is gone, which is why `dev-debuginfo` should be
+rare rather than routine.
+
+**When you need the full thing back, do not edit `[profile.dev]`** — forgetting
+to put it back is the bug. Use the profile that already exists:
+
+```sh
+cargo run --profile dev-debuginfo --example showcase
+```
+
+**These settings apply when gpuikit is the crate being built, and not when it
+is a dependency.** Cargo takes profiles from the workspace root, so an
+application depending on gpuikit gets its own profile, and the same link is the
+same size there. The equivalent in *that* manifest is:
+
+```toml
+[profile.dev.package."*"]
+debug = 0
+```
+
+### `ld terminated with signal 9 [Killed]`
+
+That is the kernel's OOM killer, not a compile error. It names no crate and no
+symbol, which is exactly why it reads as one. cargo runs one linker per job and
+picks `-j` from the CPU count with no knowledge of memory, so N cores want
+roughly N x 1 GB free at the link step — and `cargo build --all-targets`
+on a 4-core / 5.9 GiB / no-swap box used to have three linkers killed and exit
+101. Nothing in your code is wrong. The way past it is fewer jobs:
+
+```sh
+CARGO_BUILD_JOBS=1 cargo build --all-targets
+CARGO_BUILD_JOBS=1 scripts/check.sh
+```
+
+Nothing in the repository caps `-j`, because a `.cargo/config.toml` `[build]
+jobs` would serialise every build for every contributor to protect a case that
+is now well inside budget.
+
+### A piped build can report success when it failed
+
+```sh
+cargo build --all-targets | tee build.log   # exits 0 even when the build died
+```
+
+A pipeline's status is its *last* command's, so `tee` reports for cargo. This
+is how a killed link was once read as a green run. `scripts/check.sh` sets
+`set -euo pipefail` and takes each cargo status from `${PIPESTATUS[0]}`; if you
+pipe a build by hand, do the same.
+
+### Two costs that look smaller than they are
+
+- **`--all-targets` compiles gpui a second time.** It pulls the
+  dev-dependencies, and gpui is one of them with `test-support` on — a
+  different feature set, so the whole gpui stack is rebuilt. That is most of
+  the difference between `cargo check --all-targets` and `cargo check`, and
+  it is worth knowing before blaming the link for the wall clock.
+- **An unqualified `cargo test` links every example.** `cargo test --lib` plus
+  `cargo check --all-targets` covers the same ground without the links, which
+  is why the guard tests live in the lib rather than in `tests/`. `cargo check`
+  fingerprints on file content rather than mtime, so `touch`ing a file does not
+  force a re-check — a 0.2s "Finished" means nothing was recompiled.
+
+### Adding an example
+
+`[package] autoexamples = false`, so the `[[example]]` blocks in `Cargo.toml`
+are the whole list: a new file under `examples/` is built by nothing until it
+has a block. That is deliberate — each binary is another full link — and
+`src/build_memory_guard.rs` fails the test suite if a discoverable example
+(`examples/<name>.rs` or `examples/<name>/main.rs`) has no block, so the
+silence never lasts past `cargo test --lib`.

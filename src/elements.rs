@@ -9,6 +9,8 @@ pub mod button_group;
 pub mod card;
 pub mod checkbox;
 pub mod collapsible;
+pub mod combobox;
+pub mod command;
 pub mod context_menu;
 pub mod dialog;
 pub mod empty;
@@ -18,6 +20,11 @@ pub mod input;
 pub mod kbd;
 pub mod label;
 pub mod list;
+/// The listbox popup `select` and `combobox` are both built out of. The one
+/// `pub(crate)` in this list, and deliberately so: it is not a component, it
+/// is the thing two components are made of. See `docs/menus-and-listboxes.md`
+/// §2 and the module docs.
+pub(crate) mod listbox;
 pub mod loading_indicator;
 pub mod popover;
 pub mod progress;

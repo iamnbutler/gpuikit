@@ -13,10 +13,13 @@
 //! one gap below it — and was deleted in favour of this one;
 //! `dropdown(id, options, value)` is now `select(id, options).selected(value)`.
 //!
-//! The popup, `Listbox`, is private to this module on purpose. A chooser that
-//! wants a listbox is a chooser this file should grow, not a second element
-//! built on this one's internals — which is precisely the state that made
-//! `Select` and `Dropdown` indistinguishable in the first place.
+//! The popup, `Listbox`, now lives in `src/elements/listbox.rs` — a
+//! `pub(crate)` module named by both of its callers, which is what
+//! `docs/menus-and-listboxes.md` §2 said to do *when a second caller arrived*.
+//! `Combobox` is that caller. It is still not `pub`: a chooser that wants a
+//! listbox is a chooser the crate should grow, not an element an app builds on
+//! this one's internals — which is precisely the state that made `Select` and
+//! `Dropdown` indistinguishable in the first place.
 //!
 //! # Example
 //!
@@ -122,495 +125,61 @@
 //! the current highlight and wraps, so pressing the same letter again walks the
 //! options that share it.
 
-use crate::a11y::{A11y, Announce, FocusNext, FocusPrevious};
-use crate::element_id::for_entity;
+use crate::a11y::{A11y, Announce};
+use crate::elements::listbox::{Listbox, ListboxFocus, LISTBOX_GAP};
+#[cfg(test)]
+use crate::elements::listbox::option_a11y;
 use crate::theme::{focus_ring, ActiveTheme, ControlSize, Themeable};
 use crate::traits::accessible::Accessible;
 use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use gpui::{
-    actions, anchored, deferred, div, point, prelude::*, px, App, Context, DismissEvent, ElementId,
-    Entity, EventEmitter, FocusHandle, Focusable, IntoElement, KeyBinding, KeyDownEvent,
-    ParentElement, Rems, Render, Role, ScrollHandle, SharedString, Styled, Window,
+    anchored, deferred, div, point, prelude::*, px, App, Context, DismissEvent, ElementId, Entity,
+    EventEmitter, IntoElement, ParentElement, Rems, Render, Role, SharedString, Styled, Window,
 };
 
 use crate::icons::Icons;
 use std::rc::Rc;
 
-actions!(
-    select,
-    [
-        /// Move the listbox highlight to the next option, wrapping at the end.
-        HighlightNext,
-        /// Move the listbox highlight to the previous option, wrapping at the
-        /// start.
-        HighlightPrevious,
-        /// Highlight the listbox's first option.
-        HighlightFirst,
-        /// Highlight the listbox's last option.
-        HighlightLast,
-        /// Choose the highlighted option and close the listbox.
-        ChooseHighlighted,
-        /// Close the listbox without choosing anything.
-        DismissListbox,
-    ]
-);
-
-/// The key context the listbox popup declares, and the one
-/// [`bind_select_keys`] scopes its bindings to.
+/// The listbox popup's actions, re-exported.
 ///
+/// They were declared in this module before `Listbox` was lifted into
+/// [`crate::elements::listbox`] for its second caller, and they are public
+/// API: an app assembling its own keymap names them. Their gpui action names
+/// are unchanged (`select::HighlightNext`, and so on), because a keymap file
+/// written against this crate refers to those strings and a lift is not a
+/// reason to break one.
+pub use crate::elements::listbox::{
+    ChooseHighlighted, DismissListbox, HighlightFirst, HighlightLast, HighlightNext,
+    HighlightPrevious,
+};
+
+/// The key context the listbox popup declares.
+///
+/// Re-exported from [`crate::elements::listbox`], where the popup now lives.
 /// Public because the bindings are: an app assembling its own keymap needs both
 /// halves. It is deeper than `Dialog`, which is what lets a select inside a
 /// dialog keep Escape for itself.
-pub const LISTBOX_CONTEXT: &str = "Listbox";
+pub const LISTBOX_CONTEXT: &str = crate::elements::listbox::LISTBOX_CONTEXT;
 
 /// Bind the listbox popup's keys — arrows, Home / End, Enter, Space, Escape.
 ///
-/// [`crate::init`] calls this, so an app that calls `gpuikit::init` gets the
-/// keyboard model for free and nothing else is required. An app that assembles
-/// its own keymap has to call it; without it the popup opens, takes focus and
-/// answers nothing, which is the state this module's `# The keyboard` section
-/// exists to have fixed.
-///
-/// Every binding is scoped to [`LISTBOX_CONTEXT`], so none of them is reachable
-/// while the popup is closed. Tab is deliberately absent — see the module docs.
-///
-/// Space chooses as well as Enter, which is symmetric with Space opening the
-/// popup from the trigger. The cost is that a type-ahead cannot contain a
-/// space, which is a fair trade for one character of look-ahead.
+/// A one-line delegate to [`crate::elements::listbox::bind_listbox_keys`],
+/// which is where the bindings live now that the popup has two callers. Kept
+/// under this name because it is public API and [`crate::init`] calls it; the
+/// bindings it registers are the popup's, not this element's, which is what
+/// the new name says and this one no longer does.
 pub fn bind_select_keys(cx: &mut App) {
-    cx.bind_keys([
-        KeyBinding::new("down", HighlightNext, Some(LISTBOX_CONTEXT)),
-        KeyBinding::new("up", HighlightPrevious, Some(LISTBOX_CONTEXT)),
-        KeyBinding::new("home", HighlightFirst, Some(LISTBOX_CONTEXT)),
-        KeyBinding::new("end", HighlightLast, Some(LISTBOX_CONTEXT)),
-        KeyBinding::new("enter", ChooseHighlighted, Some(LISTBOX_CONTEXT)),
-        KeyBinding::new("space", ChooseHighlighted, Some(LISTBOX_CONTEXT)),
-        KeyBinding::new("escape", DismissListbox, Some(LISTBOX_CONTEXT)),
-    ]);
+    crate::elements::listbox::bind_listbox_keys(cx);
 }
 
 /// The width a trigger will not shrink below, so a short label still gives the
 /// chevron somewhere to sit.
 const MIN_TRIGGER_WIDTH: Rems = Rems(6.25);
 
-/// The gap between the trigger and the listbox that drops out of it.
-///
-/// Applied through `anchored().offset(…)` and never as a margin on the
-/// anchored child: `Anchored::prepaint` fits the *union of its children's
-/// layout bounds* to the window, and a margin sits outside that union, so a
-/// popup at the bottom of the window would be clamped correctly and then
-/// pushed straight back out by its own margin. See `docs/overlays.md`.
-const LISTBOX_GAP: Rems = Rems(0.25);
-
 /// Event emitted when the select value changes.
 pub struct SelectChanged;
 
-/// The popup that lists the options.
-///
-/// Private on purpose — see this module's docs and
-/// `docs/menus-and-listboxes.md`. It takes plain labels rather than a row type
-/// of its own: a listbox row is a label and whether it is the chosen one, and
-/// anything richer belongs to the element that grew a need for it.
-struct Listbox {
-    /// The accessible name of the control this dropped out of. A popup is
-    /// named after its trigger, not after itself.
-    label: SharedString,
-    options: Vec<SharedString>,
-    /// The row that carries the selection, if any. `None` is a real state —
-    /// a `Select` with no value marks nothing — rather than an index no option
-    /// happens to have.
-    selected_index: Option<usize>,
-    /// The row the keyboard has got to, which is **not** the chosen one.
-    ///
-    /// It starts on the choice (or the first row, when there is no choice) and
-    /// separates from it the moment an arrow key is pressed. `None` only for an
-    /// empty list — a highlight with no row to be on.
-    highlighted: Option<usize>,
-    /// The rung of the trigger that opened this listbox, so a popup's rows are
-    /// the same size as the control they dropped out of.
-    size: ControlSize,
-    focus_handle: FocusHandle,
-    /// So a highlight the keyboard moved off-screen comes back into view. The
-    /// popup scrolls; the highlight is the only thing that moves without a
-    /// pointer to move it.
-    scroll_handle: ScrollHandle,
-    /// Whatever held focus when this popup opened — the trigger, in every path
-    /// that exists today. Read at open time rather than passed in, because the
-    /// trigger's handle is minted by `A11y::focusable` inside gpui's element
-    /// state and `SelectState` never sees it.
-    restore_focus: Option<FocusHandle>,
-    on_select: Option<Rc<dyn Fn(usize, &mut Window, &mut App)>>,
-}
-
-impl EventEmitter<DismissEvent> for Listbox {}
-
-impl Focusable for Listbox {
-    fn focus_handle(&self, _cx: &App) -> FocusHandle {
-        self.focus_handle.clone()
-    }
-}
-
-impl Listbox {
-    #[allow(clippy::too_many_arguments)]
-    fn build(
-        label: SharedString,
-        options: Vec<SharedString>,
-        selected_index: Option<usize>,
-        size: ControlSize,
-        on_select: impl Fn(usize, &mut Window, &mut App) + 'static,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> Entity<Self> {
-        cx.new(|cx| {
-            // Read *before* the popup takes focus, or the handle read back is
-            // the popup's own.
-            let restore_focus = window.focused(cx);
-            let focus_handle = cx.focus_handle();
-            window.focus(&focus_handle, cx);
-            // The keyboard starts where the value is. With no value it starts
-            // at the top, which is what makes the very first Down key press
-            // land on the second row rather than nowhere.
-            let highlighted = selected_index.or(if options.is_empty() { None } else { Some(0) });
-            Self {
-                label,
-                options,
-                selected_index,
-                highlighted,
-                size,
-                focus_handle,
-                scroll_handle: ScrollHandle::new(),
-                restore_focus,
-                on_select: Some(Rc::new(on_select)),
-            }
-        })
-    }
-
-    fn select(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(on_select) = &self.on_select {
-            let on_select = on_select.clone();
-            on_select(index, window, cx);
-        }
-        // Choosing a row is something the user did *to this control*, so focus
-        // belongs back on the control — whether the row was clicked or the
-        // keyboard committed it.
-        self.dismiss(true, window, cx);
-    }
-
-    /// Close the popup.
-    ///
-    /// `restore_focus` is what separates the keyboard's closes from a click
-    /// outside. A keyboard close has to hand focus back, or the user is left
-    /// with focus on an element that no longer exists. A click outside must
-    /// **not**: that click is about to focus whatever it landed on, and pulling
-    /// focus to the trigger first would fight it.
-    fn dismiss(&mut self, restore_focus: bool, window: &mut Window, cx: &mut Context<Self>) {
-        if restore_focus {
-            if let Some(handle) = self.restore_focus.clone() {
-                window.focus(&handle, cx);
-            }
-        }
-        cx.emit(DismissEvent);
-    }
-
-    /// The single place the highlight moves, so `scroll_to_item` cannot be
-    /// forgotten on one path and remembered on the others.
-    fn highlight(&mut self, index: usize, cx: &mut Context<Self>) {
-        self.highlighted = Some(index);
-        self.scroll_handle.scroll_to_item(index);
-        cx.notify();
-    }
-
-    /// Move the highlight by `delta` rows, wrapping at both ends.
-    ///
-    /// Wrapping is `rem_euclid` rather than a pair of bounds checks because the
-    /// two ends are the same case, and a signed remainder would send `-1` off
-    /// the front of the list.
-    fn move_highlight(&mut self, delta: isize, cx: &mut Context<Self>) {
-        let count = self.options.len();
-        if count == 0 {
-            return;
-        }
-        let next = match self.highlighted {
-            Some(current) => (current as isize + delta).rem_euclid(count as isize) as usize,
-            // Only reachable if a list went from empty to full while open,
-            // which it cannot today. Entering from the near end is still the
-            // answer that reads right.
-            None if delta < 0 => count - 1,
-            None => 0,
-        };
-        self.highlight(next, cx);
-    }
-
-    /// Home and End: `last` picks which end.
-    fn highlight_edge(&mut self, last: bool, cx: &mut Context<Self>) {
-        let count = self.options.len();
-        if count == 0 {
-            return;
-        }
-        self.highlight(if last { count - 1 } else { 0 }, cx);
-    }
-
-    /// Commit the highlight to the value.
-    ///
-    /// Nothing highlighted means an empty list, and closing on a key that chose
-    /// nothing would be a worse answer than doing nothing at all.
-    fn choose_highlighted(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = self.highlighted {
-            self.select(index, window, cx);
-        }
-    }
-
-    /// Highlight the next option whose label starts with `character`.
-    ///
-    /// The search starts *after* the current highlight and wraps, so pressing
-    /// the same letter again walks the options that share it. One character, no
-    /// buffer, no timer — a buffer would need a timeout to expire, and a
-    /// timeout is a behaviour to get wrong for an affordance this small.
-    fn type_ahead(&mut self, character: char, cx: &mut Context<Self>) {
-        let count = self.options.len();
-        if count == 0 {
-            return;
-        }
-        let start = self.highlighted.map_or(0, |current| current + 1);
-
-        for offset in 0..count {
-            let index = (start + offset) % count;
-            let starts_with = self.options[index]
-                .chars()
-                .next()
-                .is_some_and(|first| first.to_lowercase().eq(character.to_lowercase()));
-            if starts_with {
-                self.highlight(index, cx);
-                return;
-            }
-        }
-    }
-
-    /// What row `index` announces.
-    ///
-    /// A method rather than a call inlined into `render` so that a test can
-    /// read the same value the element reports. It has to: the active
-    /// descendant is applied at paint time behind gpui's `a11y.is_active()`,
-    /// which no test here can switch on, so the declaration is the only thing
-    /// there is to hold. See [`A11y::active_descendant`].
-    fn row_a11y(&self, index: usize) -> A11y {
-        option_a11y(
-            self.options[index].clone(),
-            self.selected_index == Some(index),
-            self.highlighted == Some(index),
-            index,
-            self.options.len(),
-        )
-    }
-
-    /// The character a key press typed, if it typed one.
-    ///
-    /// `Keystroke::with_simulated_ime` fills a `key_char` in for `space`, `tab`
-    /// and `enter` (`" "`, `"\t"`, `"\n"`), so trusting `key_char` alone would
-    /// make Tab a type-ahead for options starting with a tab. Whitespace,
-    /// control characters and anything held with a modifier are rejected here
-    /// rather than searched for.
-    fn typed_character(event: &KeyDownEvent) -> Option<char> {
-        let modifiers = event.keystroke.modifiers;
-        if modifiers.control || modifiers.alt || modifiers.platform || modifiers.function {
-            return None;
-        }
-
-        let mut characters = event.keystroke.key_char.as_ref()?.chars();
-        let character = characters.next()?;
-        if characters.next().is_some() || character.is_whitespace() || character.is_control() {
-            return None;
-        }
-        Some(character)
-    }
-}
-
-/// The popup is named after the control it dropped out of, which is the only
-/// name it has: its own contents are the options, not a label.
-///
-/// [`Role::ListBox`] is deliberately *not* in
-/// [`crate::a11y::role_requires_a_name`] — naming it here is this element's
-/// decision, not one binding `list.rs` and every future chooser.
-impl Accessible for Listbox {
-    fn a11y(&self) -> A11y {
-        A11y::new(Role::ListBox).name(self.label.clone())
-    }
-}
-
-/// What one row of the popup announces.
-///
-/// A free function rather than an [`Accessible`] impl because a row is a `div`
-/// built inside a closure, not a component — and because this way a test can
-/// read it without laying the popup out.
-///
-/// `is_selected` and `is_highlighted` are two different things and are both
-/// here: the first is the control's value, the second is where the keyboard
-/// has got to. Exactly one row is ever the active descendant, which is what
-/// keeps gpui's two-claims-in-one-frame `debug_assert!` unreachable.
-fn option_a11y(
-    label: SharedString,
-    is_selected: bool,
-    is_highlighted: bool,
-    index: usize,
-    count: usize,
-) -> A11y {
-    A11y::new(Role::ListBoxOption)
-        .name(label)
-        .selected(is_selected)
-        .active_descendant(is_highlighted)
-        // Both, together: a position with no size announces "3" out of nowhere.
-        .position_in_set(index + 1)
-        .size_of_set(count)
-}
-
-impl Render for Listbox {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let focus_handle = self.focus_handle.clone();
-        let theme = cx.theme();
-        let metrics = theme.control(self.size);
-
-        div()
-            // Unique only because a `Listbox` is always rendered as an
-            // `Entity<_>`, which puts an `ElementId::View` above it.
-            .id(for_entity("select-listbox", cx.entity_id()))
-            .announce(self.a11y())
-            // Focus stays declared here rather than through `A11y`, and this is
-            // a standing reason rather than a stopgap: `A11y::focus_handle`
-            // applies `.tab_stop(true)`, and a transient overlay that already
-            // holds focus must not also be in the tab order. `A11y` offers only
-            // "tab stop" or "no focus"; a third answer — takes focus, is not a
-            // tab stop — would let this go through the convention like
-            // everything else.
-            .track_focus(&focus_handle)
-            .key_context(LISTBOX_CONTEXT)
-            .on_action(cx.listener(|this, _: &HighlightNext, _window, cx| {
-                this.move_highlight(1, cx);
-            }))
-            .on_action(cx.listener(|this, _: &HighlightPrevious, _window, cx| {
-                this.move_highlight(-1, cx);
-            }))
-            .on_action(cx.listener(|this, _: &HighlightFirst, _window, cx| {
-                this.highlight_edge(false, cx);
-            }))
-            .on_action(cx.listener(|this, _: &HighlightLast, _window, cx| {
-                this.highlight_edge(true, cx);
-            }))
-            .on_action(cx.listener(|this, _: &ChooseHighlighted, window, cx| {
-                this.choose_highlighted(window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &DismissListbox, window, cx| {
-                this.dismiss(true, window, cx);
-            }))
-            // Tab is not a binding of ours — `a11y`'s is context-less, and a
-            // context-less binding outranks every scoped one. It is an action
-            // listener, and a bubble-phase listener on the focused element runs
-            // before any ancestor's `moves_focus_on_tab`. Focus goes back to
-            // the trigger first so that "the next tab stop" is the one after
-            // the control, not after a popup that has just stopped existing.
-            .on_action(cx.listener(|this, _: &FocusNext, window, cx| {
-                this.dismiss(true, window, cx);
-                window.focus_next(cx);
-            }))
-            .on_action(cx.listener(|this, _: &FocusPrevious, window, cx| {
-                this.dismiss(true, window, cx);
-                window.focus_prev(cx);
-            }))
-            // The only key that is not an action: a binding per letter is not a
-            // keymap. gpui runs key-down listeners only when no binding
-            // matched, which is what keeps this out of the other keys' way.
-            .on_key_down(cx.listener(|this, event: &KeyDownEvent, _window, cx| {
-                if let Some(character) = Self::typed_character(event) {
-                    this.type_ahead(character, cx);
-                }
-            }))
-            .on_mouse_down_out(cx.listener(|this, _, window, cx| {
-                this.dismiss(false, window, cx);
-            }))
-            .min_w(px(120.))
-            .max_h(px(480.))
-            .overflow_y_scroll()
-            .track_scroll(&self.scroll_handle)
-            .on_scroll_wheel(|_, _, cx| {
-                cx.stop_propagation();
-            })
-            .bg(theme.surface())
-            .border_1()
-            .border_color(theme.border())
-            .rounded(metrics.radius)
-            .shadow_lg()
-            .py(metrics.padding_y())
-            .flex()
-            .flex_col()
-            .children(self.options.iter().enumerate().map(|(index, label)| {
-                let is_selected = self.selected_index == Some(index);
-                let is_highlighted = self.highlighted == Some(index);
-                let label = label.clone();
-                let theme = cx.theme();
-                let a11y = self.row_a11y(index);
-
-                // The chosen row is a check and the highlighted row is a fill,
-                // because they are two states and one accent fill cannot say
-                // both. The check sits in a slot every row reserves — the shape
-                // `context_menu.rs` already uses — so labels stay aligned
-                // whether or not their row is the chosen one.
-                let (fg, check_color) = if is_highlighted {
-                    (theme.bg(), theme.bg())
-                } else {
-                    (theme.fg(), theme.accent())
-                };
-
-                let row =
-                    div()
-                        .id(ElementId::NamedInteger(
-                            "select-option".into(),
-                            index as u64,
-                        ))
-                        .announce(a11y)
-                        .flex()
-                        .items_center()
-                        .gap(metrics.gap)
-                        .h(metrics.height)
-                        .px(metrics.padding_x * 1.5)
-                        .text_size(metrics.text_size)
-                        .line_height(metrics.line_height)
-                        .cursor_pointer()
-                        .text_color(fg)
-                        .when(is_highlighted, |this| this.bg(theme.accent()))
-                        // Hovering moves the highlight rather than drawing a second
-                        // one: a pointer and a keyboard fighting over which row is
-                        // "current" is exactly the two-affordances-one-state
-                        // problem this rendering exists to end.
-                        .on_hover(cx.listener(move |this, hovered: &bool, _window, cx| {
-                            if *hovered {
-                                this.highlight(index, cx);
-                            }
-                        }))
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.select(index, window, cx);
-                        }))
-                        .child(div().w(metrics.text_size).flex_shrink_0().when(
-                            is_selected,
-                            |this| {
-                                this.child(
-                                    Icons::check()
-                                        .size(metrics.text_size)
-                                        .text_color(check_color),
-                                )
-                            },
-                        ))
-                        .child(label);
-
-                // Lets a test press a key and then read which row the highlight
-                // landed on from where it was actually drawn. A no-op outside a
-                // test build.
-                #[cfg(test)]
-                let row = row.debug_selector(move || format!("gpuikit-select-option-{index}"));
-
-                row
-            }))
-    }
-}
 
 /// Builder for creating a select component.
 ///
@@ -848,6 +417,9 @@ impl<T: Clone + PartialEq + 'static> SelectState<T> {
             options,
             selected_index,
             self.size,
+            // A select's trigger is not a text field, so the popup takes real
+            // focus and hands it back on close. See `ListboxFocus`.
+            ListboxFocus::Popup,
             move |index, window, cx| {
                 if let Some(value) = values.get(index).cloned() {
                     if let Some(on_change) = &on_change {
@@ -1606,14 +1178,14 @@ mod tests {
     /// announce "2" out of nowhere; `size_of_set` is what makes it "2 of 3".
     #[test]
     fn a_row_announces_its_place_in_the_set() {
-        let node = node_for(option_a11y("Option 1".into(), true, false, 1, 3));
+        let node = node_for(option_a11y("Option 1".into(), true, false, true, 1, 3));
 
         assert_eq!(node.label(), Some("Option 1"));
         assert_eq!(node.is_selected(), Some(true));
         assert_eq!(node.position_in_set(), Some(2), "counted from 1");
         assert_eq!(node.size_of_set(), Some(3));
 
-        let unchosen = node_for(option_a11y("Option 2".into(), false, false, 2, 3));
+        let unchosen = node_for(option_a11y("Option 2".into(), false, false, true, 2, 3));
         assert_eq!(unchosen.is_selected(), Some(false));
         assert_eq!(unchosen.position_in_set(), Some(3));
     }

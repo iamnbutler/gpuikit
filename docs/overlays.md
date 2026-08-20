@@ -100,7 +100,7 @@ grep. Every `with_priority` in `src/elements/` must be a rung named here, and
 | --- | --- |
 | 1 | Popups anchored to a trigger — select, popover, context menu |
 | 2 | Sidebar's drawer and its scrim — above a popup, because a drawer covers the page a popup was opened on |
-| 10 | Dialog, and its scrim |
+| 10 | Dialog and the command palette, and their scrims — a palette is a modal over a scrim and belongs at a dialog's height |
 | 15 | Toast — above a dialog, because a toast reports the result of what the dialog did |
 
 ## The overlays this crate places
@@ -111,12 +111,14 @@ grep. Every `with_priority` in `src/elements/` must be a rung named here, and
 | --- | --- |
 | `dialog` | A centred modal over a full-window scrim. Anchored to nothing — it is `anchored()`-free by design |
 | `select` | A listbox of values hanging one `LISTBOX_GAP` below its trigger |
+| `combobox` | The same listbox, hanging one `LISTBOX_GAP` below a text field that filters it. Its popup deliberately does **not** match the field's width — see the closing section |
+| `command` | A command palette: a scrimmed panel a fixed distance down the window. Anchored to nothing, like `dialog` |
 | `popover` | A caller-built panel, offset from its trigger by a caller-supplied `Point<Pixels>` |
 | `context_menu` | A menu at the pointer, `snap_to_window_with_margin(8px)` |
 | `sidebar` | A drawer over the whole viewport, `position((0, 0))` + `snap_to_window()`, in place of the in-flow panel once the window is narrower than the breakpoint. Anchored to the *window*, not to a trigger, which is why it positions rather than flips |
 | `toast` | A stack in a window corner. Anchored to nothing |
 
-Two of these are not anchored to anything, and should not be made to look as
+Three of these are not anchored to anything, and should not be made to look as
 though they are; `sidebar` is anchored to the window rather than to a trigger. `src/elements/tooltip.rs` is deliberately absent: a `Tooltip`
 is a view handed to gpui's `.tooltip()`, and gpui positions it — which is why
 `portal.rs`'s one named use case, `PortalPosition::tooltip()`, was the one

@@ -36,8 +36,10 @@ file there restores the whole bug.
 exclude a feature from `--all-features`, so the gate does not apply to it — and that is
 the command that produced the kill on `markdown_streaming` in report #152, the first of
 the three runs this issue was filed from. The gate therefore does **not** cover the
-originally reported trigger; only the debug-info reduction does, and its magnitude here
-is **unmeasured** (see below). A reader who still sees an OOM under
+originally reported trigger; only the debug-info reduction does. That reduction is
+measured below — 2.67 GiB of peak `ld` RSS down to 0.94 GiB, so four concurrent links go
+from ~10.7 GiB to ~3.7 GiB — but whether that is enough on any particular box is a
+question about that box's memory, not one this branch can answer. A reader who still sees an OOM under
 `cargo test --all-features` after this lands should treat that as expected of this
 change, not as a regression.
 
@@ -53,7 +55,9 @@ The next moves, written down here and in the changelog so they are not rediscove
 
 ## What was verified, and what was not
 
-- All nine guard tests pass. Five mutations — `debug = 2`, a dropped
+- `cargo test --lib` on this branch: **501 passed, 0 failed**, including all nine of
+  `build_profile_guard`'s tests. (Nothing in this run ran a bare `cargo test` or an
+  `--all-targets` build, which are the commands that link the examples.) Five mutations — `debug = 2`, a dropped
   `required-features`, a new undeclared `examples/newthing.rs`, `split-debuginfo=off`,
   and a README command losing `--features examples` — each fail exactly one test and no
   others.
@@ -61,13 +65,24 @@ The next moves, written down here and in the changelog so they are not rediscove
   `required-features: ["examples"]`, the feature list is as intended, and cargo accepts
   the profile value (it validates these, so this is a real check).
 - `rustfmt --check` clean on both changed Rust files.
-- **Not verified: no before/after peak-RSS measurement of `ld`.** The reviewer asked for
-  peak RSS of `cargo build --example showcase --features examples -j 1` before and
-  after, if the budget allowed. It did not: this run started with no `target/`, no
-  `Cargo.lock` and an empty registry, and a cold build of the 748-crate tree — with
-  `[profile.dev.package."*"] opt-level = 2` on every one of them — does not fit in the
-  time available, let alone twice. The direction of all three changes is not in doubt;
-  the magnitude is unmeasured, and is reported as unmeasured rather than omitted.
+- **Measured, on a 4-core aarch64 Linux box with 8 GB of RAM** — the reviewer's
+  before/after, taken by sampling every process's RSS at 5 Hz while
+  `cargo build --example showcase --features examples` ran, and reporting the peak seen
+  for `ld`. "Before" is `debug = 2` with no `.cargo/config.toml`, built into a separate
+  target directory so the two trees do not share artifacts:
+
+  | | peak `ld` RSS | linked `showcase` |
+  | --- | --- | --- |
+  | before | 2.67 GiB (2,800,616 KB) | 764 MB |
+  | after | **0.94 GiB** (982,072 KB) | 146 MB |
+
+  2.85× less memory in the linker, and a linked image 5.2× smaller with the DWARF now
+  in `.dwo` files beside it. The number that matters is what cargo does with it: at the
+  default `-j` on 4 cores, four of these run at once — about **10.7 GiB before, 3.7 GiB
+  after**. That is the difference between not fitting in the ~5 GB the reported runs had
+  and fitting with room, and it is why the gate (which removes the links entirely from
+  the common commands) and the debug-info reduction (which is all `--all-features` has)
+  are both here.
 
 ## Review feedback
 
@@ -85,17 +100,22 @@ The next moves, written down here and in the changelog so they are not rediscove
    `examples/README.md` (the spec asked for it, and it is true for anyone building here),
    but nothing tests it, and I have not touched the agent-prompt half being fixed in the
    Tasks repo.
-4. **Take the RSS measurement if the budget allows.** It did not — stated plainly above
-   rather than omitted, with the reason.
+4. **Take the RSS measurement if the budget allows.** Taken: peak `ld` RSS for
+   `cargo build --example showcase --features examples` fell from 2.67 GiB to 0.94 GiB,
+   with the full method and the four-concurrent-links arithmetic in the section above.
+   One deviation from the reviewer's wording: the builds ran at `-j 4` rather than
+   `-j 1`. Only one example is linked either way, so the `ld` process being sampled is
+   alone in both runs and the number is the same; `-j 1` would only have serialised the
+   ~500 dependency compiles ahead of it, which did not fit.
 
 ## Directions from the orchestrator (no reviewer saw these)
 
 - *"Run `cargo test --lib` yourself; do not run bare `cargo test` or `--all-targets`."*
-  Followed — no command in this run linked an example. See the test-run note at the end
-  of the commit message for how far `cargo test --lib` got against a cold registry; the
-  guard module itself was additionally run standalone via `rustc --test` with
-  `CARGO_MANIFEST_DIR` set, which is the whole file under test (it depends on nothing in
-  the crate), and that is where the mutation results above come from.
+  Followed. `cargo test --lib` was run against a cold registry and passed 501/501; no
+  bare `cargo test` and no `--all-targets` build was run at any point. The mutation
+  results above come from running the guard module standalone via `rustc --test` with
+  `CARGO_MANIFEST_DIR` set — it depends on nothing in the crate, so that is the whole
+  file under test, and it is seconds per mutation rather than a rebuild.
 
 No item was dropped, and nothing here conflicts with the spec except item 3, which the
 spec's eighth test would otherwise have required verbatim; the feedback wins, as

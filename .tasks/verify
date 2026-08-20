@@ -1,0 +1,47 @@
+#!/bin/sh
+# gpuikit's verification suite, as run by the Builder supervisor.
+#
+# The supervisor reads this file out of the build's base commit, writes it
+# outside the worktree, and runs `sh <that path>` with the cwd already set to
+# the repository root. So: no `cd` (`$0` is not in this repo, and guessing the
+# root from it would break the day that staging path moves), no reliance on the
+# shebang or the executable bit (never consulted), and every line POSIX —
+# `/bin/sh` is dash on these images, where `set -o pipefail` is a hard error
+# before cargo ever runs. `exec`, so cargo's status *is* this script's, with no
+# shell layer to swallow a signal: an OOM-killed child surfaces as 137 rather
+# than as a pass. No pipelines anywhere, for the same reason — a pipeline
+# reports its last command's status, which is how a killed link comes back
+# green.
+#
+# `--lib`, and not something wider, for two measured reasons:
+#
+#   * `--all-features` re-enables the no-op `examples` feature, and cargo
+#     offers no way to hold a feature back from that flag, so it links eight
+#     copies of gpui at once — the OOM kill of #180. See `examples/README.md`.
+#   * Bare `cargo test` no longer links the examples, but still runs the
+#     doctests, and rustdoc links one binary per fenced block (~71 in `src/`).
+#     Same OOM class, for none of the coverage this gate exists to give.
+#
+# `cargo test --lib` is also what `examples/README.md` documents as the command
+# for a constrained environment, and what `src/build_profile_guard.rs`,
+# `src/release_version_guard.rs` and `src/undying_thread_guard.rs` are written
+# to run under. There is no `tests/` directory, so `--lib` skips no integration
+# tests; the only coverage it gives up is doctests.
+#
+# No clippy. `cargo clippy --all-targets` on trunk is 30 warnings and zero
+# errors (21 `type_complexity` on the callback-field idiom, 3
+# `too_many_arguments` in `input.rs`, 6 nits), so `-D warnings` here would fail
+# every build against this repository before it did anything, and the gate
+# would have to be reverted. Lint cleanup is its own change; when trunk is
+# clean, adding clippy here is a one-line follow-up.
+#
+# Do not narrow this further to dodge the first run's cold build. The whole
+# gpui tree compiles at `opt-level = 2` on a small box the first time, and a
+# suite round that times out reports `TimedOut` — never green, so the pull
+# request still opens and routes to a human for the verification it did not
+# get. Only a *red* suite fails a build. The cost of a cold run is one
+# unverified pull request, once; narrowing trades real coverage for that.
+
+set -eu
+
+exec cargo test --lib "$@"

@@ -80,6 +80,14 @@ cargo check --all-targets --features examples,editor      # about 3 minutes cold
 file does not force a re-check — a 0.2s "Finished" means nothing was
 recompiled.
 
+`cargo test --lib` above is also what `.tasks/verify` runs: it is this
+repository's declared verification suite, so an automated build and a human
+checking their work run the same command. Keep the two in step — and read that
+file's header before widening it, because `--all-features` and `--all-targets`
+each undo the gate described below. `scripts/run-tests.sh` wraps the same
+command when you want the summary lines judged rather than the exit status; see
+`docs/running-tests.md`.
+
 ## Why the gate, and what a killed link looks like
 
 Each example is a full link of gpui. `cargo build --all-targets` and a bare

@@ -1,5 +1,7 @@
 //! Checkbox component for gpuikit
 
+use crate::a11y::FocusNavigation;
+use crate::elements::form;
 use crate::layout::h_stack;
 use crate::theme::{ActiveTheme, ControlSize, Themeable};
 use crate::traits::control_sized::ControlSized;
@@ -266,7 +268,15 @@ impl Render for Checkbox {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         let metrics = theme.control(self.size);
-        let disabled = self.disabled;
+        // The first control in the crate to adopt `crate::elements::form`'s
+        // ambient context, and the whole of what adopting it costs: a
+        // `Fieldset` or a `Field` around this checkbox disables it without
+        // anything being threaded here by hand.
+        let disabled = form::disabled_here(self.disabled);
+        // The handle an enclosing `Field`'s label click lands on. Tracking it
+        // is what turns that click into focus on this control rather than on a
+        // handle nothing watches.
+        let field_focus = form::focus_handle_here();
         let label = self.label.clone();
 
         let state = if self.indeterminate {
@@ -279,6 +289,22 @@ impl Render for Checkbox {
 
         h_stack()
             .id(self.id.clone())
+            // `debug_selector` compiles to a no-op that never calls its
+            // closure unless gpui's `test-support` is on, so a consumer pays
+            // nothing for it — the same trade `src/elements/table.rs` makes.
+            // It is what makes "a fieldset disabled this checkbox" assertable:
+            // gpui has no `aria_disabled`, so the only observable difference is
+            // whether a click on the row does anything.
+            .debug_selector({
+                let id = self.id.clone();
+                move || format!("gpuikit-checkbox-{id:?}")
+            })
+            .when_some(field_focus, |this, handle| {
+                // `track_focus` does not make the handle a tab stop by itself
+                // — the same thing `a11y::Announce` has to do for a
+                // caller-supplied handle.
+                this.track_focus(&handle.tab_stop(true)).moves_focus_on_tab()
+            })
             .h(metrics.height)
             // A label outside the control's own box wants more room than the
             // gap between an icon and a label inside one.

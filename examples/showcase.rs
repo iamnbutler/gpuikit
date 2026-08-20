@@ -30,6 +30,7 @@ use gpuikit::{
         dialog::{dialog, DialogState},
         empty::empty,
         field::{field, LabelPosition},
+        form::fieldset,
         icon_button::icon_button,
         kbd::{kbd, kbd_combo},
         label::label,
@@ -201,6 +202,7 @@ const ELEMENT_COVERAGE: &[(&str, &str)] = &[
     ("dialog", "dialog"),
     ("empty", "empty"),
     ("field", "text"),
+    ("form", "form"),
     ("icon_button", "button"),
     ("input", "text"),
     ("kbd", "badge"),
@@ -252,6 +254,7 @@ const NAV_SECTIONS: &[NavSection] = &[
             ("combobox", "Combobox"),
             ("slider", "Slider"),
             ("text", "Text"),
+            ("form", "Form"),
             ("tabs", "Tabs"),
         ],
     ),
@@ -600,6 +603,11 @@ struct Showcase {
     toggle_pinned: Entity<Toggle>,
     toggle_disabled: Entity<Toggle>,
     checkbox_agree: Entity<Checkbox>,
+    /// The form page's three checkboxes. Two of them are inside a fieldset
+    /// disabled at the group and say nothing about `disabled` themselves.
+    checkbox_form_consent: Entity<Checkbox>,
+    checkbox_form_locked: Entity<Checkbox>,
+    checkbox_form_updates: Entity<Checkbox>,
     checkbox_newsletter: Entity<Checkbox>,
     radio_notifications: Entity<RadioGroup<NotificationPreference>>,
     switch_wifi: Entity<Switch>,
@@ -757,6 +765,10 @@ impl Showcase {
                 .label("Disabled")
                 .disabled(true)
         });
+
+        let checkbox_form_consent = cx.new(|_cx| checkbox("form-consent", false));
+        let checkbox_form_locked = cx.new(|_cx| checkbox("form-locked-consent", true));
+        let checkbox_form_updates = cx.new(|_cx| checkbox("form-locked-updates", false));
 
         let checkbox_agree =
             cx.new(|_cx| checkbox("agree-terms", false).label("I agree to the terms"));
@@ -1142,6 +1154,9 @@ impl Showcase {
             toggle_pinned,
             toggle_disabled,
             checkbox_agree,
+            checkbox_form_consent,
+            checkbox_form_locked,
+            checkbox_form_updates,
             checkbox_newsletter,
             radio_notifications,
             switch_wifi,
@@ -1774,7 +1789,7 @@ impl Showcase {
                 v_stack()
                     .gap_4()
                     .child(
-                        field()
+                        field("username")
                             .label("Username")
                             .description("Enter your preferred username")
                             .required(true)
@@ -1791,7 +1806,7 @@ impl Showcase {
                             ),
                     )
                     .child(
-                        field()
+                        field("email")
                             .label("Email")
                             .error("Please enter a valid email address")
                             .child(
@@ -1807,7 +1822,7 @@ impl Showcase {
                             ),
                     )
                     .child(
-                        field()
+                        field("department")
                             .label("Department")
                             .label_position(LabelPosition::Beside)
                             .description("Select your department")
@@ -1822,6 +1837,68 @@ impl Showcase {
                                     .text_color(theme.fg_muted())
                                     .child("(horizontal layout)"),
                             ),
+                    ),
+            )
+    }
+
+    /// Grouping and label association — the two things #164 asked for, and
+    /// nothing about form state.
+    ///
+    /// The second fieldset is the whole argument: it says `disabled(true)`
+    /// once, and neither field nor either checkbox inside it says anything
+    /// about `disabled` at all.
+    fn render_form_page(&self, cx: &Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+        v_stack()
+            .gap_4()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .child("Form"),
+            )
+            .child(
+                fieldset("form-showcase-billing")
+                    .legend("Billing address")
+                    .description("A fieldset groups related controls and names the group.")
+                    .error("This address could not be verified")
+                    .child(
+                        field("form-showcase-street")
+                            .label("Street")
+                            .description("Click the label to focus the control it names")
+                            .child(
+                                div()
+                                    .px_2()
+                                    .py_1()
+                                    .border_1()
+                                    .border_color(theme.border())
+                                    .rounded(gpui::px(4.0))
+                                    .text_sm()
+                                    .text_color(theme.fg_muted())
+                                    .child("(input placeholder)"),
+                            ),
+                    )
+                    .child(
+                        field("form-showcase-consent")
+                            .label("Consent")
+                            .child(self.checkbox_form_consent.clone()),
+                    ),
+            )
+            .child(
+                fieldset("form-showcase-locked")
+                    .legend("Disabled at the group")
+                    .description("Neither field nor checkbox below says `disabled`.")
+                    .disabled(true)
+                    .child(
+                        field("form-showcase-locked-consent")
+                            .label("Consent")
+                            .child(self.checkbox_form_locked.clone()),
+                    )
+                    .child(
+                        field("form-showcase-locked-updates")
+                            .label("Updates")
+                            .child(self.checkbox_form_updates.clone()),
                     ),
             )
     }
@@ -1929,7 +2006,7 @@ impl Showcase {
                 v_stack()
                     .gap_4()
                     .child(
-                        field()
+                        field("message")
                             .label("Message")
                             .description("Tell us what's on your mind")
                             .child(
@@ -1944,7 +2021,7 @@ impl Showcase {
                         // live element at all, so it takes neither focus nor
                         // keystrokes. It clips a long value rather than
                         // scrolling it — that is the trade for being inert.
-                        field().label("Disabled").disabled(true).child(
+                        field("disabled-message").label("Disabled").disabled(true).child(
                             textarea(&self.textarea_disabled, cx)
                                 .placeholder("This is disabled...")
                                 .rows(2)
@@ -1956,7 +2033,7 @@ impl Showcase {
                         // selectable, still scrollable, and every edit path —
                         // typing, IME, paste, delete, tab, undo — refused by
                         // `InputState`.
-                        field()
+                        field("read-only-message")
                             .label("Read-only")
                             .description("Focus it, select it, copy it — it will not change")
                             .child(
@@ -4044,6 +4121,7 @@ impl Render for Showcase {
                 .child(self.render_text_field_page(cx))
                 .child(self.render_textarea_page(cx))
                 .into_any_element(),
+            "form" => self.render_form_page(cx).into_any_element(),
             "slider" => self.render_slider_page(cx).into_any_element(),
             "tabs" => self.render_tabs_page(cx).into_any_element(),
             "avatar" => self.render_avatar_page(cx).into_any_element(),

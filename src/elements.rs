@@ -15,6 +15,7 @@ pub mod context_menu;
 pub mod dialog;
 pub mod empty;
 pub mod field;
+pub mod form;
 pub mod icon_button;
 pub mod input;
 pub mod kbd;

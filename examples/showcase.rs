@@ -8,6 +8,7 @@ use gpui::{
 };
 use gpui_platform;
 use gpuikit::a11y::FocusNavigation;
+use gpuikit::date::{Date, Weekday};
 use gpuikit::input::InputState;
 use gpuikit::markdown::{preprocessing_available, Markdown, MarkdownElement};
 use gpuikit::theme::{ActiveTheme, GlobalTheme, Theme, Themeable};
@@ -21,6 +22,7 @@ use gpuikit::{
         breadcrumb::{breadcrumb, breadcrumb_item, BreadcrumbSeparator},
         button::button,
         button_group::button_group,
+        calendar::{Calendar, CalendarEvent},
         card::card,
         checkbox::{checkbox, Checkbox},
         collapsible::{collapsible, Collapsible},
@@ -190,6 +192,7 @@ const ELEMENT_COVERAGE: &[(&str, &str)] = &[
     ("breadcrumb", "breadcrumb"),
     ("button", "button"),
     ("button_group", "button"),
+    ("calendar", "calendar"),
     ("card", "card"),
     ("checkbox", "toggle"),
     ("collapsible", "collapsible"),
@@ -245,6 +248,7 @@ const NAV_SECTIONS: &[NavSection] = &[
             ("toggle", "Toggle"),
             ("selection", "Selection"),
             ("select", "Select"),
+            ("calendar", "Calendar"),
             ("slider", "Slider"),
             ("text", "Text"),
             ("tabs", "Tabs"),
@@ -589,6 +593,12 @@ struct Showcase {
     toggle_group_alignment: Entity<ToggleGroup<Alignment>>,
     toggle_group_text_style: Entity<ToggleGroup<TextStyle>>,
     tabs_example: Entity<Tabs>,
+    /// Built on a fixed month, with a fixed `today`: a page that read the
+    /// clock would look different every day it was screenshotted.
+    calendar: Entity<Calendar>,
+    /// The last day the calendar reported, so the page can show that the
+    /// event actually fires.
+    calendar_selection: Option<Date>,
     text_field_plain: Entity<InputState>,
     text_field_icon: Entity<InputState>,
     text_field_affixes: Entity<InputState>,
@@ -843,6 +853,25 @@ impl Showcase {
             .selected(vec![TextStyle::Bold])
         });
 
+        // Fixed, not read from a clock: `gpuikit::date` deliberately has no
+        // `Date::today`, and a page that moved every day could not be compared
+        // against yesterday's screenshot.
+        let showcase_today = Date::new(2026, 8, 20).expect("2026-08-20 is a day");
+        let calendar = cx.new(|cx| {
+            Calendar::new("showcase-calendar", showcase_today, cx)
+                .today(showcase_today)
+                .selected(Some(showcase_today))
+                .first_day_of_week(Weekday::Monday)
+                .disabled_days(|date| date.weekday() == Weekday::Sunday)
+        });
+        cx.subscribe(&calendar, |this, _, event: &CalendarEvent, cx| {
+            if let CalendarEvent::Selected(date) = event {
+                this.calendar_selection = Some(*date);
+                cx.notify();
+            }
+        })
+        .detach();
+
         let tabs_example = cx.new(|_cx| {
             tabs("example-tabs")
                 .tab(tab("home", "Home"))
@@ -1027,6 +1056,8 @@ impl Showcase {
             toggle_group_alignment,
             toggle_group_text_style,
             tabs_example,
+            calendar,
+            calendar_selection: Some(showcase_today),
             text_field_plain,
             text_field_icon,
             text_field_affixes,
@@ -1401,6 +1432,61 @@ impl Showcase {
                     .child("Tabs"),
             )
             .child(self.tabs_example.clone())
+    }
+
+    /// The calendar page: a live grid, a disabled-day predicate, a week that
+    /// starts on Monday, and the day the grid last reported beside it.
+    fn render_calendar_page(&self, cx: &Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+
+        v_stack()
+            .gap_4()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .child("Calendar"),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(theme.fg_muted())
+                    .child(
+                        "A month grid of selectable days. Sundays are disabled here, by the \
+                         predicate rather than by a list. Click the chevrons or focus the grid \
+                         and use the arrows, Home / End and PageUp / PageDown.",
+                    ),
+            )
+            .child(
+                h_stack()
+                    .gap_6()
+                    .items_start()
+                    .child(self.calendar.clone())
+                    .child(
+                        v_stack()
+                            .gap_1()
+                            .child(div().text_xs().text_color(theme.fg_muted()).child("Selected"))
+                            .child(
+                                div()
+                                    .text_color(theme.accent())
+                                    .font_weight(FontWeight::BOLD)
+                                    .child(
+                                        self.calendar_selection
+                                            .map_or_else(|| "None".to_string(), |date| date.to_string()),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(theme.fg_muted())
+                                    .child(format!(
+                                        "Showing {}",
+                                        self.calendar.read(cx).visible_month()
+                                    )),
+                            ),
+                    ),
+            )
     }
 
     /// One page for one chooser. `Dropdown` was `Select` under a second name
@@ -3805,6 +3891,7 @@ impl Render for Showcase {
                 .child(self.render_toggle_group_page(cx))
                 .into_any_element(),
             "select" => self.render_select_page(cx).into_any_element(),
+            "calendar" => self.render_calendar_page(cx).into_any_element(),
             "control-sizes" => self.render_control_sizes_page(cx).into_any_element(),
             "text" => v_stack()
                 .gap_8()

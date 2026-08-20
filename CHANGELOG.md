@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Confirmation dialogs, as a mode of `Dialog` rather than a second modal.**
+  `dialog(id).confirm(question, consequence)` sets the title, the description
+  and the mode in one call — that pairing is how "a question and its
+  consequence" is enforced, since the two are independent `Option`s everywhere
+  else in the builder. `.confirm_label` / `.cancel_label` / `.destructive` /
+  `.on_confirm` / `.on_cancel` *refine* a confirmation and refuse to create
+  one, so `.confirm_label("Delete")` on a plain dialog is a `debug_assert!`
+  rather than an alert with no question in it. `DialogState` gains `confirm`,
+  `cancel`, `is_confirmation` and the `DialogConfirmed` / `DialogCancelled`
+  events. Escape, the backdrop and the header's close button all route through
+  one private `dismiss`, which cancels a confirmation and plainly closes a
+  plain dialog — there is no path in the module from a key or a stray click to
+  `DialogConfirmed`; only the confirm button reaches it. A confirmation opens
+  with the **safe** answer focused, through `Button::focus_handle`.
+  `Confirmation`'s `destructive` defaults to `true`, and the doc comment argues
+  both sides of that default so a caller who wants a plain "Save changes?"
+  finds `.destructive(false)`
+- `ButtonVariant::Destructive`, `Button::variant(..)` and `Button::destructive()`,
+  discharging the `// todo: style through ButtonVariant`. Background, text
+  colour, hover, active and the focus ring all branch on the variant, and
+  `traits::button::Button::variant` returns the stored value instead of
+  `Default::default()`. Note that the inherent `variant(..)` builder *shadows*
+  the trait getter for method-call syntax: read the value back with
+  `traits::button::Button::variant(&b)`
+- `Themeable::destructive_bg`, `destructive_bg_hover`, `destructive_bg_active`
+  and `destructive_fg`, derived from the existing `danger()` rather than added
+  as new palette entries. `destructive_fg` picks black or white off the fill's
+  own lightness, because a light theme's `fg()` is dark and dark text on a
+  saturated red is the one combination to avoid
+- `elements::dialog` is adopted into `a11y` and leaves
+  `ELEMENTS_WITHOUT_A_ROLE`. A **confirmation** announces `Role::AlertDialog`,
+  named by its question and described by its consequence, on the panel rather
+  than the scrim. A **plain** dialog still announces nothing: gpui has no
+  `aria_modal`, and the deleted entry's reason — "a dialog that announces
+  itself unmodal is worse than one that waits" — applies to it unchanged. That
+  argument now lives in `dialog.rs` next to the guard that implements it
+
 ### Breaking Changes
 
 - **`gpuikit::elements::dropdown` is gone in full.** `Dropdown`,
@@ -122,10 +161,9 @@ All notable changes to this project will be documented in this file.
   `Slider`, `SpinButton`, the combo boxes and the text inputs). The
   composite-item roles (`MenuItem*`, `Tab`, `TreeItem`, `ListBoxOption`) are
   deliberately excluded — they are arrow-key targets inside a composite that
-  owns the one tab stop, so no per-item rule can be right — and so is
-  `Role::Splitter`, which is keyboard-reachable today through its own
-  `tab_index(0)` rather than through this convention. Both declines are written
-  into the function's docs
+  owns the one tab stop, so no per-item rule can be right — as are the
+  landmarks and containers, which are read rather than operated. Both declines
+  are written into the function's docs
 - `a11y::bind_focus_keys`, `a11y::FocusNext` / `FocusPrevious`, and
   `a11y::FocusNavigation::moves_focus_on_tab`. gpui ships `Window::focus_next`
   / `focus_prev` and binds neither, so Tab did nothing at all; `gpuikit::init`
@@ -221,6 +259,17 @@ All notable changes to this project will be documented in this file.
 - `Role::Splitter` joins `a11y::role_requires_a_name`. A divider has no visible
   text to borrow a name from, so `splitter`'s name is a constructor argument,
   exactly as `icon_button`'s is
+- `Role::Splitter` joins `a11y::role_requires_keyboard_focus` too, and the
+  band's raw `tab_index(0)` — a mechanism nothing else in the crate used — is
+  gone with it. `Splitter`'s announcement declares `.focus_handle(handle)` and
+  `Announce::announce` applies it, so the role and the focus answer are decided
+  in one place like every other keyboard-operable control. The band's own
+  `track_focus` had to go along with the `tab_index`: `announce` tracks
+  `handle.tab_stop(true)`, and a second plain `track_focus` after it would put
+  the non-stop handle back and take the splitter out of the tab order. One
+  behavioural difference beyond the route into the tab order: `announce` also
+  applies `moves_focus_on_tab()`, so Tab *out* of a focused splitter is now
+  answered by the band itself rather than by an ancestor listener
 - `.github/scripts/verify-release-version.sh`, and one step in
   `release.yml` that calls it: a release now refuses to run unless the version
   it computed is the one `CHANGELOG.md`'s topmost `## [x.y.z]` heading names.

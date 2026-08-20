@@ -16,11 +16,21 @@ pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Butto
     Button::new(id, label)
 }
 
-// todo: style through ButtonVariant
-#[derive(Default)]
+/// How loud a button is, and what that loudness means.
+///
+/// The variant is styled here rather than left to the caller, so that a
+/// destructive action looks the same everywhere in an app instead of being
+/// re-derived from the palette at each call site.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ButtonVariant {
+    /// The ordinary button: a surface-coloured fill.
     #[default]
     Filled,
+    /// An action that destroys something — delete, discard, revoke. Filled in
+    /// the theme's danger colour, which is the whole of the affordance: there
+    /// is no confirmation implied by the variant, only a warning that the
+    /// press is not undoable.
+    Destructive,
 }
 
 #[derive(IntoElement)]
@@ -32,6 +42,7 @@ pub struct Button {
     handler: Option<Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>>,
     tooltip: Option<Box<dyn Fn(&mut Window, &mut App) -> AnyView + 'static>>,
     focus_handle: Option<FocusHandle>,
+    variant: ButtonVariant,
 }
 
 impl Button {
@@ -47,7 +58,24 @@ impl Button {
             handler: None,
             tooltip: None,
             focus_handle: None,
+            variant: ButtonVariant::default(),
         }
+    }
+
+    /// Set the button's variant.
+    ///
+    /// Note that this **shadows** the [`traits::button::Button::variant`]
+    /// getter of the same name for method-call syntax: `b.variant()` with no
+    /// argument resolves here and fails to compile. Read the stored value back
+    /// with `traits::button::Button::variant(&b)`.
+    pub fn variant(mut self, variant: ButtonVariant) -> Self {
+        self.variant = variant;
+        self
+    }
+
+    /// Shorthand for [`ButtonVariant::Destructive`].
+    pub fn destructive(self) -> Self {
+        self.variant(ButtonVariant::Destructive)
     }
 
     pub fn on_click(
@@ -116,6 +144,27 @@ impl RenderOnce for Button {
         // Taken before `self`'s fields are moved into the element below.
         let a11y = self.a11y();
 
+        // The `// todo: style through ButtonVariant` this replaces: every
+        // colour a variant can differ in, decided in one place.
+        let (bg, bg_hover, bg_active, fg, ring) = match self.variant {
+            ButtonVariant::Filled => (
+                theme.button_bg(),
+                theme.button_bg_hover(),
+                theme.button_bg_active(),
+                theme.fg(),
+                theme.accent(),
+            ),
+            ButtonVariant::Destructive => (
+                theme.destructive_bg(),
+                theme.destructive_bg_hover(),
+                theme.destructive_bg_active(),
+                theme.destructive_fg(),
+                // A ring in the accent colour around a red button reads as a
+                // second, unrelated state; the ring is the fill, brightened.
+                theme.destructive_bg_hover(),
+            ),
+        };
+
         h_stack()
             .id(self.id)
             .announce(a11y)
@@ -129,18 +178,18 @@ impl RenderOnce for Button {
             .text_size(metrics.text_size)
             .line_height(metrics.line_height)
             .font_weight(FontWeight::MEDIUM)
-            .bg(theme.button_bg())
-            .text_color(theme.fg())
+            .bg(bg)
+            .text_color(fg)
             .whitespace_nowrap()
             // `focus_visible`, not `focus`: clicking a button should not leave
             // a ring behind it. A spread shadow rather than a border, so
             // arriving focus does not resize the control — see
             // `theme::focus_ring`.
-            .focus_visible(|style| style.shadow(focus_ring(theme.accent())))
+            .focus_visible(move |style| style.shadow(focus_ring(ring)))
             .when(!self.disabled, |button| {
                 button
-                    .hover(|div| div.bg(theme.button_bg_hover()))
-                    .active(|div| div.bg(theme.button_bg_active()))
+                    .hover(move |div| div.bg(bg_hover))
+                    .active(move |div| div.bg(bg_active))
                     .cursor_pointer()
             })
             .when(self.disabled, |button| {
@@ -176,7 +225,7 @@ impl traits::button::Button for Button {
     type Variant = ButtonVariant;
 
     fn variant(&self) -> Self::Variant {
-        ButtonVariant::default()
+        self.variant
     }
 }
 

@@ -159,6 +159,42 @@ pub trait Themeable {
         self.border()
     }
 
+    /// Fill of a destructive button — one that deletes, discards or revokes.
+    ///
+    /// Derived from [`danger`](Themeable::danger) rather than introduced as a
+    /// new palette entry: a theme that has already said what its error colour
+    /// is has said what a destructive action looks like, and two entries that
+    /// could disagree is a way for them to.
+    fn destructive_bg(&self) -> Hsla {
+        self.danger()
+    }
+
+    /// Hover fill of a destructive button: the fill, lightened.
+    fn destructive_bg_hover(&self) -> Hsla {
+        let base = self.destructive_bg();
+        hsla(base.h, base.s, (base.l + 0.08).min(1.0), base.a)
+    }
+
+    /// Pressed fill of a destructive button: the fill, darkened.
+    fn destructive_bg_active(&self) -> Hsla {
+        let base = self.destructive_bg();
+        hsla(base.h, base.s, (base.l - 0.08).max(0.0), base.a)
+    }
+
+    /// Text on a destructive button.
+    ///
+    /// Black or white off the fill's own lightness, not
+    /// [`fg`](Themeable::fg): a light theme's foreground is dark, and dark
+    /// text on a saturated red is the one combination this has to avoid.
+    fn destructive_fg(&self) -> Hsla {
+        let bg = self.destructive_bg();
+        if bg.l > 0.6 {
+            hsla(0.0, 0.0, 0.0, 1.0)
+        } else {
+            hsla(0.0, 0.0, 1.0, 1.0)
+        }
+    }
+
     fn input_bg(&self) -> Hsla {
         self.surface()
     }

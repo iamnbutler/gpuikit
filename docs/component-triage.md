@@ -37,10 +37,10 @@ being true.
 Not every claim in this document is the same *kind* of claim, and the table
 below flattens three of them into one column. Read it this way:
 
-- The **12 Shipped** rows are facts. Each names a module, and
+- The **13 Shipped** rows are facts. Each names a module, and
   `triage_coverage` in `src/elements.rs` fails the build if that module is not
   really declared. Nobody has to take these on trust.
-- The **6 Issue** rows are proposals, and cheap ones: each is a written issue
+- The **5 Issue** rows are proposals, and cheap ones: each is a written issue
   body under `docs/issues/`, and writing one commits nobody to building it. The
   bodies were filed separately under the maintainer's authorisation.
 - The **11 Rejected** rows are **one agent's reading of this crate, proposed
@@ -64,7 +64,7 @@ taken.
 
 Three things are checkable, and all three hold:
 
-- **Its entries shipped without it noticing.** Twelve rows below are Shipped —
+- **Its entries shipped without it noticing.** Thirteen rows below are Shipped —
   eight when this triage was first taken (#146 counted seven; re-reading the
   list against `src/elements/` found one more, which is itself the point), plus
   Table and Data Table, built since as one module, plus Sidebar and Resizable,
@@ -171,7 +171,7 @@ source and read it, not trust a name in a table.
 | Data Table | Shipped | `src/elements/table.rs` |
 | Resizable | Shipped | `src/elements/splitter.rs` |
 | Sidebar | Shipped | `src/elements/sidebar.rs` |
-| Calendar | Issue | `docs/issues/calendar.md` |
+| Calendar | Shipped | `src/elements/calendar.rs` |
 | Date Picker | Issue | `docs/issues/date-picker.md` |
 | Alert Dialog | Issue | `docs/issues/confirmation-dialog.md` |
 | Form | Issue | `docs/issues/form.md` |
@@ -400,7 +400,7 @@ document's other tables are not mistaken for it — and fails the build when the
 document stops describing the crate:
 
 - the table has one row per #59 entry, and the verdict split matches the
-  12 Shipped / 6 Issue / 11 Rejected stated in prose here;
+  13 Shipped / 5 Issue / 11 Rejected stated in prose here;
 - every Shipped row names a `src/elements/<module>.rs` that is really declared;
 - every Issue row names a file under `docs/issues/` that exists and is not a
   stub;

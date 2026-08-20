@@ -122,10 +122,9 @@ All notable changes to this project will be documented in this file.
   `Slider`, `SpinButton`, the combo boxes and the text inputs). The
   composite-item roles (`MenuItem*`, `Tab`, `TreeItem`, `ListBoxOption`) are
   deliberately excluded — they are arrow-key targets inside a composite that
-  owns the one tab stop, so no per-item rule can be right — and so is
-  `Role::Splitter`, which is keyboard-reachable today through its own
-  `tab_index(0)` rather than through this convention. Both declines are written
-  into the function's docs
+  owns the one tab stop, so no per-item rule can be right — as are the
+  landmarks and containers, which are read rather than operated. Both declines
+  are written into the function's docs
 - `a11y::bind_focus_keys`, `a11y::FocusNext` / `FocusPrevious`, and
   `a11y::FocusNavigation::moves_focus_on_tab`. gpui ships `Window::focus_next`
   / `focus_prev` and binds neither, so Tab did nothing at all; `gpuikit::init`
@@ -221,6 +220,17 @@ All notable changes to this project will be documented in this file.
 - `Role::Splitter` joins `a11y::role_requires_a_name`. A divider has no visible
   text to borrow a name from, so `splitter`'s name is a constructor argument,
   exactly as `icon_button`'s is
+- `Role::Splitter` joins `a11y::role_requires_keyboard_focus` too, and the
+  band's raw `tab_index(0)` — a mechanism nothing else in the crate used — is
+  gone with it. `Splitter`'s announcement declares `.focus_handle(handle)` and
+  `Announce::announce` applies it, so the role and the focus answer are decided
+  in one place like every other keyboard-operable control. The band's own
+  `track_focus` had to go along with the `tab_index`: `announce` tracks
+  `handle.tab_stop(true)`, and a second plain `track_focus` after it would put
+  the non-stop handle back and take the splitter out of the tab order. One
+  behavioural difference beyond the route into the tab order: `announce` also
+  applies `moves_focus_on_tab()`, so Tab *out* of a focused splitter is now
+  answered by the band itself rather than by an ancestor listener
 - `.github/scripts/verify-release-version.sh`, and one step in
   `release.yml` that calls it: a release now refuses to run unless the version
   it computed is the one `CHANGELOG.md`'s topmost `## [x.y.z]` heading names.

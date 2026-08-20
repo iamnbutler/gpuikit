@@ -648,7 +648,7 @@ pub fn role_requires_a_name(role: Role) -> bool {
 /// is public so an element or its test can consult the same one, and it is
 /// expected to grow.
 ///
-/// Three groups are deliberately **not** on it:
+/// Two groups are deliberately **not** on it:
 ///
 /// - **The composite-item roles** — `MenuItem`, `MenuItemCheckBox`,
 ///   `MenuItemRadio`, `Tab`, `TreeItem`, `ListBoxOption`. These are arrow-key
@@ -657,13 +657,6 @@ pub fn role_requires_a_name(role: Role) -> bool {
 ///   authoring practices call out. They join the list when this crate has a
 ///   roving-focus convention, which is a separate decision — `Tabs`, `List`,
 ///   `ContextMenu` and `Select`'s popup all want it and none of them has it.
-/// - **`Role::Splitter`.** `src/elements/splitter.rs` is keyboard-reachable
-///   today, but through a raw `tab_index(0)` on its band rather than through
-///   this convention — it landed alongside this change and could not see it.
-///   Adopting it is filed as iamnbutler/gpuikit#181; adding the arm before
-///   that element declares a focus decision would only turn its announcement
-///   into a panic. A decline written down is the difference between a gap and
-///   an oversight.
 /// - **Landmarks and containers** — `Complementary`, `Document`, `Group`.
 ///   These are read, not operated.
 ///
@@ -687,6 +680,9 @@ pub fn role_requires_keyboard_focus(role: Role) -> bool {
             | Role::RadioButton
             | Role::Link
             | Role::Slider
+            // A standalone control that owns one tab stop and moves a value
+            // with the arrow keys — `Slider`'s shape exactly.
+            | Role::Splitter
             | Role::SpinButton
             | Role::ComboBox
             | Role::EditableComboBox
@@ -1547,7 +1543,7 @@ mod tests {
     /// rule's is: dropping an arm takes a control's focus requirement with it,
     /// breaks no other test, and a release build never evaluates the assertion
     /// at all. Membership here is therefore **exhaustive** over the list — all
-    /// 16 arms — grouped by the reason each one is on it. This test used to
+    /// 17 arms — grouped by the reason each one is on it. This test used to
     /// name four (`Button`, `DefaultButton`, `ComboBox`, `TextInput`), which
     /// left the other twelve deletable with the suite still green; the
     /// exhaustiveness is load-bearing rather than incidental.
@@ -1592,6 +1588,13 @@ mod tests {
             );
         }
 
+        assert!(
+            role_requires_keyboard_focus(Role::Splitter),
+            "a splitter is a standalone control owning one tab stop whose arrow keys move \
+             the divider — `Slider`'s shape — so it declares focus on its `A11y` like every \
+             other keyboard-operable control rather than through a raw `tab_index`"
+        );
+
         for role in [Role::ComboBox, Role::EditableComboBox] {
             assert!(
                 role_requires_keyboard_focus(role),
@@ -1630,13 +1633,6 @@ mod tests {
                  practices call out — these join the list with a roving-focus convention"
             );
         }
-
-        assert!(
-            !role_requires_keyboard_focus(Role::Splitter),
-            "declined in writing rather than absent by accident: `src/elements/splitter.rs` \
-             reaches the tab order through a raw `tab_index(0)` instead of this convention, \
-             and adopting it is iamnbutler/gpuikit#181"
-        );
 
         for role in [Role::Complementary, Role::Document, Role::Group] {
             assert!(

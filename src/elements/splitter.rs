@@ -55,6 +55,22 @@
 //! constructor argument rather than a builder, exactly as
 //! [`icon_button`](crate::elements::icon_button) does it. `Role::Splitter` is
 //! in [`crate::a11y::role_requires_a_name`] for that reason.
+//!
+//! The band is a tab stop **by declaration**: `Role::Splitter` is in
+//! [`crate::a11y::role_requires_keyboard_focus`], the announcement answers
+//! with [`A11y::focus_handle`], and [`Announce::announce`] is what turns that
+//! into a tab stop. There is no `tab_index` on the band and there must not be
+//! one — the role and the focus answer are meant to be decided in the same
+//! place, which is the whole of `crate::a11y`'s section 4.
+//!
+//! It hands over a handle it minted itself rather than letting gpui mint one
+//! into element state, because a mouse-down on the band has to *move* focus
+//! there, and a handle gpui keeps in element state is not reachable from a
+//! listener. That is exactly what [`A11y::focus_handle`] is for. Note that the
+//! band must not also `track_focus` that handle: `announce` already tracks it
+//! as `handle.tab_stop(true)`, and a second, plain `track_focus` afterwards
+//! would put the non-stop handle back and silently take the splitter out of
+//! the tab order.
 
 use std::rc::Rc;
 
@@ -346,7 +362,17 @@ impl Splitter {
     /// usable answer rather than no value at all: a splitter that announces
     /// nothing for a frame reads to assistive technology as a splitter with no
     /// position, which is worse than one whose step is briefly approximate.
-    fn announcement(&self, geometry: Option<SplitterGeometry>, step: Pixels) -> A11y {
+    /// `focus` is the band's own handle on the render path and `None` on the
+    /// declaration path, where there is no window to mint one from. Both
+    /// answers are `Focus::Takes`, so the two callers cannot come to disagree
+    /// about whether a splitter is focusable — which is why there is one
+    /// builder here rather than one per path.
+    fn announcement(
+        &self,
+        geometry: Option<SplitterGeometry>,
+        step: Pixels,
+        focus: Option<FocusHandle>,
+    ) -> A11y {
         let (position, low, high, step) = match geometry {
             Some(geometry) => {
                 let (low, high) = geometry.range();
@@ -360,7 +386,7 @@ impl Splitter {
             None => (self.ratio.clamp(0., 1.), 0., 1., 0.01),
         };
 
-        A11y::new(Role::Splitter)
+        let a11y = A11y::new(Role::Splitter)
             .name(self.name.clone())
             .orientation(match self.orientation {
                 Orientation::Vertical => gpui::Orientation::Vertical,
@@ -371,13 +397,18 @@ impl Splitter {
                 f64::from(low) * 100.,
                 f64::from(high) * 100.,
                 f64::from(step) * 100.,
-            )
+            );
+
+        match focus {
+            Some(handle) => a11y.focus_handle(handle),
+            None => a11y.focusable(),
+        }
     }
 }
 
 impl Accessible for Splitter {
     fn a11y(&self) -> A11y {
-        self.announcement(None, px(0.))
+        self.announcement(None, px(0.), None)
     }
 }
 
@@ -515,7 +546,7 @@ impl RenderOnce for Splitter {
         // what turns a pointer position into a grab offset.
         let boundary = geometry.map(|geometry| geometry.usable() * drawn);
 
-        let a11y = self.announcement(geometry, step_px);
+        let a11y = self.announcement(geometry, step_px, Some(focus_handle.clone()));
         let theme = cx.theme();
         let (line_color, hover_color) = (theme.border_subtle(), theme.accent());
 
@@ -530,9 +561,12 @@ impl RenderOnce for Splitter {
 
         let band = div()
             .id(scoped(&id, "band"))
+            // No `tab_index` and no `track_focus`: `announce` does both, from
+            // the focus decision the announcement above carries. A second
+            // `track_focus(&focus_handle)` here would replace the tab-stop
+            // handle `announce` installed with the plain one and take the
+            // band back out of the tab order.
             .announce(a11y)
-            .tab_index(0)
-            .track_focus(&focus_handle)
             .flex_none()
             .flex()
             .items_center()
@@ -707,7 +741,7 @@ impl RenderOnce for Splitter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::a11y::role_requires_a_name;
+    use crate::a11y::{role_requires_a_name, role_requires_keyboard_focus, FocusNavigation};
     use crate::theme::ControlScale;
     use gpui::{size, Modifiers, Point, Render, Size, TestAppContext, VisualTestContext};
     use std::cell::RefCell;
@@ -965,7 +999,7 @@ mod tests {
     #[test]
     fn a_splitter_announces_a_named_splitter_with_its_position() {
         let split = splitter("panes", "Editor and preview", 0.6);
-        let node = node_for(split.announcement(Some(geometry(408., 8., 40., 40.)), px(20.)));
+        let node = node_for(split.announcement(Some(geometry(408., 8., 40., 40.)), px(20.), None));
 
         assert_eq!(node.label(), Some("Editor and preview"));
         close(node.numeric_value(), 60., "position");
@@ -992,7 +1026,7 @@ mod tests {
     #[test]
     fn the_announced_position_is_clamped_like_the_drawn_one() {
         let split = splitter("panes", "Panes", 5.0);
-        let node = node_for(split.announcement(Some(geometry(408., 8., 40., 40.)), px(20.)));
+        let node = node_for(split.announcement(Some(geometry(408., 8., 40., 40.)), px(20.), None));
 
         close(node.numeric_value(), 90., "position");
     }
@@ -1019,6 +1053,33 @@ mod tests {
         assert!(!splitter("panes", "Panes", 0.5)
             .a11y()
             .is_missing_a_required_name());
+    }
+
+    /// The declaration half: the splitter answers the focus question its role
+    /// forces, on the path that has no window and so no handle.
+    ///
+    /// This says nothing about the tab order — see `tab_reaches_the_band` for
+    /// that. What it pins is that the two paths through `announcement` cannot
+    /// disagree: both are `Focus::Takes`, so neither can reach `announce`'s
+    /// `debug_assert!` on a missing focus decision.
+    #[test]
+    fn a_splitter_declares_that_it_takes_keyboard_focus() {
+        assert!(
+            role_requires_keyboard_focus(Role::Splitter),
+            "a splitter owns one tab stop and moves its value with the arrow keys, so \
+             announcing it without taking focus would reach a screen reader and not a \
+             keyboard"
+        );
+
+        let declared = splitter("panes", "Panes", 0.5).a11y();
+        assert!(
+            declared.is_focusable(),
+            "the splitter declines the focus its role requires"
+        );
+        assert!(
+            !declared.is_missing_a_focus_decision(),
+            "`announce` would panic in a debug build on this announcement"
+        );
     }
 
     // --- drawing, and the drag ---
@@ -1118,6 +1179,85 @@ mod tests {
     #[gpui::test]
     fn a_stacked_splitter_draws(cx: &mut TestAppContext) {
         scenario(cx, Orientation::Horizontal);
+    }
+
+    /// The tab order, drawn — the only place the tab stop is observable.
+    ///
+    /// `announced()` cannot see any of this: it calls two `Element` methods
+    /// and never lays out or paints, so neither the tracked handle nor the
+    /// tab-stop registration exists for it to look at. Hence a real window and
+    /// a real Tab.
+    ///
+    /// The harness is `elements::button`'s, not `scenario`'s, for two reasons.
+    /// `crate::init` rather than `crate::theme::init`, because Tab is bound by
+    /// `a11y::bind_focus_keys` and gpui binds `FocusNext` to nothing on its
+    /// own; and a root that tracks a focused handle, because with *nothing*
+    /// focused gpui dispatches `FocusNext` to the node above the root element
+    /// and the first Tab reaches no listener.
+    ///
+    /// The assertion is on the divider moving rather than on `window.focused`:
+    /// the arrow keys are the band's own `on_key_down`, so a divider that
+    /// moves is a divider the keyboard actually reached.
+    #[gpui::test]
+    fn tab_reaches_the_band(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+
+        let ratio = Rc::new(RefCell::new(0.5));
+        let emitted: Emitted = Rc::new(RefCell::new(Vec::new()));
+        let build = panes(ratio.clone(), emitted.clone(), Orientation::Vertical);
+
+        let slot: Rc<RefCell<Option<FocusHandle>>> = Rc::new(RefCell::new(None));
+        let for_render = slot.clone();
+
+        let drawn = cx.update(|cx| cx.new(|_| 0usize));
+        let counter = drawn.clone();
+        let window = cx.open_window(size(px(408.), px(408.)), move |_window, _cx| Harness {
+            build: Box::new(move |window, app| {
+                let root = for_render
+                    .borrow_mut()
+                    .get_or_insert_with(|| app.focus_handle())
+                    .clone();
+                div()
+                    .id("splitter-harness-root")
+                    .track_focus(&root)
+                    .moves_focus_on_tab()
+                    .size_full()
+                    .child(build(window, app))
+                    .into_any_element()
+            }),
+            drawn: counter,
+        });
+
+        let cx = VisualTestContext::from_window(*std::ops::Deref::deref(&window), cx).into_mut();
+        cx.run_until_parked();
+        assert!(
+            drawn.read_with(cx, |count, _| *count) > 0,
+            "the harness never drew, so this test is checking nothing"
+        );
+
+        let root = slot.borrow().clone().expect("the harness drew");
+        cx.update(|window, app| window.focus(&root, app));
+        // The canvas measures during paint, and the arrow keys do nothing
+        // until the geometry is on the frame after.
+        cx.run_until_parked();
+
+        cx.simulate_keystrokes("tab");
+        cx.run_until_parked();
+
+        cx.simulate_keystrokes("right");
+        cx.run_until_parked();
+
+        assert!(
+            !emitted.borrow().is_empty(),
+            "Tab never reached the band: the right arrow moved nothing. The band is a tab \
+             stop only by declaration — `announce` applies `track_focus(&handle.tab_stop(true))` \
+             — so a `tab_index` or a second plain `track_focus` on the band would undo it."
+        );
+        let moved = *ratio.borrow();
+        assert!(
+            moved > 0.5,
+            "the divider moved, but not rightwards: {moved}"
+        );
     }
 
     #[gpui::test]

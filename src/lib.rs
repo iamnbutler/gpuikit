@@ -95,6 +95,17 @@ mod release_version_guard;
 #[cfg(test)]
 mod release_input_validation;
 
+/// Tests for the build settings that keep linking an example inside the memory
+/// a small machine has — the dependency tier's debug info, the `dev-debuginfo`
+/// hatch, the manifest being the whole list of examples now that auto-discovery
+/// is off, and `scripts/check.sh` reading cargo's status rather than a pipe's.
+///
+/// No runtime code, and nothing outside a test build. In the lib rather than
+/// `tests/` for the usual reason and one of its own: an integration test would
+/// be one more whole-program link of gpui. See its own docs.
+#[cfg(test)]
+mod build_memory_guard;
+
 /// Embedded assets for gpuikit (icons, fonts, etc.)
 #[derive(RustEmbed)]
 #[folder = "assets"]

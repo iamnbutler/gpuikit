@@ -666,6 +666,15 @@ pub fn role_requires_a_name(role: Role) -> bool {
 ///   an oversight.
 /// - **Landmarks and containers** — `Complementary`, `Document`, `Group`.
 ///   These are read, not operated.
+///
+/// The rot here is *quiet* in the same way [`role_requires_a_name`]'s is: the
+/// list feeds a `debug_assert!` inside [`Announce::announce`] rather than a
+/// return value an element reads, so dropping an arm takes a control's focus
+/// requirement with it, breaks nothing else, and is not evaluated at all in a
+/// release build. So every arm is pinned by name, one assertion per reason, by
+/// `tests::the_focus_rule_covers_the_roles_a_keyboard_operates` — along with
+/// the three groups declined above. Adding an arm means adding it there too,
+/// with the argument for it as the assertion's message.
 pub fn role_requires_keyboard_focus(role: Role) -> bool {
     matches!(
         role,
@@ -1529,30 +1538,112 @@ mod tests {
 
     // --- section 4: the keyboard ---
 
+    /// Every arm of [`role_requires_keyboard_focus`], one assertion per reason,
+    /// so a role cannot fall off the list without a failure that says why it
+    /// was on it.
+    ///
+    /// The list feeds a `debug_assert!` inside [`Announce::announce`] and
+    /// nothing else reads it, so its rot is quiet in the same way the name
+    /// rule's is: dropping an arm takes a control's focus requirement with it,
+    /// breaks no other test, and a release build never evaluates the assertion
+    /// at all. Membership here is therefore **exhaustive** over the list — all
+    /// 16 arms — grouped by the reason each one is on it. This test used to
+    /// name four (`Button`, `DefaultButton`, `ComboBox`, `TextInput`), which
+    /// left the other twelve deletable with the suite still green; the
+    /// exhaustiveness is load-bearing rather than incidental.
+    ///
+    /// **Non-membership is not exhaustive, and that is the asymmetry to know
+    /// about.** Doing it exhaustively would mean asserting against all 182 of
+    /// accesskit's `Role` variants, almost none of which this crate has said
+    /// anything about, and an assertion with no argument behind it is the
+    /// failure mode this module is organised against. So the negative half
+    /// asserts *arguments*: exactly the three groups the rule's own docs
+    /// decline in writing. What catches a wrong *addition* is the review that
+    /// adds it.
     #[test]
     fn the_focus_rule_covers_the_roles_a_keyboard_operates() {
-        assert!(role_requires_keyboard_focus(Role::Button));
+        for role in [Role::Button, Role::Link] {
+            assert!(
+                role_requires_keyboard_focus(role),
+                "{role:?} is activated by a keystroke on the control itself, and a \
+                 keystroke only ever reaches the focused element"
+            );
+        }
+
         assert!(
             role_requires_keyboard_focus(Role::DefaultButton),
             "a dialog's Enter key resolves to the default button, so it is the most \
              focus-requiring control in the set"
         );
-        assert!(role_requires_keyboard_focus(Role::ComboBox));
-        assert!(role_requires_keyboard_focus(Role::TextInput));
 
-        // Composite items are arrow-key targets inside a composite that owns
-        // the one tab stop. They join the list with a roving-focus convention.
-        assert!(!role_requires_keyboard_focus(Role::ListBoxOption));
-        assert!(!role_requires_keyboard_focus(Role::MenuItem));
-        assert!(!role_requires_keyboard_focus(Role::Tab));
-        assert!(!role_requires_keyboard_focus(Role::TreeItem));
+        for role in [Role::CheckBox, Role::Switch, Role::RadioButton] {
+            assert!(
+                role_requires_keyboard_focus(role),
+                "{role:?} holds a state the keyboard changes with Space, and that toggle \
+                 is a keystroke that has to land on the control"
+            );
+        }
 
-        // Declined in writing rather than absent by accident: see the
-        // function's docs and iamnbutler/gpuikit#181.
-        assert!(!role_requires_keyboard_focus(Role::Splitter));
+        for role in [Role::Slider, Role::SpinButton] {
+            assert!(
+                role_requires_keyboard_focus(role),
+                "{role:?} moves its value with the arrow keys, which go to the focused \
+                 element and nowhere else"
+            );
+        }
 
-        // Landmarks are read, not operated.
-        assert!(!role_requires_keyboard_focus(Role::Complementary));
+        for role in [Role::ComboBox, Role::EditableComboBox] {
+            assert!(
+                role_requires_keyboard_focus(role),
+                "{role:?} delivers its popup's arrow keys to the trigger, so the trigger \
+                 holding focus is what makes the list operable at all"
+            );
+        }
+
+        for role in [
+            Role::TextInput,
+            Role::MultilineTextInput,
+            Role::SearchInput,
+            Role::NumberInput,
+            Role::PasswordInput,
+            Role::DateInput,
+        ] {
+            assert!(
+                role_requires_keyboard_focus(role),
+                "{role:?} is typed into, and typing is nothing but the focused element's \
+                 keystrokes"
+            );
+        }
+
+        for role in [
+            Role::MenuItem,
+            Role::MenuItemCheckBox,
+            Role::MenuItemRadio,
+            Role::ListBoxOption,
+            Role::Tab,
+            Role::TreeItem,
+        ] {
+            assert!(
+                !role_requires_keyboard_focus(role),
+                "{role:?} is an arrow-key target inside a composite that owns the one tab \
+                 stop, so making each item a tab stop is the mistake the ARIA authoring \
+                 practices call out — these join the list with a roving-focus convention"
+            );
+        }
+
+        assert!(
+            !role_requires_keyboard_focus(Role::Splitter),
+            "declined in writing rather than absent by accident: `src/elements/splitter.rs` \
+             reaches the tab order through a raw `tab_index(0)` instead of this convention, \
+             and adopting it is iamnbutler/gpuikit#181"
+        );
+
+        for role in [Role::Complementary, Role::Document, Role::Group] {
+            assert!(
+                !role_requires_keyboard_focus(role),
+                "{role:?} is a landmark or container: it is read, not operated"
+            );
+        }
     }
 
     /// The three states are distinguishable, and only silence is a bug.

@@ -95,6 +95,17 @@ mod release_version_guard;
 #[cfg(test)]
 mod release_input_validation;
 
+/// Tests for the build configuration that keeps `ld` from being OOM-killed
+/// while linking this crate's eight examples — the dev profile's debug level,
+/// Linux's `split-debuginfo`, and the `examples` feature every `[[example]]`
+/// requires.
+///
+/// No runtime code, and nothing outside a test build. One test reads
+/// `examples/` from disk, because a new undeclared file there is autodiscovered
+/// as a target and cannot carry `required-features`. See its own docs.
+#[cfg(test)]
+mod build_profile_guard;
+
 /// Embedded assets for gpuikit (icons, fonts, etc.)
 #[derive(RustEmbed)]
 #[folder = "assets"]

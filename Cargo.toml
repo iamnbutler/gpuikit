@@ -20,33 +20,56 @@ rust-version = "1.85"
 name = "gpuikit"
 path = "src/lib.rs"
 
+# Every example is gated behind the no-op `examples` feature, so that
+# `cargo test`, `cargo build --all-targets` and `cargo check --all-targets` do
+# not each link eight copies of gpui — see `[profile.dev]` below and
+# `examples/README.md`. Run one with `--features examples`.
+#
+# A new example is declared here, with `required-features`. An autodiscovered
+# target — any top-level `examples/*.rs`, or `examples/*/main.rs` — cannot carry
+# `required-features`, so it would be built by every one of those commands
+# regardless. `src/build_profile_guard.rs` reads `examples/` from disk to catch
+# exactly that.
+
 [[example]]
 name = "markdown_selection"
 path = "examples/markdown_selection.rs"
+required-features = ["examples"]
 
 [[example]]
 name = "markdown_streaming"
 path = "examples/markdown_streaming.rs"
+required-features = ["examples"]
 
 [[example]]
 name = "showcase"
 path = "examples/showcase.rs"
+required-features = ["examples"]
 
 [[example]]
 name = "tasks"
 path = "examples/tasks.rs"
+required-features = ["examples"]
 
 [[example]]
 name = "input_sandbox"
 path = "examples/input/sandbox.rs"
+required-features = ["examples"]
 
 [[example]]
 name = "dialog_example"
 path = "examples/dialog_example.rs"
+required-features = ["examples"]
 
 [[example]]
 name = "popover_demo"
 path = "examples/popover_demo.rs"
+required-features = ["examples"]
+
+[[example]]
+name = "context_menu"
+path = "examples/context_menu.rs"
+required-features = ["examples"]
 
 [dependencies]
 # GPUI framework (from gpui-unofficial on crates.io)
@@ -95,6 +118,12 @@ runtime_shaders = ["gpui_platform/runtime_shaders"]
 # enabling it raises the toolchain a consumer needs. Keep the README's feature
 # table in step with these numbers.
 stitch = ["dep:mdstitch"]
+# Enables nothing. It exists only so that every `[[example]]` above can require
+# it, keeping eight full links of gpui out of `cargo test` and
+# `cargo {build,check} --all-targets`. Note that `--all-features` turns it back
+# on — cargo offers no way to exclude a feature from that flag — so
+# `cargo test --all-features` still links all eight.
+examples = []
 
 # Lints
 [lints.rust]
@@ -111,7 +140,14 @@ opt-level = 3
 # Speed up debug builds
 [profile.dev]
 opt-level = 0
-debug = 2
+# Not `2`. Full DWARF for this crate *and* for gpui beneath it is the bulk of
+# what `ld` holds in memory, and cargo sizes `-j` from the CPU count with no
+# knowledge of a memory limit, so several of those links run at once and the
+# kernel kills one — `ld terminated with signal 9 [Killed]`, naming no crate and
+# no symbol. Line tables keep file and line in every backtrace; only the type
+# and variable detail a debugger wants is gone, and a debugging session asks for
+# it on that build alone with `RUSTFLAGS="-Cdebuginfo=2"`.
+debug = "line-tables-only"
 
 # Dependencies — gpui above all — are compiled once and then only linked, so
 # optimizing them costs nothing on an incremental build of this crate and is

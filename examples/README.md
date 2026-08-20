@@ -49,27 +49,86 @@ small app:
   the editor go undemonstrated in the first place.
 - **If `showcase.rs` grows much further, split it into `examples/showcase/` —
   one binary, many files** — rather than adding a second binary.
+- **A new example binary is declared in `Cargo.toml` with
+  `required-features = ["examples"]`.** Dropping a file into `examples/` is not
+  enough and is worse than nothing: cargo autodiscovers any top-level
+  `examples/*.rs` or `examples/*/main.rs` as a target, an autodiscovered target
+  cannot carry `required-features`, and so that one file gets linked by every
+  `cargo test` and `--all-targets` build in the repository. A test in
+  `src/build_profile_guard.rs` reads this directory and fails on exactly that.
 
 ## Building
 
+Every example is behind the `examples` feature, which enables nothing else:
+
 ```sh
-cargo run --example showcase                     # every page, plain code fences
-cargo run --example showcase --features editor   # + highlighted fences, live editor buffer
-cargo run --example markdown_streaming --features stitch
+cargo run --example showcase --features examples                     # every page, plain code fences
+cargo run --example showcase --features examples,editor              # + highlighted fences, live editor buffer
+cargo run --example markdown_streaming --features examples,stitch
 ```
 
 Checks, in the order they are quickest to run:
 
 ```sh
 cargo fmt --check
-cargo test --lib                        # includes the two coverage guards
-cargo check --all-targets
-cargo check --all-targets --features editor   # about 3 minutes cold on 4 cores
+cargo test --lib                                          # coverage guards, and the build-config guards
+cargo check --all-targets --features examples             # type-checks the examples without linking them
+cargo check --all-targets --features examples,editor      # about 3 minutes cold on 4 cores
 ```
 
-Note that an unqualified `cargo test` also *links* every example, and linking
-the showcase has been OOM-killed in a constrained environment. `cargo test
---lib` plus `cargo check --all-targets` covers the same ground without the
-link. `cargo check` fingerprints on file content rather than mtime, so
-`touch`ing a file does not force a re-check — a 0.2s "Finished" means nothing
-was recompiled.
+`cargo check` fingerprints on file content rather than mtime, so `touch`ing a
+file does not force a re-check — a 0.2s "Finished" means nothing was
+recompiled.
+
+## Why the gate, and what a killed link looks like
+
+Each example is a full link of gpui. `cargo build --all-targets` and a bare
+`cargo test` link all eight, and cargo sizes `-j` from the CPU count with no
+knowledge of how much memory the machine has, so several `ld` processes run at
+once and the kernel kills one:
+
+```
+= note: collect2: fatal error: ld terminated with signal 9 [Killed]
+```
+
+That message names no crate, no file and no symbol, so it reads as a compile
+error that does not exist. Three separate runs in one week were spent hunting a
+type error that was never there. `required-features = ["examples"]` is what
+keeps those eight links out of a build that did not ask for a demo;
+`[profile.dev] debug = "line-tables-only"` and, on Linux,
+`-Csplit-debuginfo=unpacked` from `.cargo/config.toml` are what shrink the links
+you do ask for. Backtraces keep file and line; a debugging session that wants
+the full detail back asks for it on that build alone with
+`RUSTFLAGS="-Cdebuginfo=2"` (which, being an environment variable, also replaces
+the config file's flags rather than adding to them).
+
+**`--all-features` re-enables the gate.** Cargo offers no way to hold a feature
+back from that flag, so `cargo test --all-features` still links all eight and
+rests entirely on the debug-info reductions. `cargo test --lib` is the command
+to reach for in a constrained environment.
+
+`src/build_profile_guard.rs` holds all of this in place, under `cargo test
+--lib`.
+
+## A piped build reports the pipe's exit status
+
+This is not a build setting and no test can hold it: a shell pipeline reports
+the exit status of its *last* command, so an OOM-killed link inside
+
+```sh
+cargo build --all-targets 2>&1 | tail -50
+```
+
+exits 0 and reads as success. The failure then surfaces later, somewhere
+unrelated, as a missing binary. Either turn it on:
+
+```sh
+set -o pipefail
+cargo build --all-targets 2>&1 | tail -50
+```
+
+or read the real status back afterwards:
+
+```sh
+cargo build --all-targets 2>&1 | tail -50; exit ${PIPESTATUS[0]}
+```

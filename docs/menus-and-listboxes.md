@@ -22,13 +22,25 @@ Everything else here follows from it.
 
 | Module | Family | What it is |
 | --- | --- | --- |
-| `select` | Listbox | The chooser: a bordered trigger, a chevron, and a popup of values one of which is marked. Its popup is `Listbox`, private to the module |
+| `select` | Listbox | The chooser: a bordered trigger, a chevron, and a popup of values one of which is marked. Its popup is `Listbox`, now shared |
+| `combobox` | Listbox | A text field that filters the same popup. The typed text is not the value: `selected` is, and typing clears it |
 | `context_menu` | Menu | A menu of actions at the pointer, with its own row vocabulary (items, separators, disabled items) and its own keyboard model |
+| `command` | Menu | A command palette: a filterable list of actions over a scrim. Its rows are actions and nothing stays selected once one has run, which is what puts it here rather than beside `select` — even though its nodes announce listbox *roles*, because gpui's menu roles carry no `position_in_set` and a palette's "3 of 40" is the one thing a screen reader user most needs |
 
-Two rows is the honest size of this table today, and it is the size the test
-enforces against the crate rather than a target. A third chooser or a third
-menu adds a row; anything that would need a row in *both* columns is the shape
-this document exists to catch.
+Four rows, two per family, and the test enforces the table against the crate
+rather than a target. Anything that would need a row in *both* columns is the
+shape this document exists to catch.
+
+**A gap in gpui, recorded once rather than twice.** `combobox` and `command`
+both want the APG arrangement where focus stays on a text field and points at a
+list beside it, and `src/a11y.rs`'s `A11y::active_descendant` says that
+arrangement **cannot be expressed**: gpui puts the property on the item and
+honours it only under a focused *ancestor*, and a sibling is not an ancestor.
+Both decline the claim in writing rather than making one that would be dropped
+in silence — and neither could learn it was dropped, because the property is
+applied at paint time behind `window.a11y.is_active()`, which no test platform
+here switches on. Two components independently unable to express it is a gpui
+gap, not a gap in either of them.
 
 Elements that choose a value without a popup — `radio_group`, `toggle_group`,
 `tabs`, `list` — are not in the table. They are not listboxes in the sense that
@@ -69,7 +81,9 @@ without a replacement argument is the next section.
 
 ## 2. Why the popup is private
 
-`Listbox` — the popup — is a private type in `src/elements/select.rs`. It is
+`Listbox` — the popup — is a `pub(crate)` type in `src/elements/listbox.rs`,
+lifted there when `combobox` became its second caller; it was a private type in
+`src/elements/select.rs` when this rule was written. The rule is unchanged. It is
 not `pub`, not `pub(crate)`, and not in a module of its own.
 
 This is the part of the decision that enforces itself. The mistake #154 undid
@@ -198,13 +212,14 @@ test here could be.
 
 ## What would reopen this
 
-**A second element that genuinely needs a listbox popup.**
-`docs/issues/combobox.md` is the candidate: a text field that filters a list of
-choices is a listbox with typing, and its popup rows are values. That issue
-inherits this decision rather than re-taking it, and it inherits the
-instruction in §2 with it — lift `Listbox` into a `pub(crate)` module named by
-both callers, do not make it `pub` where it sits, and do not build a fourth
-popup beside it.
+**A second element that genuinely needs a listbox popup — and it arrived.**
+`docs/issues/combobox.md` was the candidate and `src/elements/combobox.rs` is
+the answer: a text field that filters a list of choices is a listbox with
+typing, and its popup rows are values. It took the escape clause §2 wrote for
+it rather than re-taking the decision — `Listbox` was lifted into
+`src/elements/listbox.rs`, a `pub(crate)` module named by both callers, it was
+**not** made `pub` where it sat, and no fourth popup was built beside it. The
+clause is spent; a third caller uses the module that now exists.
 
 **A menu that wants a trigger.** See §5. That reopens nothing here; it fills a
 row in the table.

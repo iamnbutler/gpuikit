@@ -1,7 +1,6 @@
 //! Cursor blink state management for text input components.
 
 use gpui::Context;
-use smol::Timer;
 use std::time::Duration;
 
 /// Manages the blinking state of a text cursor.
@@ -84,7 +83,10 @@ impl CursorBlink {
         let interval = self.interval;
 
         cx.spawn(async move |this, cx| {
-            Timer::after(interval).await;
+            // Bound to a local first: `cx.background_executor().timer(d).await`
+            // would hold a borrow of `cx` across the await point.
+            let timer = cx.background_executor().timer(interval);
+            timer.await;
             this.update(cx, |this, cx| {
                 if this.generation == generation {
                     this.paused = false;
@@ -108,7 +110,8 @@ impl CursorBlink {
         let interval = self.interval;
 
         cx.spawn(async move |this, cx| {
-            Timer::after(interval).await;
+            let timer = cx.background_executor().timer(interval);
+            timer.await;
             if let Some(this) = this.upgrade() {
                 this.update(cx, |this, cx| {
                     if this.generation == generation {

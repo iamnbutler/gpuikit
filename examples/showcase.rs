@@ -611,6 +611,8 @@ struct Showcase {
     textarea_read_only: Entity<InputState>,
     popover_example: Entity<PopoverState>,
     dialog_example: Entity<DialogState>,
+    /// The destructive confirmation: same element, confirm mode.
+    destructive_dialog: Entity<DialogState>,
     context_menu_pinned: bool,
     context_menu_status: SharedString,
     /// Whether the Loading page's indicators advance. Pausing them takes the
@@ -961,6 +963,21 @@ impl Showcase {
             )
         });
 
+        let destructive_dialog = cx.new(|_cx| {
+            DialogState::new(
+                dialog("showcase-destructive-dialog")
+                    .confirm(
+                        "Delete this project?",
+                        "Its 42 tasks are deleted with it. This cannot be undone.",
+                    )
+                    // Name the verb, not "Confirm".
+                    .confirm_label("Delete")
+                    .on_confirm(|_window, _cx| {
+                        log::info!("the destructive confirmation was confirmed");
+                    }),
+            )
+        });
+
         let table_filter = cx.new(InputState::new_singleline);
         // Typing in the filter has to re-derive the page's rows, and the rows
         // are derived in `render`, so the page has to hear about the keystroke.
@@ -1027,6 +1044,7 @@ impl Showcase {
             textarea_read_only,
             popover_example,
             dialog_example,
+            destructive_dialog,
             context_menu_pinned: true,
             context_menu_status: "No action chosen yet.".into(),
             loading_playing: true,
@@ -2666,6 +2684,19 @@ impl Showcase {
                     });
                 },
             )))
+            .child(div().text_sm().text_color(theme.fg_muted()).child(
+                "A confirmation is the same element in confirm mode: one question, \
+                            two answers, focus on the safe one, and Role::AlertDialog.",
+            ))
+            .child(
+                button("open-destructive-dialog", "Delete Project")
+                    .destructive()
+                    .on_click(cx.listener(|showcase, _, window, cx| {
+                        showcase.destructive_dialog.update(cx, |dialog, cx| {
+                            dialog.open(window, cx);
+                        });
+                    })),
+            )
     }
 
     fn render_context_menu_page(&self, cx: &Context<Self>) -> impl IntoElement {
@@ -3850,6 +3881,7 @@ impl Render for Showcase {
                     .child(content),
             )
             .child(self.dialog_example.clone())
+            .child(self.destructive_dialog.clone())
             .child(cx.toast_manager().clone())
     }
 }

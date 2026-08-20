@@ -812,11 +812,6 @@ pub const ELEMENTS_WITHOUT_A_ROLE: &[(&str, &str)] = &[
          need the roving-focus convention `role_requires_keyboard_focus` names",
     ),
     (
-        "dialog",
-        "would be Role::Dialog with a required name and `modal`; gpui has no `aria_modal` \
-         builder, and a dialog that announces itself unmodal is worse than one that waits",
-    ),
-    (
         "empty",
         "an empty-state illustration with a heading and a message: it would announce a \
          Role::Group named by its own heading, which is the naming rule `card` is also waiting on",

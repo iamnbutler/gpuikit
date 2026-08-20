@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Confirmation dialogs, as a mode of `Dialog` rather than a second modal.**
+  `dialog(id).confirm(question, consequence)` sets the title, the description
+  and the mode in one call — that pairing is how "a question and its
+  consequence" is enforced, since the two are independent `Option`s everywhere
+  else in the builder. `.confirm_label` / `.cancel_label` / `.destructive` /
+  `.on_confirm` / `.on_cancel` *refine* a confirmation and refuse to create
+  one, so `.confirm_label("Delete")` on a plain dialog is a `debug_assert!`
+  rather than an alert with no question in it. `DialogState` gains `confirm`,
+  `cancel`, `is_confirmation` and the `DialogConfirmed` / `DialogCancelled`
+  events. Escape, the backdrop and the header's close button all route through
+  one private `dismiss`, which cancels a confirmation and plainly closes a
+  plain dialog — there is no path in the module from a key or a stray click to
+  `DialogConfirmed`; only the confirm button reaches it. A confirmation opens
+  with the **safe** answer focused, through `Button::focus_handle`.
+  `Confirmation`'s `destructive` defaults to `true`, and the doc comment argues
+  both sides of that default so a caller who wants a plain "Save changes?"
+  finds `.destructive(false)`
+- `ButtonVariant::Destructive`, `Button::variant(..)` and `Button::destructive()`,
+  discharging the `// todo: style through ButtonVariant`. Background, text
+  colour, hover, active and the focus ring all branch on the variant, and
+  `traits::button::Button::variant` returns the stored value instead of
+  `Default::default()`. Note that the inherent `variant(..)` builder *shadows*
+  the trait getter for method-call syntax: read the value back with
+  `traits::button::Button::variant(&b)`
+- `Themeable::destructive_bg`, `destructive_bg_hover`, `destructive_bg_active`
+  and `destructive_fg`, derived from the existing `danger()` rather than added
+  as new palette entries. `destructive_fg` picks black or white off the fill's
+  own lightness, because a light theme's `fg()` is dark and dark text on a
+  saturated red is the one combination to avoid
+- `elements::dialog` is adopted into `a11y` and leaves
+  `ELEMENTS_WITHOUT_A_ROLE`. A **confirmation** announces `Role::AlertDialog`,
+  named by its question and described by its consequence, on the panel rather
+  than the scrim. A **plain** dialog still announces nothing: gpui has no
+  `aria_modal`, and the deleted entry's reason — "a dialog that announces
+  itself unmodal is worse than one that waits" — applies to it unchanged. That
+  argument now lives in `dialog.rs` next to the guard that implements it
+
 ### Breaking Changes
 
 - **`gpuikit::elements::dropdown` is gone in full.** `Dropdown`,

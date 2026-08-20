@@ -30,7 +30,7 @@ use crate::traits::control_sized::ControlSized;
 /// The controls the row draws, in the order it draws them. Each name is also
 /// the `debug_selector` its box is measured through.
 ///
-/// Nine of the crate's sixteen `ControlSized` implementors. The other seven,
+/// Nine of the crate's seventeen `ControlSized` implementors. The other eight,
 /// and the six elements that are not on the scale at all, are enumerated on
 /// [`every_sized_control_on_a_row_is_the_same_height`].
 const CONTROLS: &[&str] = &[
@@ -135,7 +135,7 @@ fn measure_row(cx: &mut TestAppContext, size: ControlSize) -> Vec<(&'static str,
 ///
 /// The name says "sized" rather than "control" because both halves of that
 /// gap are real, and neither is visible from the row itself. `grep "impl
-/// ControlSized"` finds sixteen implementors; this row measures nine. Someone
+/// ControlSized"` finds seventeen implementors; this row measures nine. Someone
 /// who adds a tenth needs to be able to tell unfinished coverage from a broken
 /// scale, and this comment is the only thing that tells them.
 ///
@@ -151,7 +151,7 @@ fn measure_row(cx: &mut TestAppContext, size: ControlSize) -> Vec<(&'static str,
 ///   `px(8.)` bar, a `rems(1.0)` radio. Not padding-derived, whatever the
 ///   shorthand in iamnbutler/gpuikit#152 says.
 ///
-/// **Seven more do implement `ControlSized` and are still not measured here**,
+/// **Eight more do implement `ControlSized` and are still not measured here**,
 /// which is the half that is easy to miss:
 ///
 /// - `Field`, `Input` — reachable through the `text-field` entry above, which
@@ -163,6 +163,9 @@ fn measure_row(cx: &mut TestAppContext, size: ControlSize) -> Vec<(&'static str,
 /// - `Table`, `Sidebar`, `SidebarTrigger` — containers rather than row
 ///   controls. `SidebarTrigger` is the arguable one: it is an `IconButton` in
 ///   all but name and could join the row.
+/// - `Dialog` — a modal surface, not a row control. Its rung sizes the two
+///   action buttons of a confirmation and the gap between them; the panel's
+///   own padding is component-specific.
 ///
 /// Closing the gap is separate work, tracked as iamnbutler/gpuikit#152. The
 /// three worth doing first are `Tabs`, `ToggleGroup` and `Slider`: all three

@@ -84,7 +84,12 @@ log = "0.4"
 # Input module dependencies
 unicode-bidi = "0.3"
 unicode-segmentation = "1.10"
-smol = "2.0"
+# No async runtime here on purpose. `smol::Timer` is `async_io::Timer`, and
+# constructing one spawns the process-global `async-io` OS thread, whose
+# `main_loop` has no exit path — it was still in the reactor at process exit
+# and aborted the test binary after every test had passed (#190). Delays go
+# through gpui's own `BackgroundExecutor::timer`, which is also the
+# deterministic clock under `#[gpui::test]`. See `src/undying_thread_guard.rs`.
 
 # Markdown parsing
 pulldown-cmark = { version = "0.13.4", default-features = false, features = ["simd"] }

@@ -106,6 +106,17 @@ mod release_input_validation;
 #[cfg(test)]
 mod build_profile_guard;
 
+/// Tests for the rule that this crate creates no thread it cannot join — no
+/// `smol` / `async-io` dependency, no `smol::` or `async_io::` in the source,
+/// and the two delays (cursor blink, toast auto-dismiss) scheduled on gpui's
+/// `BackgroundExecutor::timer`.
+///
+/// No runtime code, and nothing outside a test build. The `async-io` thread's
+/// `main_loop` has no exit path, so it raced process teardown and aborted a
+/// fully green `cargo test --lib` (#190). See its own docs.
+#[cfg(test)]
+mod undying_thread_guard;
+
 /// Embedded assets for gpuikit (icons, fonts, etc.)
 #[derive(RustEmbed)]
 #[folder = "assets"]

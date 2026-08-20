@@ -30,7 +30,6 @@ use gpui::{
     Global, Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement, Render,
     SharedString, StatefulInteractiveElement, Styled, Svg, Window,
 };
-use smol::Timer;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -295,7 +294,10 @@ impl ToastManager {
         // Schedule auto-dismiss
         let duration = toast.duration;
         cx.spawn(async move |this, cx| {
-            Timer::after(duration).await;
+            // Bound to a local first: awaiting the call directly would hold a
+            // borrow of `cx` across the await point.
+            let timer = cx.background_executor().timer(duration);
+            timer.await;
             if let Some(this) = this.upgrade() {
                 this.update(cx, |manager, cx| {
                     manager.dismiss_toast_by_generation(generation, cx);

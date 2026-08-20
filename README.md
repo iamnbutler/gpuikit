@@ -87,6 +87,23 @@ follow-up parse. The `stitch` feature additionally closes unterminated syntax
 document flickering between literal markers and styled text. See
 `examples/markdown_streaming.rs`.
 
+## Testing
+
+```sh
+cargo test --lib
+```
+
+That is the whole suite, and it is what `.tasks/verify` runs. `--lib` is not a
+shortcut: `--all-features` re-enables the `examples` feature and links eight
+copies of gpui at once, and a bare `cargo test` links one binary per doctest,
+both of which get the linker OOM-killed on a small machine. There are no
+integration tests, so `--lib` skips nothing but doctests.
+
+Judging a run by its exit status alone has misreported this repository twice —
+in both directions. `scripts/run-tests.sh --lib` decides from the harness's own
+`test result:` lines instead; [docs/running-tests.md](docs/running-tests.md)
+explains when that matters.
+
 ## License
 
 Licensed under either of:

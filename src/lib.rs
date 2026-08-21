@@ -54,6 +54,7 @@ use rust_embed::RustEmbed;
 
 // Core modules
 pub mod a11y;
+pub mod date;
 pub mod element_id;
 pub mod elements;
 pub mod error;
@@ -163,6 +164,11 @@ pub fn init(cx: &mut App) {
     // close its own popup. Registering last is belt and braces for the second
     // half of that. See `elements::select`'s `# The keyboard`.
     elements::select::bind_select_keys(cx);
+    // Same reasoning as the listbox above, one component along: the grid's
+    // arrows, Home/End, PageUp/PageDown and Enter are bound in the deeper
+    // `Calendar` context, so a calendar inside a dialog keeps them and the
+    // dialog still gets Escape. See `elements::calendar`'s `# The keyboard`.
+    elements::calendar::bind_calendar_keys(cx);
     // **After `input::bind_input_keys`, and the order is load-bearing.** Both
     // of these bind `up`, `down`, `enter` and `escape` in a
     // `"<Component> > Input"` context predicate, which matches at the focused

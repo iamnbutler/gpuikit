@@ -6,6 +6,31 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **`Calendar`: a six-by-seven month grid of selectable days**, in
+  `src/elements/calendar.rs`. Weekday headings, muted leading and trailing days
+  so the grid never changes height, single selection, a caller-supplied `today`
+  rather than a clock read, a disabled-day *predicate* rather than a list,
+  month navigation, and `first_day_of_week` / `month_labels` / `weekday_labels`
+  as the localisation parameters. An entity, because it holds the visible
+  month, the keyboard-focused day and its `FocusHandle` across frames; events
+  are `CalendarEvent::Selected` and `CalendarEvent::MonthChanged`, and the
+  visible month is symmetric — `set_visible_month` in, `MonthChanged` out — so
+  an owner can bring the grid to a date it got from a field beside it. The
+  keyboard is bound **actions** in a `Calendar` key context registered by
+  `bind_calendar_keys` from `gpuikit::init`, not one `on_key_down`, because
+  gpui dispatches bound actions first and a raw handler would hand these keys
+  to an enclosing dialog (`docs/menus-and-listboxes.md` §3). Announces
+  `Role::Grid` over `Role::Row` / `Role::ColumnHeader` / `Role::GridCell`, with
+  the grid as the one tab stop and `active_descendant` on the focused day —
+  the ancestor arrangement gpui honours, not the sibling one it drops
+- **`gpuikit::date`: a minimal civil `Date { year, month, day }` and `Weekday`**,
+  so no `chrono` / `time` / `jiff` reaches this crate's public API. Private
+  fields behind a validating `Date::new`, derived chronological ordering, and
+  every operation — `weekday`, `add_days`, `add_months` (clamping),
+  `is_same_month`, `first_of_month` — defined through Hinnant's
+  `days_from_civil` / `civil_from_days`, so the leap-year rule appears once.
+  Verified over every day from 1800 to 2200 rather than sampled. Deliberately
+  no `Date::today`
 - **Confirmation dialogs, as a mode of `Dialog` rather than a second modal.**
   `dialog(id).confirm(question, consequence)` sets the title, the description
   and the mode in one call — that pairing is how "a question and its

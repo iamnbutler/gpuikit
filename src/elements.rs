@@ -6,6 +6,7 @@ pub mod badge;
 pub mod breadcrumb;
 pub mod button;
 pub mod button_group;
+pub mod calendar;
 pub mod card;
 pub mod checkbox;
 pub mod collapsible;
@@ -80,7 +81,7 @@ mod triage_coverage {
 
     /// The split the document states in prose. Restated here on purpose:
     /// editing the table without editing the prose fails.
-    const EXPECTED: [(&str, usize); 3] = [("Shipped", 12), ("Issue", 6), ("Rejected", 11)];
+    const EXPECTED: [(&str, usize); 3] = [("Shipped", 13), ("Issue", 5), ("Rejected", 11)];
 
     /// An issue body shorter than this is a stub, and #146 asked for complete
     /// ones — prior art, references, crate gaps, the a11y answer, sizing and

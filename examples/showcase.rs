@@ -26,10 +26,13 @@ use gpuikit::{
         card::card,
         checkbox::{checkbox, Checkbox},
         collapsible::{collapsible, Collapsible},
+        combobox::{combobox, Combobox, ComboboxState},
+        command::{CommandItem, CommandState},
         context_menu::{context_menu, menu_item},
         dialog::{dialog, DialogState},
         empty::empty,
         field::{field, LabelPosition},
+        form::fieldset,
         icon_button::icon_button,
         kbd::{kbd, kbd_combo},
         label::label,
@@ -196,10 +199,13 @@ const ELEMENT_COVERAGE: &[(&str, &str)] = &[
     ("card", "card"),
     ("checkbox", "toggle"),
     ("collapsible", "collapsible"),
+    ("combobox", "combobox"),
+    ("command", "command"),
     ("context_menu", "context-menu"),
     ("dialog", "dialog"),
     ("empty", "empty"),
     ("field", "text"),
+    ("form", "form"),
     ("icon_button", "button"),
     ("input", "text"),
     ("kbd", "badge"),
@@ -249,8 +255,10 @@ const NAV_SECTIONS: &[NavSection] = &[
             ("selection", "Selection"),
             ("select", "Select"),
             ("calendar", "Calendar"),
+            ("combobox", "Combobox"),
             ("slider", "Slider"),
             ("text", "Text"),
+            ("form", "Form"),
             ("tabs", "Tabs"),
         ],
     ),
@@ -289,6 +297,7 @@ const NAV_SECTIONS: &[NavSection] = &[
             ("popover", "Popover"),
             ("dialog", "Dialog"),
             ("context-menu", "Context Menu"),
+            ("command", "Command"),
             ("toast", "Toast"),
         ],
     ),
@@ -566,6 +575,22 @@ struct Showcase {
     priority_select: Entity<SelectState<Priority>>,
     theme_select: Entity<SelectState<ThemeChoice>>,
     country_select: Entity<SelectState<Country>>,
+    /// The six states `docs/issues/combobox.md` asked a page to show, plus the
+    /// two blur modes that are not the default.
+    combobox_default: Entity<ComboboxState<&'static str>>,
+    combobox_selected: Entity<ComboboxState<&'static str>>,
+    combobox_small: Entity<ComboboxState<&'static str>>,
+    combobox_medium: Entity<ComboboxState<&'static str>>,
+    combobox_large: Entity<ComboboxState<&'static str>>,
+    combobox_disabled: Entity<ComboboxState<&'static str>>,
+    combobox_keep: Entity<ComboboxState<&'static str>>,
+    combobox_create: Entity<ComboboxState<&'static str>>,
+    /// What the `Create` field's handler was last handed. The handler gets a
+    /// `&mut App` and not this view, so it writes through an `Rc<RefCell<…>>`
+    /// the page reads back — which is also the shape a real caller uses to push
+    /// the created option onto its own list.
+    combobox_created: Rc<RefCell<SharedString>>,
+    command_palette: Entity<CommandState>,
     /// Retained, not minted per frame: selection state lives on the entity,
     /// so `markdown()` — which creates a fresh one per call — cannot hold it.
     markdown: Entity<Markdown>,
@@ -582,6 +607,11 @@ struct Showcase {
     toggle_pinned: Entity<Toggle>,
     toggle_disabled: Entity<Toggle>,
     checkbox_agree: Entity<Checkbox>,
+    /// The form page's three checkboxes. Two of them are inside a fieldset
+    /// disabled at the group and say nothing about `disabled` themselves.
+    checkbox_form_consent: Entity<Checkbox>,
+    checkbox_form_locked: Entity<Checkbox>,
+    checkbox_form_updates: Entity<Checkbox>,
     checkbox_newsletter: Entity<Checkbox>,
     radio_notifications: Entity<RadioGroup<NotificationPreference>>,
     switch_wifi: Entity<Switch>,
@@ -745,6 +775,10 @@ impl Showcase {
                 .label("Disabled")
                 .disabled(true)
         });
+
+        let checkbox_form_consent = cx.new(|_cx| checkbox("form-consent", false));
+        let checkbox_form_locked = cx.new(|_cx| checkbox("form-locked-consent", true));
+        let checkbox_form_updates = cx.new(|_cx| checkbox("form-locked-updates", false));
 
         let checkbox_agree =
             cx.new(|_cx| checkbox("agree-terms", false).label("I agree to the terms"));
@@ -1016,6 +1050,100 @@ impl Showcase {
         let active_page = Rc::new(RefCell::new(SharedString::from("button")));
         let nav = nav_entries(&active_page);
 
+        let fruits = || {
+            vec![
+                ("apple", "Apple"),
+                ("apricot", "Apricot"),
+                ("banana", "Banana"),
+                ("blackberry", "Blackberry"),
+                ("cherry", "Cherry"),
+                ("damson", "Damson"),
+            ]
+        };
+        let mut new_combobox = |id: &'static str,
+                                build: &dyn Fn(Combobox<&'static str>) -> Combobox<&'static str>,
+                                window: &mut Window,
+                                cx: &mut Context<Self>| {
+            cx.new(|cx| {
+                ComboboxState::new(build(combobox(id, "Fruit", fruits())), window, cx)
+            })
+        };
+
+        let combobox_default = new_combobox("combobox-default", &|b| b, _window, cx);
+        let combobox_selected =
+            new_combobox("combobox-selected", &|b| b.selected("banana"), _window, cx);
+        let combobox_small = new_combobox(
+            "combobox-small",
+            &|b| b.control_size(ControlSize::Small),
+            _window,
+            cx,
+        );
+        let combobox_medium = new_combobox(
+            "combobox-medium",
+            &|b| b.control_size(ControlSize::Medium),
+            _window,
+            cx,
+        );
+        let combobox_large = new_combobox(
+            "combobox-large",
+            &|b| b.control_size(ControlSize::Large),
+            _window,
+            cx,
+        );
+        let combobox_disabled = new_combobox(
+            "combobox-disabled",
+            &|b| b.selected("cherry").disabled(true),
+            _window,
+            cx,
+        );
+        let combobox_keep =
+            new_combobox("combobox-keep", &|b| b.keep_unmatched_text(), _window, cx);
+
+        let combobox_created = Rc::new(RefCell::new(SharedString::from("nothing yet")));
+        let created = combobox_created.clone();
+        let combobox_create = cx.new(|cx| {
+            ComboboxState::new(
+                combobox("combobox-create", "Fruit", fruits()).on_create(move |text, _window, _cx| {
+                    *created.borrow_mut() = text;
+                }),
+                _window,
+                cx,
+            )
+        });
+
+        let command_palette = cx.new(|cx| {
+            CommandState::new(
+                "showcase-command",
+                "Commands",
+                vec![
+                    CommandItem::new("Open File")
+                        .subtitle("from disk")
+                        .keywords(["edit", "load"])
+                        .shortcut("cmd-o"),
+                    CommandItem::new("Save").shortcut("cmd-s"),
+                    CommandItem::new("Save As…").subtitle("write a copy"),
+                    CommandItem::new("Close Window").shortcut("cmd-w"),
+                    CommandItem::new("Toggle Theme").keywords(["dark", "light"]),
+                    CommandItem::new("Publish").subtitle("needs a signed build").disabled(true),
+                    CommandItem::new("Quit").shortcut("cmd-q"),
+                ],
+                _window,
+                cx,
+            )
+            // The two-line case-insensitive filter a consumer writes.
+            // Deliberately here rather than in the crate: a palette that
+            // shipped a ranking would ship an opinion no caller could replace.
+            .matcher(|query, items| {
+                let query = query.to_lowercase();
+                items
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, item)| item.haystack().to_lowercase().contains(&query))
+                    .map(|(index, _)| index)
+                    .collect()
+            })
+        });
+
         Self {
             focus_handle: cx.focus_handle(),
             active_page,
@@ -1034,6 +1162,16 @@ impl Showcase {
             priority_select,
             theme_select,
             country_select,
+            combobox_default,
+            combobox_selected,
+            combobox_small,
+            combobox_medium,
+            combobox_large,
+            combobox_disabled,
+            combobox_keep,
+            combobox_create,
+            combobox_created,
+            command_palette,
             markdown,
             markdown_stream,
             stream_generation: 0,
@@ -1045,6 +1183,9 @@ impl Showcase {
             toggle_pinned,
             toggle_disabled,
             checkbox_agree,
+            checkbox_form_consent,
+            checkbox_form_locked,
+            checkbox_form_updates,
             checkbox_newsletter,
             radio_notifications,
             switch_wifi,
@@ -1495,6 +1636,110 @@ impl Showcase {
     /// `.selected(…)` always has a value — that is the old `Dropdown` — and one
     /// built without shows its placeholder until something is chosen, and can
     /// be put back into that state with `clear()`.
+    /// The combobox page: the six states the issue asked for — default,
+    /// pre-selected, the three `ControlSize` rungs, disabled — plus the two
+    /// blur modes that are not the default. It draws real comboboxes rather
+    /// than pointing `ELEMENT_COVERAGE` at the select page, which would answer
+    /// the build gate without meeting it.
+    fn render_combobox_page(&self, cx: &Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+        let heading = |text: &'static str| {
+            div()
+                .text_sm()
+                .text_color(theme.fg_muted())
+                .child(text)
+        };
+
+        v_stack()
+            .gap_4()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .child("Combobox"),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(theme.fg_muted())
+                    .child(
+                        "A text field that filters a list of values. Type to filter, \
+                         Down / Up to move the highlight, Enter to commit, Escape to close.",
+                    ),
+            )
+            .child(heading("Default, and with a value from `.selected(…)`"))
+            .child(
+                h_stack()
+                    .gap_4()
+                    .items_start()
+                    .child(self.combobox_default.clone())
+                    .child(self.combobox_selected.clone()),
+            )
+            .child(heading("The three control sizes"))
+            .child(
+                h_stack()
+                    .gap_4()
+                    .items_start()
+                    .child(self.combobox_small.clone())
+                    .child(self.combobox_medium.clone())
+                    .child(self.combobox_large.clone()),
+            )
+            .child(heading("Disabled"))
+            .child(self.combobox_disabled.clone())
+            .child(heading(
+                "`.keep_unmatched_text()` — text that matches nothing survives blur",
+            ))
+            .child(self.combobox_keep.clone())
+            .child(heading(
+                "`.on_create(…)` — unmatched text is handed to a handler on blur",
+            ))
+            .child(self.combobox_create.clone())
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(theme.fg_muted())
+                    .child(format!("Last created: {}", self.combobox_created.borrow())),
+            )
+    }
+
+    /// The command palette page. The palette itself is an overlay, so the page
+    /// is a button that opens it and a note about the keyboard.
+    fn render_command_page(&self, cx: &Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+        let palette = self.command_palette.clone();
+
+        v_stack()
+            .gap_4()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .child("Command"),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(theme.fg_muted())
+                    .child(
+                        "A filterable list of actions over a scrim. Down / Up move the \
+                         selection while focus stays in the query field, Enter runs, \
+                         Escape dismisses. The matcher is two lines in this example and \
+                         deliberately not in the crate.",
+                    ),
+            )
+            .child(
+                button("open-command-palette", "Open the palette").on_click({
+                    let palette = palette.clone();
+                    move |_event, window, cx| {
+                        palette.update(cx, |state, cx| state.open(window, cx));
+                    }
+                }),
+            )
+            .child(palette)
+    }
+
     fn render_select_page(&self, cx: &Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         let country_select = self.country_select.clone();
@@ -1630,7 +1875,7 @@ impl Showcase {
                 v_stack()
                     .gap_4()
                     .child(
-                        field()
+                        field("username")
                             .label("Username")
                             .description("Enter your preferred username")
                             .required(true)
@@ -1647,7 +1892,7 @@ impl Showcase {
                             ),
                     )
                     .child(
-                        field()
+                        field("email")
                             .label("Email")
                             .error("Please enter a valid email address")
                             .child(
@@ -1663,7 +1908,7 @@ impl Showcase {
                             ),
                     )
                     .child(
-                        field()
+                        field("department")
                             .label("Department")
                             .label_position(LabelPosition::Beside)
                             .description("Select your department")
@@ -1678,6 +1923,68 @@ impl Showcase {
                                     .text_color(theme.fg_muted())
                                     .child("(horizontal layout)"),
                             ),
+                    ),
+            )
+    }
+
+    /// Grouping and label association — the two things #164 asked for, and
+    /// nothing about form state.
+    ///
+    /// The second fieldset is the whole argument: it says `disabled(true)`
+    /// once, and neither field nor either checkbox inside it says anything
+    /// about `disabled` at all.
+    fn render_form_page(&self, cx: &Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+        v_stack()
+            .gap_4()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.fg_muted())
+                    .child("Form"),
+            )
+            .child(
+                fieldset("form-showcase-billing")
+                    .legend("Billing address")
+                    .description("A fieldset groups related controls and names the group.")
+                    .error("This address could not be verified")
+                    .child(
+                        field("form-showcase-street")
+                            .label("Street")
+                            .description("Click the label to focus the control it names")
+                            .child(
+                                div()
+                                    .px_2()
+                                    .py_1()
+                                    .border_1()
+                                    .border_color(theme.border())
+                                    .rounded(gpui::px(4.0))
+                                    .text_sm()
+                                    .text_color(theme.fg_muted())
+                                    .child("(input placeholder)"),
+                            ),
+                    )
+                    .child(
+                        field("form-showcase-consent")
+                            .label("Consent")
+                            .child(self.checkbox_form_consent.clone()),
+                    ),
+            )
+            .child(
+                fieldset("form-showcase-locked")
+                    .legend("Disabled at the group")
+                    .description("Neither field nor checkbox below says `disabled`.")
+                    .disabled(true)
+                    .child(
+                        field("form-showcase-locked-consent")
+                            .label("Consent")
+                            .child(self.checkbox_form_locked.clone()),
+                    )
+                    .child(
+                        field("form-showcase-locked-updates")
+                            .label("Updates")
+                            .child(self.checkbox_form_updates.clone()),
                     ),
             )
     }
@@ -1785,7 +2092,7 @@ impl Showcase {
                 v_stack()
                     .gap_4()
                     .child(
-                        field()
+                        field("message")
                             .label("Message")
                             .description("Tell us what's on your mind")
                             .child(
@@ -1800,7 +2107,7 @@ impl Showcase {
                         // live element at all, so it takes neither focus nor
                         // keystrokes. It clips a long value rather than
                         // scrolling it — that is the trade for being inert.
-                        field().label("Disabled").disabled(true).child(
+                        field("disabled-message").label("Disabled").disabled(true).child(
                             textarea(&self.textarea_disabled, cx)
                                 .placeholder("This is disabled...")
                                 .rows(2)
@@ -1812,7 +2119,7 @@ impl Showcase {
                         // selectable, still scrollable, and every edit path —
                         // typing, IME, paste, delete, tab, undo — refused by
                         // `InputState`.
-                        field()
+                        field("read-only-message")
                             .label("Read-only")
                             .description("Focus it, select it, copy it — it will not change")
                             .child(
@@ -3892,6 +4199,8 @@ impl Render for Showcase {
                 .into_any_element(),
             "select" => self.render_select_page(cx).into_any_element(),
             "calendar" => self.render_calendar_page(cx).into_any_element(),
+            "combobox" => self.render_combobox_page(cx).into_any_element(),
+            "command" => self.render_command_page(cx).into_any_element(),
             "control-sizes" => self.render_control_sizes_page(cx).into_any_element(),
             "text" => v_stack()
                 .gap_8()
@@ -3899,6 +4208,7 @@ impl Render for Showcase {
                 .child(self.render_text_field_page(cx))
                 .child(self.render_textarea_page(cx))
                 .into_any_element(),
+            "form" => self.render_form_page(cx).into_any_element(),
             "slider" => self.render_slider_page(cx).into_any_element(),
             "tabs" => self.render_tabs_page(cx).into_any_element(),
             "avatar" => self.render_avatar_page(cx).into_any_element(),

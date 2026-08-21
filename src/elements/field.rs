@@ -1,12 +1,21 @@
 //! Field component for wrapping form inputs with labels, descriptions, and error states.
+//!
+//! A `Field` does two things a control beside it cannot do for itself: it
+//! *names* it, and it opens an ambient [`FormContext`] carrying that name, the
+//! field's `disabled`, and the focus handle its label click lands on. See
+//! [`crate::elements::form`] for why that is ambient rather than a prop.
 
+use crate::a11y::{A11y, Announce};
+use crate::element_id;
+use crate::elements::form::{self, FormContext, WithFormContext};
 use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::traits::accessible::Accessible;
 use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use crate::traits::labelable::Labelable;
 use gpui::{
-    div, prelude::FluentBuilder, rems, AnyElement, App, IntoElement, ParentElement, Rems,
-    RenderOnce, SharedString, Styled, Window,
+    div, prelude::FluentBuilder, rems, AnyElement, App, ElementId, InteractiveElement, IntoElement,
+    ParentElement, Rems, RenderOnce, Role, SharedString, StatefulInteractiveElement, Styled, Window,
 };
 
 /// Width of the label column in the beside layout.
@@ -15,9 +24,9 @@ const LABEL_COLUMN_WIDTH: Rems = Rems(8.0);
 /// Gap between the label column and the input beside it.
 const LABEL_COLUMN_GAP: Rems = Rems(0.75);
 
-/// Creates a new Field builder.
-pub fn field() -> Field {
-    Field::new()
+/// Creates a new Field builder with the given id.
+pub fn field(id: impl Into<ElementId>) -> Field {
+    Field::new(id)
 }
 
 /// Label position relative to the input.
@@ -35,7 +44,7 @@ pub enum LabelPosition {
 /// # Example
 ///
 /// ```ignore
-/// field()
+/// field("username")
 ///     .label("Username")
 ///     .description("Enter your username")
 ///     .required(true)
@@ -43,6 +52,7 @@ pub enum LabelPosition {
 /// ```
 #[derive(IntoElement)]
 pub struct Field {
+    id: ElementId,
     label: Option<SharedString>,
     description: Option<SharedString>,
     error: Option<SharedString>,
@@ -54,9 +64,14 @@ pub struct Field {
 }
 
 impl Field {
-    /// Create a new Field.
-    pub fn new() -> Self {
+    /// Create a new Field with the given id.
+    ///
+    /// The id is required — it carries the field's accessibility node, scopes
+    /// the label's own id, and keys the focus handle the label publishes. See
+    /// [`crate::element_id`] for the rule it has to satisfy.
+    pub fn new(id: impl Into<ElementId>) -> Self {
         Field {
+            id: id.into(),
             label: None,
             description: None,
             error: None,
@@ -101,12 +116,6 @@ impl Field {
     }
 }
 
-impl Default for Field {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Labelable for Field {
     fn label(mut self, label: impl Into<SharedString>) -> Self {
         self.label = Some(label.into());
@@ -119,14 +128,14 @@ impl Disableable for Field {
         self.disabled
     }
 
-    /// Dims this field's own label, description and error, and **nothing
-    /// else**: a field's child is an opaque `AnyElement`, so it cannot reach
-    /// the control inside it. Disable the control too —
-    /// `field().disabled(true).child(textarea(…).disabled(true))`.
+    /// Dims this field's own label, description and error, **and** publishes
+    /// `disabled` to the control inside it through the ambient
+    /// [`FormContext`].
     ///
-    /// Checked deliberately while fixing the disabled `Textarea`, which looked
-    /// inert under an opacity and still took keystrokes: a `Field` puts no
-    /// opacity over its child, so it is not another instance of that bug.
+    /// A control that reads [`form::disabled_here`] therefore needs nothing
+    /// said about it twice. A control that has not adopted the context still
+    /// needs its own `disabled(true)` — a field's child is an opaque
+    /// `AnyElement`, so this element cannot reach into it.
     fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self
@@ -140,12 +149,35 @@ impl ControlSized for Field {
     }
 }
 
+impl Accessible for Field {
+    /// A `Role::Group` named by the label.
+    ///
+    /// This is label association expressed as its *result* rather than as the
+    /// relation: gpui has no `labelled_by` builder — accesskit has the
+    /// relation, gpui's `AriaProperties` has no field for it — so the field
+    /// announces the name over the label and the control, and republishes it
+    /// through [`FormContext::name`] for the control to announce as its own.
+    fn a11y(&self) -> A11y {
+        let a11y = A11y::new(Role::Group);
+        match &self.label {
+            Some(label) => a11y.name(label.clone()),
+            None => a11y,
+        }
+    }
+}
+
 impl RenderOnce for Field {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let a11y = self.a11y();
+        // Before the theme, which borrows `cx` immutably for the rest of the
+        // function.
+        let focus_handle = form::field_focus_handle(&self.id, cx);
         let theme = cx.theme();
         let metrics = theme.control(self.size);
         let has_error = self.error.is_some();
-        let disabled = self.disabled;
+        // Its own `disabled`, over any group around it. One line, and it is
+        // the whole of what adopting the cascade costs.
+        let disabled = form::disabled_here(self.disabled);
 
         let label_color = if disabled {
             theme.fg_disabled()
@@ -155,10 +187,23 @@ impl RenderOnce for Field {
             theme.fg()
         };
 
-        let label_element = self.label.map(|label_text| {
+        let label_element = self.label.clone().map(|label_text| {
+            let handle = focus_handle.clone();
             div()
+                .id(element_id::scoped(&self.id, "label"))
+                // `debug_selector` compiles to a no-op that never calls its
+                // closure unless gpui's `test-support` is on, so a consumer
+                // pays nothing for it — the same trade `src/elements/table.rs`
+                // makes. It is what makes "a click on the label lands focus on
+                // the control" assertable at all.
+                .debug_selector(|| "gpuikit-field-label".into())
                 .flex()
                 .gap(rems(0.25))
+                // Clicking a label focuses the control it names. A control
+                // that has not adopted `form::focus_handle_here` tracks no
+                // such handle, and the click is inert rather than wrong.
+                .cursor_pointer()
+                .on_click(move |_, window, cx| window.focus(&handle, cx))
                 .child(
                     div()
                         .text_sm()
@@ -186,22 +231,41 @@ impl RenderOnce for Field {
             .error
             .map(|err| div().text_xs().text_color(theme.danger()).child(err));
 
+        // What the field tells the control beside it: what it is called, that
+        // it is disabled, and which handle its label clicks.
+        let context = {
+            let context = FormContext::new()
+                .disabled(disabled)
+                .focus_handle(focus_handle);
+            match self.label {
+                Some(label) => context.name(label),
+                None => context,
+            }
+        };
+        let child = self
+            .child
+            .map(|child| WithFormContext::new(context, child));
+
         match self.label_position {
             LabelPosition::Above => {
                 // Vertical layout: label above input
                 div()
+                    .id(self.id)
+                    .announce(a11y)
                     .flex()
                     .flex_col()
                     .gap(rems(0.375))
                     .when(disabled, |el| el.cursor_not_allowed())
                     .when_some(label_element, |container, label| container.child(label))
                     .when_some(description_element, |container, desc| container.child(desc))
-                    .when_some(self.child, |container, child| container.child(child))
+                    .when_some(child, |container, child| container.child(child))
                     .when_some(error_element, |container, err| container.child(err))
             }
             LabelPosition::Beside => {
                 // Horizontal layout: label beside input
                 div()
+                    .id(self.id)
+                    .announce(a11y)
                     .flex()
                     .flex_col()
                     .gap(rems(0.375))
@@ -233,7 +297,7 @@ impl RenderOnce for Field {
                                         }),
                                 )
                             })
-                            .when_some(self.child, |container, child| {
+                            .when_some(child, |container, child| {
                                 container.child(div().flex_1().child(child))
                             }),
                     )
@@ -242,5 +306,49 @@ impl RenderOnce for Field {
                     })
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::a11y::test_support::announced;
+    use gpui::TestAppContext;
+
+    #[gpui::test]
+    fn a_field_announces_its_label_as_a_group(cx: &mut TestAppContext) {
+        cx.update(crate::theme::init);
+        let cx = cx.add_empty_window();
+
+        let announced = cx.update(|window, cx| {
+            announced(field("street").label("Street"), window, cx)
+        });
+
+        assert_eq!(announced.role, Some(Role::Group));
+        assert_eq!(announced.name(), Some("Street"));
+        assert_eq!(announced.id, Some(ElementId::Name("street".into())));
+    }
+
+    /// The name the field publishes to the control beside it is the same
+    /// string it announces itself — there is no second place for the two to
+    /// disagree.
+    #[test]
+    fn a_field_publishes_its_label_as_the_ambient_name() {
+        let field = field("street").label("Street");
+
+        assert_eq!(
+            field.a11y().accessible_name().map(|name| name.to_string()),
+            Some("Street".to_string())
+        );
+    }
+
+    /// A field inside a disabled group is disabled, without being told.
+    #[test]
+    fn a_field_inherits_an_enclosing_groups_disabled() {
+        form::scope(FormContext::new().disabled(true), || {
+            assert!(form::disabled_here(field("street").is_disabled()));
+        });
+
+        assert!(!form::disabled_here(field("street").is_disabled()));
     }
 }

@@ -169,5 +169,20 @@ pub fn init(cx: &mut App) {
     // `Calendar` context, so a calendar inside a dialog keeps them and the
     // dialog still gets Escape. See `elements::calendar`'s `# The keyboard`.
     elements::calendar::bind_calendar_keys(cx);
+    // **After `input::bind_input_keys`, and the order is load-bearing.** Both
+    // of these bind `up`, `down`, `enter` and `escape` in a
+    // `"<Component> > Input"` context predicate, which matches at the focused
+    // field's own node and so *ties* on depth with `bind_input_keys`' plain
+    // `Input` binding. gpui's `KeyBindingContextPredicate::Descendant`
+    // (`gpui/src/keymap/context.rs:181`, parsed from `>` at `:361`) is what
+    // makes that predicate legal, and `Keymap::bindings_for_input`
+    // (`gpui/src/keymap.rs:173`) sorts candidates
+    // `depth_b.cmp(depth_a).then(ix_b.cmp(ix_a))` — descending depth, then
+    // descending registration index. So the later registration wins the tie,
+    // and registered before `bind_input_keys` these two would compile, run,
+    // and do nothing: every arrow key would move the text cursor. See
+    // `elements::combobox`'s and `elements::command`'s `# The keyboard`.
+    elements::combobox::bind_combobox_keys(cx);
+    elements::command::bind_command_keys(cx);
     elements::toast::init(cx);
 }

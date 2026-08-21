@@ -817,11 +817,6 @@ pub const ELEMENTS_WITHOUT_A_ROLE: &[(&str, &str)] = &[
          Role::Group named by its own heading, which is the naming rule `card` is also waiting on",
     ),
     (
-        "field",
-        "the element that most wants `labelled_by`, which gpui has no builder for — a Field's \
-         whole job is naming the control beside it",
-    ),
-    (
         "icon_button",
         "would be Role::Button with the name as a required constructor argument, which is the \
          breaking change section 2 describes and the first of section 6's rollout",

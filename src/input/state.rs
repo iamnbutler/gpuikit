@@ -1,6 +1,9 @@
 use std::ops::Range;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+// std's Instant::now() panics on wasm32-unknown-unknown; web-time re-exports
+// std::time::Instant on native targets.
+use web_time::Instant;
 
 use gpui::{
     point, px, App, AppContext, Bounds, ClipboardItem, Context, Entity, EventEmitter, FocusHandle,

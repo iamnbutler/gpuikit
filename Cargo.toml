@@ -84,6 +84,9 @@ log = "0.4"
 # Input module dependencies
 unicode-bidi = "0.3"
 unicode-segmentation = "1.10"
+# `std::time::Instant::now()` panics on wasm32-unknown-unknown; web-time
+# re-exports the std types unchanged on native targets.
+web-time = "1"
 # No async runtime here on purpose. `smol::Timer` is `async_io::Timer`, and
 # constructing one spawns the process-global `async-io` OS thread, whose
 # `main_loop` has no exit path — it was still in the reactor at process exit

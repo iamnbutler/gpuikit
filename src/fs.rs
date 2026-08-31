@@ -1,3 +1,12 @@
+//! In-memory file editing backed by the local filesystem.
+//!
+//! **Native-only.** This module exists to read and write the local disk via
+//! `std::fs`, so while it *compiles* for `wasm32-unknown-unknown`, every disk
+//! operation fails at runtime in the browser — there is no filesystem there.
+//! A wasm consumer should bundle content as assets (see [`crate::assets`])
+//! instead of reaching for this module. `src/wasm_compat_guard.rs` tracks
+//! this exemption.
+
 use anyhow::{anyhow, Result};
 use gpui::Context;
 use gpui::TaskExt as _;

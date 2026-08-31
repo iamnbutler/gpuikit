@@ -458,6 +458,8 @@ impl InputBindings {
 
     /// Collects all `Some` bindings into a `Vec<KeyBinding>`.
     pub fn into_bindings(self) -> Vec<KeyBinding> {
+        // The `mut` is only exercised by the macOS-only pushes below.
+        #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
         let mut bindings: Vec<Option<KeyBinding>> = vec![
             self.backspace,
             self.delete,

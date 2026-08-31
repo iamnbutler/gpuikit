@@ -108,6 +108,14 @@ gpui_util = { package = "gpui-util-gpui-unofficial", version = "1.14.2", optiona
 # Schema generation (optional)
 schemars = { version = "0.8", optional = true }
 
+# rust-embed's default debug behavior reads assets from disk at runtime, and
+# the browser has no disk — a debug wasm build would fail to load every icon
+# and font. `debug-embed` compiles the assets in for every profile; gating it
+# to wasm keeps native debug builds' fast from-disk iteration. Consumers get
+# this via feature unification without knowing the trick exists.
+[target.'cfg(target_family = "wasm")'.dependencies]
+rust-embed = { version = "8.2.0", features = ["debug-embed"] }
+
 [dev-dependencies]
 gpui = { package = "gpui-unofficial", version = "1.14.2", features = ["test-support"] }
 tempfile = "3.8"

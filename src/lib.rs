@@ -118,6 +118,17 @@ mod build_profile_guard;
 #[cfg(test)]
 mod undying_thread_guard;
 
+/// Tests for the rule that runtime code stays runnable on
+/// `wasm32-unknown-unknown` — no `std::time::Instant`/`SystemTime`,
+/// `std::fs`, or `std::thread::spawn` outside an explicit allowlist of
+/// native-only APIs and test-only code. These compile for wasm and then
+/// panic or error in the browser, which no local `cargo test` would catch.
+///
+/// No runtime code, and nothing outside a test build. See its own docs, and
+/// <https://github.com/iamnbutler/gpuikit-demo> for gpuikit running on wasm.
+#[cfg(test)]
+mod wasm_compat_guard;
+
 /// Embedded assets for gpuikit (icons, fonts, etc.)
 #[derive(RustEmbed)]
 #[folder = "assets"]

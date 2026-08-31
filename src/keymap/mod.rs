@@ -2,6 +2,11 @@
 //!
 //! This module provides JSON-based keymap configuration support, allowing
 //! keybindings to be loaded from external files rather than hardcoded.
+//!
+//! **Loading from a path is native-only.** The from-file APIs use `std::fs`,
+//! which compiles for `wasm32-unknown-unknown` but fails at runtime in the
+//! browser. On wasm, build a [`Keymap`] from a JSON string or in code
+//! instead. `src/wasm_compat_guard.rs` tracks this exemption.
 
 use anyhow::{anyhow, Context as _, Result};
 use serde::{Deserialize, Serialize};

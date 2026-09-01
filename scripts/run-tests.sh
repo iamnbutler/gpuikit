@@ -36,8 +36,12 @@ log=$(mktemp "${TMPDIR:-/tmp}/gpuikit-tests.XXXXXX")
 trap 'rm -f "$log"' EXIT INT TERM
 
 echo "running: cargo test $*"
+# The verdict below greps cargo's own announcements, so the run it judges is
+# made in the one format those greps read: under CARGO_TERM_COLOR=always (CI
+# sets it) every `Running` line arrives wrapped in escape codes and the count
+# sees no binaries at all.
 status=0
-(cd "$root" && cargo test "$@") >"$log" 2>&1 || status=$?
+(cd "$root" && CARGO_TERM_COLOR=never cargo test "$@") >"$log" 2>&1 || status=$?
 cat "$log"
 echo
 

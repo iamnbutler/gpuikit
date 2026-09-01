@@ -6,7 +6,6 @@ use gpui::{
     Rgba, SharedString, StatefulInteractiveElement, Styled, TitlebarOptions, Window, WindowBounds,
     WindowOptions,
 };
-use gpui_platform;
 use gpuikit::a11y::FocusNavigation;
 use gpuikit::date::{Date, Weekday};
 use gpuikit::input::InputState;
@@ -914,12 +913,12 @@ impl Showcase {
                 .tab(tab("disabled", "Disabled").disabled(true))
         });
 
-        let text_field_plain = cx.new(|cx| InputState::new_singleline(cx));
-        let text_field_icon = cx.new(|cx| InputState::new_singleline(cx));
-        let text_field_affixes = cx.new(|cx| InputState::new_singleline(cx));
-        let text_field_action = cx.new(|cx| InputState::new_singleline(cx));
-        let text_field_composed = cx.new(|cx| InputState::new_singleline(cx));
-        let text_field_disabled = cx.new(|cx| InputState::new_singleline(cx));
+        let text_field_plain = cx.new(InputState::new_singleline);
+        let text_field_icon = cx.new(InputState::new_singleline);
+        let text_field_affixes = cx.new(InputState::new_singleline);
+        let text_field_action = cx.new(InputState::new_singleline);
+        let text_field_composed = cx.new(InputState::new_singleline);
+        let text_field_disabled = cx.new(InputState::new_singleline);
         let text_field_read_only = cx.new(|cx| {
             let mut state = InputState::new_singleline(cx);
             state.set_content("gpuikit-0.8.0", cx);
@@ -967,10 +966,9 @@ impl Showcase {
                 )
             })
         });
-        let control_row_fields =
-            ControlSize::ALL.map(|_| cx.new(|cx| InputState::new_singleline(cx)));
-        let textarea_example = cx.new(|cx| InputState::new_multiline(cx));
-        let textarea_disabled = cx.new(|cx| InputState::new_multiline(cx));
+        let control_row_fields = ControlSize::ALL.map(|_| cx.new(InputState::new_singleline));
+        let textarea_example = cx.new(InputState::new_multiline);
+        let textarea_disabled = cx.new(InputState::new_multiline);
         let textarea_read_only = cx.new(|cx| {
             let mut state = InputState::new_multiline(cx);
             state.set_content(
@@ -1060,13 +1058,11 @@ impl Showcase {
                 ("damson", "Damson"),
             ]
         };
-        let mut new_combobox = |id: &'static str,
-                                build: &dyn Fn(Combobox<&'static str>) -> Combobox<&'static str>,
-                                window: &mut Window,
-                                cx: &mut Context<Self>| {
-            cx.new(|cx| {
-                ComboboxState::new(build(combobox(id, "Fruit", fruits())), window, cx)
-            })
+        let new_combobox = |id: &'static str,
+                            build: &dyn Fn(Combobox<&'static str>) -> Combobox<&'static str>,
+                            window: &mut Window,
+                            cx: &mut Context<Self>| {
+            cx.new(|cx| ComboboxState::new(build(combobox(id, "Fruit", fruits())), window, cx))
         };
 
         let combobox_default = new_combobox("combobox-default", &|b| b, _window, cx);
@@ -1103,9 +1099,11 @@ impl Showcase {
         let created = combobox_created.clone();
         let combobox_create = cx.new(|cx| {
             ComboboxState::new(
-                combobox("combobox-create", "Fruit", fruits()).on_create(move |text, _window, _cx| {
-                    *created.borrow_mut() = text;
-                }),
+                combobox("combobox-create", "Fruit", fruits()).on_create(
+                    move |text, _window, _cx| {
+                        *created.borrow_mut() = text;
+                    },
+                ),
                 _window,
                 cx,
             )
@@ -1124,7 +1122,9 @@ impl Showcase {
                     CommandItem::new("Save As…").subtitle("write a copy"),
                     CommandItem::new("Close Window").shortcut("cmd-w"),
                     CommandItem::new("Toggle Theme").keywords(["dark", "light"]),
-                    CommandItem::new("Publish").subtitle("needs a signed build").disabled(true),
+                    CommandItem::new("Publish")
+                        .subtitle("needs a signed build")
+                        .disabled(true),
                     CommandItem::new("Quit").shortcut("cmd-q"),
                 ],
                 _window,
@@ -1589,16 +1589,11 @@ impl Showcase {
                     .text_color(theme.fg_muted())
                     .child("Calendar"),
             )
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(theme.fg_muted())
-                    .child(
-                        "A month grid of selectable days. Sundays are disabled here, by the \
+            .child(div().text_sm().text_color(theme.fg_muted()).child(
+                "A month grid of selectable days. Sundays are disabled here, by the \
                          predicate rather than by a list. Click the chevrons or focus the grid \
                          and use the arrows, Home / End and PageUp / PageDown.",
-                    ),
-            )
+            ))
             .child(
                 h_stack()
                     .gap_6()
@@ -1607,25 +1602,25 @@ impl Showcase {
                     .child(
                         v_stack()
                             .gap_1()
-                            .child(div().text_xs().text_color(theme.fg_muted()).child("Selected"))
-                            .child(
-                                div()
-                                    .text_color(theme.accent())
-                                    .font_weight(FontWeight::BOLD)
-                                    .child(
-                                        self.calendar_selection
-                                            .map_or_else(|| "None".to_string(), |date| date.to_string()),
-                                    ),
-                            )
                             .child(
                                 div()
                                     .text_xs()
                                     .text_color(theme.fg_muted())
-                                    .child(format!(
-                                        "Showing {}",
-                                        self.calendar.read(cx).visible_month()
+                                    .child("Selected"),
+                            )
+                            .child(
+                                div()
+                                    .text_color(theme.accent())
+                                    .font_weight(FontWeight::BOLD)
+                                    .child(self.calendar_selection.map_or_else(
+                                        || "None".to_string(),
+                                        |date| date.to_string(),
                                     )),
-                            ),
+                            )
+                            .child(div().text_xs().text_color(theme.fg_muted()).child(format!(
+                                "Showing {}",
+                                self.calendar.read(cx).visible_month()
+                            ))),
                     ),
             )
     }
@@ -1643,12 +1638,7 @@ impl Showcase {
     /// the build gate without meeting it.
     fn render_combobox_page(&self, cx: &Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
-        let heading = |text: &'static str| {
-            div()
-                .text_sm()
-                .text_color(theme.fg_muted())
-                .child(text)
-        };
+        let heading = |text: &'static str| div().text_sm().text_color(theme.fg_muted()).child(text);
 
         v_stack()
             .gap_4()
@@ -1659,15 +1649,10 @@ impl Showcase {
                     .text_color(theme.fg_muted())
                     .child("Combobox"),
             )
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(theme.fg_muted())
-                    .child(
-                        "A text field that filters a list of values. Type to filter, \
+            .child(div().text_sm().text_color(theme.fg_muted()).child(
+                "A text field that filters a list of values. Type to filter, \
                          Down / Up to move the highlight, Enter to commit, Escape to close.",
-                    ),
-            )
+            ))
             .child(heading("Default, and with a value from `.selected(…)`"))
             .child(
                 h_stack()
@@ -1718,17 +1703,12 @@ impl Showcase {
                     .text_color(theme.fg_muted())
                     .child("Command"),
             )
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(theme.fg_muted())
-                    .child(
-                        "A filterable list of actions over a scrim. Down / Up move the \
+            .child(div().text_sm().text_color(theme.fg_muted()).child(
+                "A filterable list of actions over a scrim. Down / Up move the \
                          selection while focus stays in the query field, Enter runs, \
                          Escape dismisses. The matcher is two lines in this example and \
                          deliberately not in the crate.",
-                    ),
-            )
+            ))
             .child(
                 button("open-command-palette", "Open the palette").on_click({
                     let palette = palette.clone();
@@ -2107,12 +2087,15 @@ impl Showcase {
                         // live element at all, so it takes neither focus nor
                         // keystrokes. It clips a long value rather than
                         // scrolling it — that is the trade for being inert.
-                        field("disabled-message").label("Disabled").disabled(true).child(
-                            textarea(&self.textarea_disabled, cx)
-                                .placeholder("This is disabled...")
-                                .rows(2)
-                                .disabled(true),
-                        ),
+                        field("disabled-message")
+                            .label("Disabled")
+                            .disabled(true)
+                            .child(
+                                textarea(&self.textarea_disabled, cx)
+                                    .placeholder("This is disabled...")
+                                    .rows(2)
+                                    .disabled(true),
+                            ),
                     )
                     .child(
                         // Read-only is the other half: still focusable, still

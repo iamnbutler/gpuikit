@@ -115,6 +115,11 @@ impl GapBuffer {
         self.buffer.len() - self.gap_size()
     }
 
+    /// Whether the buffer holds no content — the gap spans the whole allocation
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Get the size of the gap
     fn gap_size(&self) -> usize {
         self.gap_end - self.gap_start
@@ -221,47 +226,18 @@ impl GapBuffer {
         let mut new_buffer = vec!['\0'; new_capacity];
 
         // Copy content before the gap
-        for i in 0..self.gap_start {
-            new_buffer[i] = self.buffer[i];
-        }
+        new_buffer[..self.gap_start].copy_from_slice(&self.buffer[..self.gap_start]);
 
         // Copy content after the gap
         let after_gap_start = self.gap_end;
         let after_gap_count = old_capacity - self.gap_end;
         let new_gap_end = self.gap_start + self.gap_size() + additional_capacity;
 
-        for i in 0..after_gap_count {
-            new_buffer[new_gap_end + i] = self.buffer[after_gap_start + i];
-        }
+        new_buffer[new_gap_end..new_gap_end + after_gap_count]
+            .copy_from_slice(&self.buffer[after_gap_start..after_gap_start + after_gap_count]);
 
         self.buffer = new_buffer;
         self.gap_end = new_gap_end;
-    }
-
-    /// Convert the buffer to a string.
-    ///
-    /// Reconstructs the text by concatenating the content before the gap
-    /// with the content after the gap, skipping the gap itself.
-    ///
-    /// # Complexity
-    /// O(n) where n is the length of the text
-    pub fn to_string(&self) -> String {
-        let mut result = String::with_capacity(self.len());
-
-        // Add content before the gap
-        for i in 0..self.gap_start {
-            result.push(self.buffer[i]);
-        }
-
-        // Add content after the gap
-        for i in self.gap_end..self.buffer.len() {
-            let ch = self.buffer[i];
-            if ch != '\0' {
-                result.push(ch);
-            }
-        }
-
-        result
     }
 
     /// Convert the buffer to lines, with the `\n` separators stripped.
@@ -298,7 +274,7 @@ impl GapBuffer {
     ///
     /// - The line *count* is identical to [`to_lines`](Self::to_lines), so a
     ///   row index means the same thing in both.
-    /// - Concatenating the result reproduces [`to_string`](Self::to_string)
+    /// - Concatenating the result reproduces `to_string` (via [`std::fmt::Display`])
     ///   byte for byte, so a line-by-line pass sees exactly the document a
     ///   whole-text pass would.
     ///
@@ -363,9 +339,8 @@ impl GapBuffer {
 
         let mut row = 0;
         let mut col = 0;
-        let mut char_index = 0;
 
-        for ch in text.chars() {
+        for (char_index, ch) in text.chars().enumerate() {
             if char_index >= position {
                 break;
             }
@@ -375,10 +350,32 @@ impl GapBuffer {
             } else {
                 col += 1;
             }
-            char_index += 1;
         }
 
         (row, col)
+    }
+}
+
+/// Reconstructs the text by concatenating the content before the gap with the
+/// content after the gap, skipping the gap itself. `GapBuffer::to_string`
+/// (via `ToString`) goes through here. O(n) in the length of the text.
+impl std::fmt::Display for GapBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::fmt::Write as _;
+
+        // Content before the gap
+        for &ch in &self.buffer[..self.gap_start] {
+            f.write_char(ch)?;
+        }
+
+        // Content after the gap
+        for &ch in &self.buffer[self.gap_end..] {
+            if ch != '\0' {
+                f.write_char(ch)?;
+            }
+        }
+
+        Ok(())
     }
 }
 

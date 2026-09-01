@@ -602,6 +602,7 @@ fn screen_to_text_position(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn paint_multiline(
     input: &Entity<InputState>,
     focus_handle: &FocusHandle,
@@ -1028,6 +1029,7 @@ fn paint_multiline_marked_underline(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn paint_multiline_cursor(
     line_layouts: &[InputLineLayout],
     cursor_offset: usize,
@@ -1174,6 +1176,7 @@ impl SingleLinePaintState {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn paint_singleline(
     input: &Entity<InputState>,
     focus_handle: &FocusHandle,

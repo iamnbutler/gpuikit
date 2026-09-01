@@ -133,7 +133,8 @@ pub struct InputBindings {
     pub enter: Option<KeyBinding>,
 
     /// Binding for submitting the input via `InputStateEvent::Submit`.
-    /// Only fires on inputs configured with a submit mode ([`InputState::submit_on`]).
+    /// Only fires on inputs configured with a submit mode
+    /// ([`InputState::submit_on`](crate::input::InputState::submit_on)).
     /// Default: `cmd-enter` (macOS) / `ctrl-enter` (other platforms)
     pub submit: Option<KeyBinding>,
 

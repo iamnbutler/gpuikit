@@ -1,0 +1,230 @@
+# CI: what merging into main has to survive.
+#
+# The shape of this file follows what the repository already knows about
+# itself, not just what other Rust CIs do:
+#
+#   * Tests run through `scripts/run-tests.sh`, never bare `cargo test` — this
+#     repository has had runs misreported in both directions (a binary killed
+#     without a summary read as green, gpuikit#180; an all-green run exiting
+#     non-zero, gpuikit#190), and the script judges the harness's own
+#     `test result:` lines. `docs/running-tests.md` is the argument.
+#   * Linking is the expensive, killable step; checking is not. So clippy and
+#     `cargo check` run with `--all-targets --all-features` freely (they link
+#     nothing), while everything that links — the test binary, the examples,
+#     the doctests — runs on runners with the memory to pay for it, and the
+#     examples link on Linux's 16 GB runner rather than macOS's 7 GB one.
+#   * macOS is the primary platform; Linux proves consumers there build and
+#     pass; wasm is a first-class check because gpui ships a wasm platform
+#     crate and this library compiles for it today. No Windows job — see the
+#     note above the `ci` gate.
+#   * The toolchain is pinned so clippy's lint set changes when this repo
+#     chooses, not when rustup does. Bump it deliberately, in its own change.
+#
+# Repository rule: no `${{ }}` inside a `run:` body, anywhere, ever. Values a
+# script needs are bound under `env:` and read as `"$NAME"` (see the `ci`
+# gate). `src/release_input_validation.rs` holds this file to that rule on
+# every `cargo test --lib`; this file is registered in its `WORKFLOWS` list.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Superseded pushes to a PR cancel their runs; nothing on main is cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.ref_name == 'main' && github.sha || 'anysha' }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: '1'
+  # CI builds each ref once; incremental artifacts only bloat the cache.
+  CARGO_INCREMENTAL: '0'
+
+jobs:
+  style:
+    name: fmt + typos
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98'
+          components: rustfmt
+      - name: rustfmt
+        run: cargo fmt --all -- --check
+      # Exceptions live in _typos.toml, each with a reason.
+      - uses: crate-ci/typos@v1
+
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      # Advisories, licenses, bans, sources — deny.toml is the policy, and
+      # every exception in it carries its reason.
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          log-level: error
+
+  macos:
+    name: clippy + tests (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98'
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      # `--all-features` re-enables the `examples` feature, so this is also
+      # the type-check of every example. Safe here: clippy links nothing.
+      - name: clippy
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      # `--lib` confines `--all-features` to the one test binary, so the
+      # feature-gated modules (editor, schema, stitch) are tested without
+      # linking anything extra. See docs/running-tests.md for why the script.
+      - name: tests
+        run: scripts/run-tests.sh --lib --all-features --locked
+
+  linux-checks:
+    name: clippy + features + docs (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      # gpui's Linux build needs these present even to check: fontconfig and
+      # friends have build scripts that probe the system. The list is
+      # gpui-component's proven Ubuntu 24.04 set, minus their webkit extra.
+      - name: system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc g++ clang libfontconfig-dev libwayland-dev \
+            libxkbcommon-x11-dev libx11-xcb-dev libssl-dev libzstd-dev \
+            libvulkan1 vulkan-validationlayers
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98'
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
+      - name: clippy
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      # `--all-features` cannot prove a feature compiles alone; this can.
+      - name: each feature alone
+        run: cargo hack check --each-feature --locked
+      # The same invocation docs.rs makes, warnings denied. Broken intra-doc
+      # links surface here and nowhere else.
+      - name: docs
+        env:
+          RUSTDOCFLAGS: --cfg docsrs -D warnings
+        run: cargo doc --locked --no-deps --all-features
+
+  linux-tests:
+    name: tests + examples link (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc g++ clang libfontconfig-dev libwayland-dev \
+            libxkbcommon-x11-dev libx11-xcb-dev libssl-dev libzstd-dev \
+            libvulkan1 vulkan-validationlayers
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98'
+      - uses: Swatinem/rust-cache@v2
+      - name: tests
+        run: scripts/run-tests.sh --lib --all-features --locked
+      # Every example must link, not merely type-check — gpuikit#180 was a
+      # linker dying, and no local machine wants eight whole-program links of
+      # gpui. This runner has the memory to be the machine that always does.
+      - name: examples link
+        run: cargo build --locked --features examples --examples
+
+  doctests:
+    name: doctests (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc g++ clang libfontconfig-dev libwayland-dev \
+            libxkbcommon-x11-dev libx11-xcb-dev libssl-dev libzstd-dev \
+            libvulkan1 vulkan-validationlayers
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98'
+      - uses: Swatinem/rust-cache@v2
+      # The one coverage `--lib` gives up (docs/running-tests.md): each fenced
+      # block links its own binary, which is exactly why no constrained box
+      # runs them and why this job exists. Its own job so the links happen in
+      # parallel with everything else; if it proves to be the long pole, the
+      # demotion path is a schedule trigger, not deletion.
+      - name: doctests
+        run: scripts/run-tests.sh --doc --all-features --locked
+
+  wasm:
+    name: check (wasm32)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # Nightly on purpose, and only here: gpui's web platform runs background
+      # executors on web workers over a shared wasm memory, so std itself is
+      # rebuilt with atomics — `-Z build-std`, which is unstable cargo. A
+      # stable check of this target cannot pass (wasm_thread needs a feature
+      # gate). The recipe is the working wasm example's rust-toolchain.toml +
+      # .cargo/config.toml, minus the link args a check never reaches. Pinned
+      # to the nightly it was verified against; bump deliberately.
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-08-30
+          components: rust-src
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      # Checking only — running wasm needs the trunk harness documented in the
+      # wasm example repo.
+      - name: check
+        env:
+          RUSTFLAGS: -C target-feature=+atomics,+bulk-memory,+mutable-globals
+        run: cargo check --locked --target wasm32-unknown-unknown -Z build-std=std,panic_abort
+
+  # No Windows job on purpose: the hosted runners are slow enough to dominate
+  # every run, and nothing here targets Windows today. If that changes, a
+  # `cargo check` job is the cheapest first claim.
+
+  # The one status branch protection points at. Everything above must succeed
+  # (or be skipped); adding a job means adding it to `needs`, and the jq
+  # judges whatever arrives so a job forgotten here fails loudly in review,
+  # not silently in protection settings.
+  ci:
+    name: ci
+    if: always()
+    needs: [style, deny, macos, linux-checks, linux-tests, doctests, wasm]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: decide
+        env:
+          RESULTS: ${{ toJson(needs) }}
+        run: |
+          echo "$RESULTS"
+          echo "$RESULTS" | jq -e 'all(.[] | .result; . == "success" or . == "skipped")'

@@ -264,7 +264,11 @@ impl Listbox {
     ) {
         self.options = options;
         self.selected_index = selected_index;
-        self.highlighted = if self.options.is_empty() { None } else { Some(0) };
+        self.highlighted = if self.options.is_empty() {
+            None
+        } else {
+            Some(0)
+        };
         self.scroll_handle.scroll_to_item(0);
         cx.notify();
     }
@@ -287,7 +291,12 @@ impl Listbox {
     /// with focus on an element that no longer exists. A click outside must
     /// **not**: that click is about to focus whatever it landed on, and pulling
     /// focus to the trigger first would fight it.
-    pub(crate) fn dismiss(&mut self, restore_focus: bool, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn dismiss(
+        &mut self,
+        restore_focus: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if restore_focus {
             if let Some(handle) = self.restore_focus.clone() {
                 window.focus(&handle, cx);

@@ -737,7 +737,7 @@ mod tests {
     /// The colour each byte of a line ends up rendered in.
     fn run_colors(runs: &[TextRun]) -> Vec<Option<Hsla>> {
         runs.iter()
-            .flat_map(|run| std::iter::repeat(Some(run.color)).take(run.len))
+            .flat_map(|run| std::iter::repeat_n(Some(run.color), run.len))
             .collect()
     }
 

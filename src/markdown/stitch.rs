@@ -41,7 +41,7 @@ pub fn close_open_syntax(source: &str) -> Cow<'_, str> {
 }
 
 /// Whether this build can close open syntax — true with the `stitch` feature,
-/// false without it, where [`close_open_syntax`] is the identity.
+/// false without it, where `close_open_syntax` is the identity.
 ///
 /// Worth surfacing in an app that streams: the difference is visible.
 pub fn preprocessing_available() -> bool {

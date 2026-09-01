@@ -147,6 +147,13 @@ missing_docs = "warn"
 rust_2018_idioms = { level = "warn", priority = -1 }
 elided_lifetimes_in_paths = "allow"
 
+[lints.clippy]
+# Every callback field spells the full gpui handler signature —
+# `Option<Box<dyn Fn(&ClickEvent, &mut Window, &mut App)>>` and its variants.
+# The signature is the information a reader at the field wants; a type alias
+# per element would hide it behind a name that differs at every site anyway.
+type_complexity = "allow"
+
 # Optimize release builds
 [profile.release]
 lto = true

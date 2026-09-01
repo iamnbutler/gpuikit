@@ -381,9 +381,7 @@ impl RenderOnce for Text {
             TextVariant::Accent => theme.accent(),
         };
 
-        let size = if self.small {
-            BASE_SIZE * 0.875
-        } else if self.code {
+        let size = if self.small || self.code {
             BASE_SIZE * 0.875
         } else {
             BASE_SIZE

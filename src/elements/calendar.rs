@@ -434,11 +434,9 @@ impl Calendar {
             // spelled out, and the focus decision is explicit — silence there
             // is a `debug_assert!`, because `Role::Button` is a control a
             // keyboard operates.
-            .announce(
-                A11y::new(Role::Button).name(name).not_focusable(
-                    "the grid owns the one tab stop; PageUp and PageDown reach this from it",
-                ),
-            )
+            .announce(A11y::new(Role::Button).name(name).not_focusable(
+                "the grid owns the one tab stop; PageUp and PageDown reach this from it",
+            ))
             .flex()
             .items_center()
             .justify_center()
@@ -536,13 +534,7 @@ impl Render for Calendar {
                     .text_center()
                     .child(title.clone()),
             )
-            .child(self.month_button(
-                "next-month",
-                "Next month",
-                1,
-                Icons::chevron_right(),
-                cx,
-            ));
+            .child(self.month_button("next-month", "Next month", 1, Icons::chevron_right(), cx));
 
         let headings = div()
             .id(scoped(&self.id, "weekdays"))
@@ -903,7 +895,8 @@ mod tests {
         }
 
         fn focused_day(&mut self) -> Date {
-            self.calendar.read_with(self.cx, |this, _cx| this.focused_day)
+            self.calendar
+                .read_with(self.cx, |this, _cx| this.focused_day)
         }
 
         fn visible_month(&mut self) -> Date {
@@ -912,7 +905,8 @@ mod tests {
         }
 
         fn selection(&mut self) -> Option<Date> {
-            self.calendar.read_with(self.cx, |this, _cx| this.selection())
+            self.calendar
+                .read_with(self.cx, |this, _cx| this.selection())
         }
     }
 

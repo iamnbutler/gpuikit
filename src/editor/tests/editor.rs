@@ -703,7 +703,7 @@ fn test_grapheme_cluster_navigation() {
     }
 
     let line = editor.get_buffer().get_line(0).unwrap();
-    assert!(line.len() > 0);
+    assert!(!line.is_empty());
 }
 
 #[test]
@@ -880,7 +880,7 @@ fn test_control_characters() {
     let line = editor.get_buffer().get_line(0).unwrap();
     // All control characters should be preserved
     assert_eq!(line.len(), 4);
-    assert_eq!(line.chars().nth(0), Some('\x00'));
+    assert_eq!(line.chars().next(), Some('\x00'));
     assert_eq!(line.chars().nth(1), Some('\x01'));
     assert_eq!(line.chars().nth(2), Some('\x1F'));
     assert_eq!(line.chars().nth(3), Some('\x7F'));
@@ -914,7 +914,7 @@ fn painted_colors(editor: &mut Editor, lines: &[String]) -> Vec<Vec<Option<gpui:
                 line.len(),
             );
             runs.iter()
-                .flat_map(|run| std::iter::repeat(Some(run.color)).take(run.len))
+                .flat_map(|run| std::iter::repeat_n(Some(run.color), run.len))
                 .collect()
         })
         .collect()

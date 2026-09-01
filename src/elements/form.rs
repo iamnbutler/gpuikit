@@ -82,8 +82,8 @@ use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use gpui::{
     div, prelude::FluentBuilder, rems, AnyElement, App, Bounds, ElementId, FocusHandle,
-    GlobalElementId, InspectorElementId, IntoElement, LayoutId, ParentElement, Pixels, RenderOnce,
-    InteractiveElement, Role, SharedString, Styled, Window,
+    GlobalElementId, InspectorElementId, InteractiveElement, IntoElement, LayoutId, ParentElement,
+    Pixels, RenderOnce, Role, SharedString, Styled, Window,
 };
 
 /// What a group tells the controls inside it.
@@ -293,7 +293,7 @@ pub fn field_focus_handle(id: &ElementId, cx: &mut App) -> FocusHandle {
 
 /// Drop every cached field focus handle on this thread.
 ///
-/// The explicit eviction [`FIELD_FOCUS_HANDLES`] describes: a long-lived view
+/// The explicit eviction `FIELD_FOCUS_HANDLES` describes: a long-lived view
 /// that derives field ids from a changing collection (a row, a record, a task)
 /// calls this when that collection changes, so the map does not grow one handle
 /// per id ever seen for the life of the process. The next
@@ -676,11 +676,7 @@ mod tests {
         let cx = cx.add_empty_window();
 
         let announced = cx.update(|window, cx| {
-            announced(
-                fieldset("billing").legend("Billing address"),
-                window,
-                cx,
-            )
+            announced(fieldset("billing").legend("Billing address"), window, cx)
         });
 
         assert_eq!(announced.role, Some(Role::Group));
@@ -737,10 +733,11 @@ mod tests {
                         .child(field("consent-open").label("Consent").child(loose.clone())),
                 )
                 .child(
-                    fieldset("locked")
-                        .legend("Locked")
-                        .disabled(true)
-                        .child(field("consent-locked").label("Consent").child(grouped.clone())),
+                    fieldset("locked").legend("Locked").disabled(true).child(
+                        field("consent-locked")
+                            .label("Consent")
+                            .child(grouped.clone()),
+                    ),
                 )
                 .into_any_element()
         });
@@ -790,9 +787,8 @@ mod tests {
         click(cx, "gpuikit-field-label");
 
         let focused = cx.update(|window, cx| window.focused(cx));
-        let expected = cx.update(|_window, cx| {
-            field_focus_handle(&ElementId::Name("street".into()), cx)
-        });
+        let expected =
+            cx.update(|_window, cx| field_focus_handle(&ElementId::Name("street".into()), cx));
         assert_eq!(
             focused,
             Some(expected),

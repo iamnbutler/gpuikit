@@ -6,7 +6,6 @@ use gpui::{
     div, prelude::*, px, size, App, Application, Bounds, Context, Entity, FocusHandle, Focusable,
     IntoElement, ParentElement, Render, Styled, Window, WindowBounds, WindowOptions,
 };
-use gpui_platform;
 use gpuikit::elements::button::button;
 use gpuikit::elements::popover::{popover, PopoverState};
 use gpuikit::layout::v_stack;

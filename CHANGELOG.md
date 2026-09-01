@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
 ## [0.8.0] - 2026-09-01
 
 The release 0.8.0 was always going to be, plus everything that landed while it

@@ -26,7 +26,7 @@
 //! belongs in.
 //!
 //! They live in the lib rather than `tests/`, for the reason stated at
-//! `src/elements.rs`'s `triage_coverage`: `cargo test --lib` is the command
+//! `src/elements.rs`'s `showcase_coverage`: `cargo test --lib` is the command
 //! that works in a constrained environment. The parser asserts it matched
 //! something before anything else is trusted, and there is a fixture it is run
 //! against, for the same reason `release_version_guard` does — a parser that

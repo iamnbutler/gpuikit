@@ -10,6 +10,11 @@ description = "A UI toolkit for GPUI applications"
 readme = "README.md"
 keywords = ["gpui", "ui", "components", "toolkit", "gui"]
 categories = ["gui", "graphics"]
+# The README's screenshot lives in `.github/media/` and is linked by absolute
+# URL, so crates.io renders it without the file shipping in the package. Note
+# it cannot live in `assets/`: that folder is `#[folder = "assets"]` for
+# rust-embed, so anything in it is compiled into every consumer's binary.
+exclude = [".github/"]
 # This crate's own floor, not a promise about the whole dependency tree: it uses
 # async closures (stable in 1.85), and gpui is edition 2024, which needs the same
 # 1.85. The declared 1.75 was never true. Dependencies declare their own, higher

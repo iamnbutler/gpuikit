@@ -85,8 +85,7 @@ repository's declared verification suite, so an automated build and a human
 checking their work run the same command. Keep the two in step — and read that
 file's header before widening it, because `--all-features` and `--all-targets`
 each undo the gate described below. `scripts/run-tests.sh` wraps the same
-command when you want the summary lines judged rather than the exit status; see
-`docs/running-tests.md`.
+command when you want the summary lines judged rather than the exit status.
 
 ## Why the gate, and what a killed link looks like
 

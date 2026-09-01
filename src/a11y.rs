@@ -1704,8 +1704,8 @@ mod tests {
     /// directions against [`ELEMENTS_WITHOUT_A_ROLE`], so the excuse list can
     /// only shrink.
     ///
-    /// Modelled on `elements::overlay_coverage::every_overlay_is_written_down`,
-    /// which is this crate's existing shape for holding a list to the tree.
+    /// The shape is this crate's usual one for holding a list to the tree: read
+    /// the source, compare both directions, and fail on either mismatch.
     #[test]
     fn every_element_module_declares_a_role() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

@@ -2,7 +2,132 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.8.0] - 2026-09-01
+
+The release 0.8.0 was always going to be, plus everything that landed while it
+sat unpublished. Streaming markdown finally depends on a published version
+rather than a git rev — `Markdown::append`, the off-thread parser and the
+optional `stitch` feature have been on `main` since 0.7.0 with nothing to name
+them by. Alongside it: `Calendar`, confirmation dialogs as a mode of `Dialog`,
+`Splitter`, `Sidebar`, `Table`, `Combobox`, `Command`, `Form`, a civil `date`
+module that keeps `chrono` out of the public API, and an accessibility
+convention in `src/a11y.rs` that elements announce their roles through. Also
+corrects `rust-version`, which claimed 1.75 and had not been true for some
+time.
+
+Read the Breaking Changes section before upgrading: this is a pre-1.0 release
+and there are several.
+
+### Breaking Changes
+
+- **`gpuikit::elements::dropdown` is gone in full.** `Dropdown`,
+  `DropdownState`, `DropdownChanged`, `DropdownMenu`, `DropdownOption` and
+  `dropdown()` are deleted, and `src/elements/dropdown.rs` with them.
+  `Dropdown` and `Select` were one component under two names — the same
+  bordered trigger with a chevron, the same popup one gap below it, the same
+  `ControlSize`, and `select.rs` importing `DropdownMenu`, `DropdownOption` and
+  `MENU_GAP` *from* `dropdown.rs` to get there. The only behavioural difference
+  was that a `Dropdown`'s selection could not be absent, which is a constructor
+  argument rather than a component. `Select` takes the union of the two APIs:
+
+  | Was | Is |
+  | --- | --- |
+  | `dropdown(id, options, value)` | `select(id, options).selected(value)` |
+  | `DropdownState::new(…)` | `SelectState::new(…)` |
+  | `DropdownChanged` | `SelectChanged` |
+  | `state.selected` (a `T`) | `state.selected` (an `Option<T>`) |
+  | `state.set_selected(value, cx)` | `state.set_selected(Some(value), cx)` |
+  | `DropdownMenu`, `DropdownOption` | no replacement — the popup is private |
+
+  `on_change`, `full_width`, `disabled`, `control_size`, `is_open`,
+  `is_disabled` and `set_disabled` carry over unchanged, and `Select` adds
+  `placeholder` and `clear()`, which a `Dropdown` could not express. 0.8.0's
+  note that `DropdownMenu::build` gained a `ControlSize` argument is now moot:
+  the type it describes no longer exists
+- The popup is **private**. `DropdownMenu` becomes `Listbox`, a private type in
+  `src/elements/select.rs`, and `DropdownOption` — a newtype over
+  `SharedString` — is deleted rather than renamed; the popup takes plain
+  labels. This is the part of the decision that enforces itself: a public popup
+  type is what let one element get built on another's internals in the first
+  place, so the next chooser in this neighbourhood has to either grow
+  `select.rs` or write its own, and both are visible in review.
+  `MENU_GAP` becomes a private `LISTBOX_GAP` for the same reason
+- Element ids and debug selectors move with the names: `dropdown-menu` /
+  `dropdown-option` become `select-listbox` / `select-option`, and the test-only
+  selectors become `gpuikit-select-trigger` / `gpuikit-select-popup`. These are
+  internal, but a consumer that had pinned a test to one would notice
+- **`select()` and `Select::new()` take the accessible name as their second
+  argument**: `select(id, name, options)`. `Role::ComboBox` is in
+  `a11y::role_requires_a_name`, so an honest role for the trigger forces a
+  name, and every naming source that convention allows was unavailable here — a
+  select's visible text is its *value* (naming the control after it would
+  rename the control every time the user changed it), the placeholder
+  disappears the moment a choice is made and defaults to "Select…", and gpui has
+  no `labelled_by` builder, so a `Field` or `Label` beside the control cannot
+  name it. A required constructor argument is what `src/a11y.rs`'s section 2
+  prescribes for this case; it was written for `IconButton` and `Select` got
+  there first. `select("country", vec![…])` becomes
+  `select("country", "Country", vec![…])`
+- **`gpuikit::traits::visual_focus` is deleted**, with the `VisualFocus` trait
+  and the `FocusStyle` enum in it. It had no implementors anywhere in this
+  crate and could not usefully gain one: it requires `gpui::Focusable`, which a
+  `RenderOnce` control cannot implement. `theme::focus_ring` is now this
+  crate's answer to the same question, and carrying both would be a second fork
+  of one decision
+
+- `gpuikit::traits::portal` is gone — `Portal`, `PortalPosition`,
+  `AnchorCorner`, `AnchorEdge` and `FitMode` with it. 486 lines of positioning
+  math with zero callers, zero implementors and zero tests, read against all
+  six of this crate's overlay call sites and adopted at none of them:
+  `gpui::anchored()` offers every corner, fit mode and offset `PortalPosition`
+  did — plus edge-centre anchors and `.position()` — and computes them in
+  `prepaint`, where the overlay's measured size and the viewport size exist.
+  Those are exactly the two arguments `calculate_position` demanded from its
+  callers, and no `render()` body has either. Migration: `.offset(point)`
+  becomes `anchored().offset(point)`, and `FitMode::SnapToViewport` becomes
+  `anchored().snap_to_window_with_margin(margin)` — the two calls `Portal`
+  stood in for. The convention that replaces the trait is `docs/overlays.md`,
+  checked by `overlay_coverage` in `src/elements.rs`
+- `InputGroup` is gone, replaced by `TextField`
+  (`gpuikit::elements::text_field`). The group drew an addon cell, a stripped
+  input and another addon cell as three sibling boxes and spent most of its
+  code disguising them as one; the field is a single bordered box that owns the
+  border, background, radius, hover/focus/disabled states and padding, with
+  optional adornments laid inside it. Migration:
+  `input_group(&state, cx).left_addon(InputAddon::icon(icon))` becomes
+  `text_field(&state, cx).prefix(Adornment::icon(icon))`, and `right_addon` /
+  `InputAddon::text` become `suffix` / `Adornment::text`.
+  `InputAddon::button` has no replacement on purpose — a button that is its own
+  box beside a field is composition,
+  `h_stack().child(text_field(…)).child(button(…))`; an action *inside* the
+  field is `Adornment::element`
+- `KbdSize` is gone; `Kbd` takes the shared `ControlSize` like every other
+  control. `kbd("S").size(KbdSize::Small)` becomes `kbd("S").small()`, and
+  `KbdSize::Default` is now `ControlSize::Medium`
+- `IconButton`'s pixel API is rems. `.size(px(24.))` becomes `.box_size(…)` —
+  renamed because `.size()` read as though it set the *control* size, which is
+  now `.small()` / `.medium()` / `.large()` — and `.width`, `.height` and
+  `.icon_size` take `impl Into<Rems>` instead of `impl Into<Pixels>`
+- `DropdownMenu::build` takes a `ControlSize` as its third argument, so a
+  popup's rows are the size of the trigger they dropped out of
+- `Input` applies the rung's font size and line height in the same base text
+  style that already forced the theme foreground, so a wrapper's `.text_lg()`
+  no longer reaches an input. This is deliberate — a declared height and
+  inherited text disagree, and the height is what a row is aligned on —
+  but `.text_size()` on the input itself still wins, as before
+- `Theme` gains a non-`Option` `controls: ControlScale` field. Themes built
+  through `Theme::new` (which is all of the bundled ones) are unaffected;
+  a struct-literal `Theme { … }` has to name it
+- `SelectableText::new` takes two more arguments: the run's plain text, and a
+  `RunRole` saying how the run is announced. A run can no longer be built
+  without deciding what it is. It exists to serve the markdown renderer, so
+  callers outside this crate are unlikely
+- pulldown-cmark 0.12 → 0.13.4. gpuikit's own rendering is unchanged, but
+  pulldown-cmark types are part of gpuikit's public surface — `MarkdownEvent`
+  hands out a `pulldown_cmark::Event<'static>`, and `CodeBlockKind`,
+  `LinkType`, `Options` and `Parser` are re-exported — so a downstream crate
+  with its own `pulldown-cmark = "0.12"` dependency will end up with two
+  non-unifying copies of `Event` until it bumps too
 
 ### Added
 
@@ -67,65 +192,6 @@ All notable changes to this project will be documented in this file.
   `aria_modal`, and the deleted entry's reason — "a dialog that announces
   itself unmodal is worse than one that waits" — applies to it unchanged. That
   argument now lives in `dialog.rs` next to the guard that implements it
-
-### Breaking Changes
-
-- **`gpuikit::elements::dropdown` is gone in full.** `Dropdown`,
-  `DropdownState`, `DropdownChanged`, `DropdownMenu`, `DropdownOption` and
-  `dropdown()` are deleted, and `src/elements/dropdown.rs` with them.
-  `Dropdown` and `Select` were one component under two names — the same
-  bordered trigger with a chevron, the same popup one gap below it, the same
-  `ControlSize`, and `select.rs` importing `DropdownMenu`, `DropdownOption` and
-  `MENU_GAP` *from* `dropdown.rs` to get there. The only behavioural difference
-  was that a `Dropdown`'s selection could not be absent, which is a constructor
-  argument rather than a component. `Select` takes the union of the two APIs:
-
-  | Was | Is |
-  | --- | --- |
-  | `dropdown(id, options, value)` | `select(id, options).selected(value)` |
-  | `DropdownState::new(…)` | `SelectState::new(…)` |
-  | `DropdownChanged` | `SelectChanged` |
-  | `state.selected` (a `T`) | `state.selected` (an `Option<T>`) |
-  | `state.set_selected(value, cx)` | `state.set_selected(Some(value), cx)` |
-  | `DropdownMenu`, `DropdownOption` | no replacement — the popup is private |
-
-  `on_change`, `full_width`, `disabled`, `control_size`, `is_open`,
-  `is_disabled` and `set_disabled` carry over unchanged, and `Select` adds
-  `placeholder` and `clear()`, which a `Dropdown` could not express. 0.8.0's
-  note that `DropdownMenu::build` gained a `ControlSize` argument is now moot:
-  the type it describes no longer exists
-- The popup is **private**. `DropdownMenu` becomes `Listbox`, a private type in
-  `src/elements/select.rs`, and `DropdownOption` — a newtype over
-  `SharedString` — is deleted rather than renamed; the popup takes plain
-  labels. This is the part of the decision that enforces itself: a public popup
-  type is what let one element get built on another's internals in the first
-  place, so the next chooser in this neighbourhood has to either grow
-  `select.rs` or write its own, and both are visible in review.
-  `MENU_GAP` becomes a private `LISTBOX_GAP` for the same reason
-- Element ids and debug selectors move with the names: `dropdown-menu` /
-  `dropdown-option` become `select-listbox` / `select-option`, and the test-only
-  selectors become `gpuikit-select-trigger` / `gpuikit-select-popup`. These are
-  internal, but a consumer that had pinned a test to one would notice
-- **`select()` and `Select::new()` take the accessible name as their second
-  argument**: `select(id, name, options)`. `Role::ComboBox` is in
-  `a11y::role_requires_a_name`, so an honest role for the trigger forces a
-  name, and every naming source that convention allows was unavailable here — a
-  select's visible text is its *value* (naming the control after it would
-  rename the control every time the user changed it), the placeholder
-  disappears the moment a choice is made and defaults to "Select…", and gpui has
-  no `labelled_by` builder, so a `Field` or `Label` beside the control cannot
-  name it. A required constructor argument is what `src/a11y.rs`'s section 2
-  prescribes for this case; it was written for `IconButton` and `Select` got
-  there first. `select("country", vec![…])` becomes
-  `select("country", "Country", vec![…])`
-- **`gpuikit::traits::visual_focus` is deleted**, with the `VisualFocus` trait
-  and the `FocusStyle` enum in it. It had no implementors anywhere in this
-  crate and could not usefully gain one: it requires `gpui::Focusable`, which a
-  `RenderOnce` control cannot implement. `theme::focus_ring` is now this
-  crate's answer to the same question, and carrying both would be a second fork
-  of one decision
-
-### Added
 
 - **The select popup answers the keyboard.** Up and Down move a highlight
   through the options and wrap at each end, Home and End jump to the ends, Enter
@@ -338,217 +404,6 @@ All notable changes to this project will be documented in this file.
   `cargo publish` with `CARGO_REGISTRY_TOKEN` set for every job, has the same
   defect in five `run:` blocks and is tracked separately
 
-### Changed
-
-- **The chosen option in an open select now shows a check mark instead of a
-  filled row.** Before, the row you had chosen was the one painted in the accent
-  colour. Now every row reserves a small slot on its left, the chosen row shows
-  a check in it, and the accent fill marks the row the keyboard or the pointer
-  is currently on. Two states arrived where there had been one — what you chose,
-  and where you are — and one filled row could not say both. This is the only
-  part of the keyboard work a consumer sees whether or not they use a keyboard,
-  and it follows the fixed-width check slot `context_menu.rs` already draws its
-  toggled items with. If the visual is reworked later, the property that has to
-  survive is that **the highlighted row and the chosen row stay distinguishable
-  when they are different rows** — that state is the whole reason the keyboard
-  model exists
-- Every `run:` block in `release.yml` takes its outside values from `env:`
-  bindings (`CURRENT`, `CUSTOM_VERSION`, `VERSION_TYPE`, `NEW_VERSION`, `TAG`,
-  `BRANCH`, `REPOSITORY`, `PREVIOUS_VERSION`, `DRY_RUN`) rather than `${{ }}`
-  interpolation, and a comment at the top of the file states the rule for the
-  next person adding an input. Behaviour is unchanged; the one incidental
-  repair is that `cargo set-version ${{ ... }}` was unquoted and is now
-  `cargo set-version "$NEW_VERSION"`. The rule is a repository rule, but
-  `release-deploy.yml` does not satisfy it yet
-- `Button`, `SidebarTrigger` and `Select`'s trigger take keyboard focus when
-  they are enabled, and decline it — **with a stated reason** — when they are
-  disabled. Tab now moves focus between gpuikit controls, and a disabled control
-  is not a tab stop; those are the two behavioural changes a consumer could
-  notice. A disabled control leaving the tab order is the weaker of the two
-  ARIA-sanctioned answers, and is forced by gpui still having no `aria_disabled`
-  to announce the other with
-- `src/a11y.rs`'s module docs grow a section 4, "How the keyboard reaches it",
-  and the old sections 4 and 5 renumber to 5 and 6. Section 6 no longer states
-  the rollout order in prose — `ELEMENTS_WITHOUT_A_ROLE` is the checked form of
-  it
-- `Sidebar` and `SidebarTrigger`, which shipped roles ahead of the convention,
-  are migrated onto it — as their issue said they would be if the convention
-  chose differently. Behaviour is unchanged: the panel still reports
-  `Role::Complementary` with its optional name, and `aria-expanded` still sits
-  on the trigger, which the convention now states as a rule ("state goes on the
-  element that changes it"). The markdown document's `Role::Document` moves the
-  same way
-- Two properties this convention deliberately cannot express, because gpui
-  cannot: `disabled` (gpui has no `aria_disabled`; a disabled control is
-  distinguishable only by the `Click` action its node does not offer) and
-  `sort_direction` (no `aria_sort`, the finding `src/elements/table.rs` had
-  recorded). Both are documented as upstream asks at the point the crate would
-  use them, rather than modelled as fields that would silently do nothing
-- `docs/component-triage.md` says **who took its verdicts**. A new attribution
-  section, anchored on `<!-- ratification -->`, separates the three kinds of
-  claim the verdict table flattens into one column: the 12 Shipped rows are
-  facts a test checks, the 6 Issue rows are cheap proposals, and the 11
-  Rejected rows are one agent's reading of this crate — **proposed and not
-  ratified**. No rejection reason is softened, because the reasons were never
-  the problem; a rejection that hedges is the "deferred / maybe / someday" the
-  document exists to replace. What was missing was attribution
-- The `Closing note for #59` section is **gone**, replaced by a past-tense
-  "What became of #59". #59 was closed `COMPLETED` on 2026-03-25, five months
-  before that document existed, so the ready-to-paste comment asserted a
-  pending action nobody could take — and its counts ("10 have shipped", "8
-  have a ready-to-file issue body") were the one part of a machine-checked
-  document no test reached. Counts now live only where `triage_coverage` can
-  see them
-- `every_control_on_a_row_is_the_same_height` is renamed
-  `every_sized_control_on_a_row_is_the_same_height`, and carries the two
-  exclusion lists it was missing: the six elements that are not on the shared
-  size scale at all (`ToggleGroup`, `Tabs` and `Alert`, whose height is their
-  padding plus a line box; `Slider`, `Progress` and `RadioGroup`, which
-  hard-code a track or glyph size), and the seven that *are* `ControlSized` and
-  still are not measured (`Field`, `Input`, `Textarea`, `Table`, `Sidebar`,
-  `SidebarTrigger`, `CheckboxBox`), each with its one-line reason. Sixteen
-  implementors, nine in the row: someone adding a tenth can now tell unfinished
-  coverage from a broken scale. No behaviour changed
-- Prose counts in `docs/component-triage.md` that had drifted are corrected
-  with the `Resizable` row's move: the verdict split is **12 Shipped / 6 Issue
-  / 11 Rejected**, and `EXPECTED` in `src/elements.rs` moves with it. "Ten rows
-  below are Shipped" (stale since `Sidebar` shipped in #169) and "eight
-  surviving components" go with them, and the dependency graph's edge onto the
-  deleted `docs/issues/sidebar.md` is discharged
-- Two new tests in `src/elements.rs`'s `triage_coverage` hold the above to the
-  document: the attribution section exists, precedes the table it is about,
-  still says the rejections are proposed rather than ratified, and states the
-  same three counts `EXPECTED` enforces; and the #59 section neither promises a
-  paste nor loses the date. An unchecked claim in prose is how the missing
-  attribution went unnoticed in the first place
-
-### Fixed
-
-- **`ld` is no longer OOM-killed while linking the examples.** Eight example
-  binaries live in `examples/`, and each is a full link of gpui.
-  `cargo build --all-targets` and a bare `cargo test` link all eight; cargo
-  sizes `-j` from the CPU count with no knowledge of a memory limit, so several
-  `ld` processes run at once — each holding that binary's debug info, which
-  `[profile.dev] debug = 2` made maximal — and the kernel kills one. The
-  message, `ld terminated with signal 9 [Killed]`, names no crate and no
-  symbol, so it reads as a compile error that does not exist. Three changes,
-  all build configuration and no library code: `[profile.dev]` now sets
-  `debug = "line-tables-only"`; a new `.cargo/config.toml` passes
-  `-Csplit-debuginfo=unpacked` on Linux targets, where the dev default of `off`
-  copies every byte of DWARF through the linker into the image; and every
-  `[[example]]` now carries `required-features = ["examples"]` against a
-  feature that enables nothing, so a build that did not ask for a demo does not
-  link one. `examples/context_menu.rs` is declared in `Cargo.toml` for the
-  first time, because an autodiscovered target cannot carry
-  `required-features`.
-
-  **The cost.** Debug builds keep file and line in backtraces but lose the type
-  and variable detail a debugger wants; a session that needs it asks on that
-  build alone with `RUSTFLAGS="-Cdebuginfo=2"`. Running an example now needs
-  `--features examples`, and `cargo check --all-targets` no longer type-checks
-  the examples without it — `examples/README.md` and the commands in it are
-  updated. `src/build_profile_guard.rs` holds all three settings, plus the
-  absence of a new autodiscovered example, under `cargo test --lib`.
-
-  **What this does not cover.** `cargo test --all-features` still links all
-  eight: cargo has no way to hold a feature back from `--all-features`, so the
-  gate does not apply to the command that produced the original kill on
-  `markdown_streaming`. That case rests entirely on the debug-info reductions,
-  whose magnitude here is unmeasured. If it still dies, the next levers, in
-  order: `[profile.dev.package."*"] debug = 0` — dependency debug info is the
-  bulk, and the guard test rejects only a *raised* override, so this stays
-  open — and then moving the examples into a package of their own, which is the
-  only arrangement in which no invocation of this library's own cargo commands
-  builds them at all, `--all-features` included.
-
-- **`Slider`'s value maths reads the thumb radius at the rem size the thumb is
-  drawn at.** `value_from_position` inset the usable track by a hardcoded
-  `px(6.)` while `render` drew the thumb at `rems(0.75)` — the same length only
-  at gpui's default 16px rem. At any other rem size the value-to-position
-  mapping skewed, worst towards the ends of the track: at a 32px rem, a press
-  three quarters along the track set 73.4 instead of 75. Both now read one
-  private `THUMB_SIZE` constant, resolved against `Window::rem_size()` when the
-  event is handled, so the drawn thumb and the inset cannot disagree. The
-  public API is unchanged
-- **`Slider` keeps the drag after the pointer leaves the track.** The movement
-  and the release are registered on the *window* now, from the `canvas` paint
-  closure that already measures the track — the pattern `Splitter` and `Input`
-  established. Only the press stays on the track div, because a press always
-  starts there. Before this, all three were plain `div` listeners, and a `div`
-  listener only fires while its hitbox is hovered: a drag that left the track
-  froze the thumb at the edge instead of pinning it to the end of the range,
-  and a button released outside the track was never delivered at all, leaving
-  `is_dragging` stuck `true` and the thumb wearing its dragging border. A move
-  with no button held now ends the drag too, which covers the release the
-  window never saw — the pointer left the *window* with the button down, or
-  another handler swallowed the mouse-up. The public API is unchanged
-
-## [0.8.0] - 2026-08-17
-
-The release that makes streaming markdown depend on a published version rather
-than a git rev. `Markdown::append`, the off-thread parser and the optional
-`stitch` feature have all been on `main` since 0.7.0 with nothing to name them
-by. Also corrects `rust-version`, which claimed 1.75 and has not been true for
-some time.
-
-### Breaking Changes
-
-- `gpuikit::traits::portal` is gone — `Portal`, `PortalPosition`,
-  `AnchorCorner`, `AnchorEdge` and `FitMode` with it. 486 lines of positioning
-  math with zero callers, zero implementors and zero tests, read against all
-  six of this crate's overlay call sites and adopted at none of them:
-  `gpui::anchored()` offers every corner, fit mode and offset `PortalPosition`
-  did — plus edge-centre anchors and `.position()` — and computes them in
-  `prepaint`, where the overlay's measured size and the viewport size exist.
-  Those are exactly the two arguments `calculate_position` demanded from its
-  callers, and no `render()` body has either. Migration: `.offset(point)`
-  becomes `anchored().offset(point)`, and `FitMode::SnapToViewport` becomes
-  `anchored().snap_to_window_with_margin(margin)` — the two calls `Portal`
-  stood in for. The convention that replaces the trait is `docs/overlays.md`,
-  checked by `overlay_coverage` in `src/elements.rs`
-- `InputGroup` is gone, replaced by `TextField`
-  (`gpuikit::elements::text_field`). The group drew an addon cell, a stripped
-  input and another addon cell as three sibling boxes and spent most of its
-  code disguising them as one; the field is a single bordered box that owns the
-  border, background, radius, hover/focus/disabled states and padding, with
-  optional adornments laid inside it. Migration:
-  `input_group(&state, cx).left_addon(InputAddon::icon(icon))` becomes
-  `text_field(&state, cx).prefix(Adornment::icon(icon))`, and `right_addon` /
-  `InputAddon::text` become `suffix` / `Adornment::text`.
-  `InputAddon::button` has no replacement on purpose — a button that is its own
-  box beside a field is composition,
-  `h_stack().child(text_field(…)).child(button(…))`; an action *inside* the
-  field is `Adornment::element`
-- `KbdSize` is gone; `Kbd` takes the shared `ControlSize` like every other
-  control. `kbd("S").size(KbdSize::Small)` becomes `kbd("S").small()`, and
-  `KbdSize::Default` is now `ControlSize::Medium`
-- `IconButton`'s pixel API is rems. `.size(px(24.))` becomes `.box_size(…)` —
-  renamed because `.size()` read as though it set the *control* size, which is
-  now `.small()` / `.medium()` / `.large()` — and `.width`, `.height` and
-  `.icon_size` take `impl Into<Rems>` instead of `impl Into<Pixels>`
-- `DropdownMenu::build` takes a `ControlSize` as its third argument, so a
-  popup's rows are the size of the trigger they dropped out of
-- `Input` applies the rung's font size and line height in the same base text
-  style that already forced the theme foreground, so a wrapper's `.text_lg()`
-  no longer reaches an input. This is deliberate — a declared height and
-  inherited text disagree, and the height is what a row is aligned on —
-  but `.text_size()` on the input itself still wins, as before
-- `Theme` gains a non-`Option` `controls: ControlScale` field. Themes built
-  through `Theme::new` (which is all of the bundled ones) are unaffected;
-  a struct-literal `Theme { … }` has to name it
-- `SelectableText::new` takes two more arguments: the run's plain text, and a
-  `RunRole` saying how the run is announced. A run can no longer be built
-  without deciding what it is. It exists to serve the markdown renderer, so
-  callers outside this crate are unlikely
-- pulldown-cmark 0.12 → 0.13.4. gpuikit's own rendering is unchanged, but
-  pulldown-cmark types are part of gpuikit's public surface — `MarkdownEvent`
-  hands out a `pulldown_cmark::Event<'static>`, and `CodeBlockKind`,
-  `LinkType`, `Options` and `Parser` are re-exported — so a downstream crate
-  with its own `pulldown-cmark = "0.12"` dependency will end up with two
-  non-unifying copies of `Event` until it bumps too
-
-### Added
-
 - `Sidebar` (`gpuikit::elements::sidebar`): a panel docked to the left or right
   edge of the window, with a caller-owned width and expanded/collapsed state.
   Collapsed is a **rail** of icon controls rather than a `when(open, …)`, which
@@ -712,6 +567,103 @@ some time.
 
 ### Changed
 
+- **The README is rewritten**, and `docs/` and `todo.md` are deleted. Process
+  records, decision documents and issue bodies do not belong in a library's
+  repository; the issue bodies live on GitHub, and the three test modules that
+  enforced those documents against the crate (`triage_coverage`,
+  `overlay_coverage`, `family_coverage`) are gone with them. `showcase_coverage`
+  stays — it checks code against code. The README keeps what a consumer needs
+  (getting started, the feature table, the MSRV) and leaves control sizes and
+  streaming markdown to the rustdoc that already documented them
+- **The README screenshot renders on crates.io again.** It was an `<img>` tag
+  carrying `height="1424"`, which crates.io honours while scaling the width to
+  its container, so the page drew a 1424px-tall box with the image letterboxed
+  inside. It also pointed at a `user-attachments` URL that redirects to an S3
+  signature expiring in 300 seconds. The image now lives at
+  `.github/media/showcase.png`, is referenced by absolute URL in plain markdown,
+  and `.github/` is excluded from the published package
+- **The chosen option in an open select now shows a check mark instead of a
+  filled row.** Before, the row you had chosen was the one painted in the accent
+  colour. Now every row reserves a small slot on its left, the chosen row shows
+  a check in it, and the accent fill marks the row the keyboard or the pointer
+  is currently on. Two states arrived where there had been one — what you chose,
+  and where you are — and one filled row could not say both. This is the only
+  part of the keyboard work a consumer sees whether or not they use a keyboard,
+  and it follows the fixed-width check slot `context_menu.rs` already draws its
+  toggled items with. If the visual is reworked later, the property that has to
+  survive is that **the highlighted row and the chosen row stay distinguishable
+  when they are different rows** — that state is the whole reason the keyboard
+  model exists
+- Every `run:` block in `release.yml` takes its outside values from `env:`
+  bindings (`CURRENT`, `CUSTOM_VERSION`, `VERSION_TYPE`, `NEW_VERSION`, `TAG`,
+  `BRANCH`, `REPOSITORY`, `PREVIOUS_VERSION`, `DRY_RUN`) rather than `${{ }}`
+  interpolation, and a comment at the top of the file states the rule for the
+  next person adding an input. Behaviour is unchanged; the one incidental
+  repair is that `cargo set-version ${{ ... }}` was unquoted and is now
+  `cargo set-version "$NEW_VERSION"`. The rule is a repository rule, but
+  `release-deploy.yml` does not satisfy it yet
+- `Button`, `SidebarTrigger` and `Select`'s trigger take keyboard focus when
+  they are enabled, and decline it — **with a stated reason** — when they are
+  disabled. Tab now moves focus between gpuikit controls, and a disabled control
+  is not a tab stop; those are the two behavioural changes a consumer could
+  notice. A disabled control leaving the tab order is the weaker of the two
+  ARIA-sanctioned answers, and is forced by gpui still having no `aria_disabled`
+  to announce the other with
+- `src/a11y.rs`'s module docs grow a section 4, "How the keyboard reaches it",
+  and the old sections 4 and 5 renumber to 5 and 6. Section 6 no longer states
+  the rollout order in prose — `ELEMENTS_WITHOUT_A_ROLE` is the checked form of
+  it
+- `Sidebar` and `SidebarTrigger`, which shipped roles ahead of the convention,
+  are migrated onto it — as their issue said they would be if the convention
+  chose differently. Behaviour is unchanged: the panel still reports
+  `Role::Complementary` with its optional name, and `aria-expanded` still sits
+  on the trigger, which the convention now states as a rule ("state goes on the
+  element that changes it"). The markdown document's `Role::Document` moves the
+  same way
+- Two properties this convention deliberately cannot express, because gpui
+  cannot: `disabled` (gpui has no `aria_disabled`; a disabled control is
+  distinguishable only by the `Click` action its node does not offer) and
+  `sort_direction` (no `aria_sort`, the finding `src/elements/table.rs` had
+  recorded). Both are documented as upstream asks at the point the crate would
+  use them, rather than modelled as fields that would silently do nothing
+- `docs/component-triage.md` says **who took its verdicts**. A new attribution
+  section, anchored on `<!-- ratification -->`, separates the three kinds of
+  claim the verdict table flattens into one column: the 12 Shipped rows are
+  facts a test checks, the 6 Issue rows are cheap proposals, and the 11
+  Rejected rows are one agent's reading of this crate — **proposed and not
+  ratified**. No rejection reason is softened, because the reasons were never
+  the problem; a rejection that hedges is the "deferred / maybe / someday" the
+  document exists to replace. What was missing was attribution
+- The `Closing note for #59` section is **gone**, replaced by a past-tense
+  "What became of #59". #59 was closed `COMPLETED` on 2026-03-25, five months
+  before that document existed, so the ready-to-paste comment asserted a
+  pending action nobody could take — and its counts ("10 have shipped", "8
+  have a ready-to-file issue body") were the one part of a machine-checked
+  document no test reached. Counts now live only where `triage_coverage` can
+  see them
+- `every_control_on_a_row_is_the_same_height` is renamed
+  `every_sized_control_on_a_row_is_the_same_height`, and carries the two
+  exclusion lists it was missing: the six elements that are not on the shared
+  size scale at all (`ToggleGroup`, `Tabs` and `Alert`, whose height is their
+  padding plus a line box; `Slider`, `Progress` and `RadioGroup`, which
+  hard-code a track or glyph size), and the seven that *are* `ControlSized` and
+  still are not measured (`Field`, `Input`, `Textarea`, `Table`, `Sidebar`,
+  `SidebarTrigger`, `CheckboxBox`), each with its one-line reason. Sixteen
+  implementors, nine in the row: someone adding a tenth can now tell unfinished
+  coverage from a broken scale. No behaviour changed
+- Prose counts in `docs/component-triage.md` that had drifted are corrected
+  with the `Resizable` row's move: the verdict split is **12 Shipped / 6 Issue
+  / 11 Rejected**, and `EXPECTED` in `src/elements.rs` moves with it. "Ten rows
+  below are Shipped" (stale since `Sidebar` shipped in #169) and "eight
+  surviving components" go with them, and the dependency graph's edge onto the
+  deleted `docs/issues/sidebar.md` is discharged
+- Two new tests in `src/elements.rs`'s `triage_coverage` hold the above to the
+  document: the attribution section exists, precedes the table it is about,
+  still says the rejections are proposed rather than ratified, and states the
+  same three counts `EXPECTED` enforces; and the #59 section neither promises a
+  paste nor loses the date. An unchecked claim in prose is how the missing
+  attribution went unnoticed in the first place
+
 - The showcase's Markdown page demonstrates what the renderer can do rather
   than only that it renders: it says which build you are running (highlighted
   code fences or not, partial-syntax closing or not), notes the accessibility
@@ -746,6 +698,65 @@ some time.
   all four features instead of only `editor`
 
 ### Fixed
+
+- **`ld` is no longer OOM-killed while linking the examples.** Eight example
+  binaries live in `examples/`, and each is a full link of gpui.
+  `cargo build --all-targets` and a bare `cargo test` link all eight; cargo
+  sizes `-j` from the CPU count with no knowledge of a memory limit, so several
+  `ld` processes run at once — each holding that binary's debug info, which
+  `[profile.dev] debug = 2` made maximal — and the kernel kills one. The
+  message, `ld terminated with signal 9 [Killed]`, names no crate and no
+  symbol, so it reads as a compile error that does not exist. Three changes,
+  all build configuration and no library code: `[profile.dev]` now sets
+  `debug = "line-tables-only"`; a new `.cargo/config.toml` passes
+  `-Csplit-debuginfo=unpacked` on Linux targets, where the dev default of `off`
+  copies every byte of DWARF through the linker into the image; and every
+  `[[example]]` now carries `required-features = ["examples"]` against a
+  feature that enables nothing, so a build that did not ask for a demo does not
+  link one. `examples/context_menu.rs` is declared in `Cargo.toml` for the
+  first time, because an autodiscovered target cannot carry
+  `required-features`.
+
+  **The cost.** Debug builds keep file and line in backtraces but lose the type
+  and variable detail a debugger wants; a session that needs it asks on that
+  build alone with `RUSTFLAGS="-Cdebuginfo=2"`. Running an example now needs
+  `--features examples`, and `cargo check --all-targets` no longer type-checks
+  the examples without it — `examples/README.md` and the commands in it are
+  updated. `src/build_profile_guard.rs` holds all three settings, plus the
+  absence of a new autodiscovered example, under `cargo test --lib`.
+
+  **What this does not cover.** `cargo test --all-features` still links all
+  eight: cargo has no way to hold a feature back from `--all-features`, so the
+  gate does not apply to the command that produced the original kill on
+  `markdown_streaming`. That case rests entirely on the debug-info reductions,
+  whose magnitude here is unmeasured. If it still dies, the next levers, in
+  order: `[profile.dev.package."*"] debug = 0` — dependency debug info is the
+  bulk, and the guard test rejects only a *raised* override, so this stays
+  open — and then moving the examples into a package of their own, which is the
+  only arrangement in which no invocation of this library's own cargo commands
+  builds them at all, `--all-features` included.
+
+- **`Slider`'s value maths reads the thumb radius at the rem size the thumb is
+  drawn at.** `value_from_position` inset the usable track by a hardcoded
+  `px(6.)` while `render` drew the thumb at `rems(0.75)` — the same length only
+  at gpui's default 16px rem. At any other rem size the value-to-position
+  mapping skewed, worst towards the ends of the track: at a 32px rem, a press
+  three quarters along the track set 73.4 instead of 75. Both now read one
+  private `THUMB_SIZE` constant, resolved against `Window::rem_size()` when the
+  event is handled, so the drawn thumb and the inset cannot disagree. The
+  public API is unchanged
+- **`Slider` keeps the drag after the pointer leaves the track.** The movement
+  and the release are registered on the *window* now, from the `canvas` paint
+  closure that already measures the track — the pattern `Splitter` and `Input`
+  established. Only the press stays on the track div, because a press always
+  starts there. Before this, all three were plain `div` listeners, and a `div`
+  listener only fires while its hitbox is hovered: a drag that left the track
+  froze the thumb at the edge instead of pinning it to the end of the range,
+  and a button released outside the track was never delivered at all, leaving
+  `is_dragging` stuck `true` and the thumb wearing its dragging border. A move
+  with no button held now ends the drag too, which covers the release the
+  window never saw — the pointer left the *window* with the button down, or
+  another handler swallowed the mouse-up. The public API is unchanged
 
 - `Textarea::disabled(true)` produces a control that is actually inert. It used
   to set `opacity(0.65)` over a fully live `text_area()`, so the textarea

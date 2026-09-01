@@ -1,149 +1,75 @@
 # gpuikit
 
-<img width="2400" height="1424" alt="CleanShot 2025-12-05 at 14 31 13@2x" src="https://github.com/user-attachments/assets/4d3bddc5-83c2-4afc-b767-01047bdf46fa" />
+[![crates.io](https://img.shields.io/crates/v/gpuikit.svg)](https://crates.io/crates/gpuikit)
+[![docs.rs](https://docs.rs/gpuikit/badge.svg)](https://docs.rs/gpuikit)
+[![CI](https://github.com/iamnbutler/gpuikit/actions/workflows/ci.yml/badge.svg)](https://github.com/iamnbutler/gpuikit/actions/workflows/ci.yml)
 
-A UI toolkit for GPUI applications.
+> 🚧 Pre-1.0: expect breaking changes in every release. Pin your version. 🚧
 
-🚧 Note: Expect every release to have many, undocumented breaking changes for now. Use at your own risk and pin your versions 🚧
+A UI toolkit for [gpui](https://www.gpui.rs) applications. Targeting a conceptual union of SwiftUI and web-style component libraries to make building modern gpui applications seamless.
 
-## Usage
+[See it in action &rarr;](https://nate.rip/gpuikit-demo/)
+
+![The gpuikit showcase](https://raw.githubusercontent.com/iamnbutler/gpuikit/main/.github/media/showcase.png)
+
+## Getting started
+
+gpuikit builds against
+[gpui-unofficial](https://github.com/iamnbutler/gpui-unofficial), a crates.io
+distribution of gpui — your app should depend on the same one:
 
 ```toml
 [dependencies]
+gpui = { package = "gpui-unofficial", version = "1.14" }
 gpuikit = "0.8"
-
-# OR to enable the text editor component:
-# gpuikit = { version = "0.8", features = ["editor"] }
-
-# OR, for streaming markdown, to close the syntax a half-written document
-# leaves open before parsing it (needs Rust 1.95+):
-# gpuikit = { version = "0.8", features = ["stitch"] }
 ```
 
-## Features
+```rust
+use gpui::Application;
 
-All features are off by default.
-
-| Feature | Needs Rust | What it adds |
-| --- | --- | --- |
-| `editor` | 1.85 | The `Editor` component, and the syntect-backed syntax highlighting that markdown code fences use once an app calls `markdown::init_code_highlighting`. Pulls in `syntect` |
-| `stitch` | **1.95** | Closes the syntax a partially streamed markdown document leaves open (`**bold`, `[label](htt`) before parsing, so streaming text does not flicker between literal markers and styled text. Pulls in [mdstitch](https://docs.rs/mdstitch), which declares `rust-version = "1.95.0"`. `markdown::preprocessing_available()` reports which build you got |
-| `runtime_shaders` | 1.85 | Compiles Metal shaders at runtime instead of at build time, so a macOS build needs no Xcode Metal toolchain |
-| `schema` | 1.85 | Adds the `schemars` dependency. Nothing in the crate derives `JsonSchema` yet, so today this only affects your dependency graph |
-| `examples` | 1.85 | Enables nothing in the library. It exists so that the eight example binaries — each a full link of gpui — are built only when asked for: `cargo run --example showcase --features examples`. See `examples/README.md` |
-
-### Minimum Rust version
-
-gpuikit declares `rust-version = "1.85"`. That is a statement about **this
-crate's own source** — it uses async closures, and gpui is edition 2024, which
-needs the same 1.85 — and not a guarantee about a whole build. The crate is
-edition 2021, so cargo's v2 feature resolver does not hold dependencies back to
-gpuikit's floor, and several of them already declare more (cosmic-text and
-smol_str 1.89, image and time 1.88, oo7 1.92 on the Linux secret-service path).
-On a toolchain near 1.85 you will most likely meet a dependency's floor before
-you meet gpuikit's. A recent stable is the practical answer.
-
-`stitch` is the one feature that raises the floor of gpuikit itself, to **1.95**.
-Leaving it off costs you only the partial-syntax closing: `Markdown::append` and
-the background parser are unconditional, so streaming still works — a
-half-written `**bold` just flashes as literal asterisks until its closer
-arrives.
-
-## Control sizes
-
-Controls that can share a row share one size scale. `ControlSize` names a rung
-— `Small` / `Medium` / `Large`, 16 / 20 / 24px at a 16px root, `Medium` the
-default — and the theme resolves it into every dimension a control needs:
-height, padding, gap, radius, text size, line box, and how much of its box the
-control's graphic fills.
-
-```rust,ignore
-use gpuikit::traits::control_sized::ControlSized;
-
-h_stack()
-    .child(button("save", "Save").large())
-    .child(badge("2").large())
-    .child(text_field(&state, cx).large())
+fn main() {
+    Application::new()
+        .with_assets(gpuikit::assets())
+        .run(|cx| {
+            gpuikit::init(cx);
+            // ... your app
+        });
+}
 ```
 
-Every control in that list is the same height, because none of them names one:
-the rung does. A theme can rescale the whole set at once through
-`Theme::controls`, and `Themeable::control_scale` is the method to override for
-a custom theme type.
-
-## Streaming markdown
-
-Markdown parses off the UI thread, and content that arrives a piece at a time
-goes in through `Markdown::append`:
-
-```rust,ignore
-markdown.update(cx, |markdown, cx| markdown.append(&delta, cx));
-```
-
-The previous parse keeps rendering until the new one lands, so the document
-never blanks, and deltas arriving during a parse coalesce into a single
-follow-up parse. The `stitch` feature additionally closes unterminated syntax
-(`**bold`, `[label](htt`) before parsing, which is what stops a streaming
-document flickering between literal markers and styled text. See
-`examples/markdown_streaming.rs`.
-
-## Web (wasm)
-
-gpuikit runs in the browser on gpui's web platform
-(`gpui-web-gpui-unofficial`, WebGPU via wgpu) — live demo at
-<https://nate.rip/gpuikit-demo/>, built from
-[iamnbutler/gpuikit-demo](https://github.com/iamnbutler/gpuikit-demo), which
-is also the reference for the build setup (trunk, nightly + `build-std`, wasm
-atomics, COOP/COEP headers).
-
-Two things to know beyond that recipe:
-
-- **Boot with `run_embedded`, not `run`.** The browser owns the event loop,
-  so `Platform::run` returns immediately and plain `Application::run` drops
-  the app right after launch — a blank page with no error. Keep the handle
-  alive: `std::mem::forget(app.run_embedded(boot))`. (Upstream:
-  [gpui-unofficial#297](https://github.com/iamnbutler/gpui-unofficial/issues/297).)
-- **Assets embed automatically.** On wasm targets this crate turns on
-  rust-embed's `debug-embed`, so debug builds don't try to read icons and
-  fonts from a disk that isn't there.
-
-A few APIs are native-only by design — `gpuikit::fs`, keymap-from-file, the
-editor's theme-from-file — and say so in their docs;
-`src/wasm_compat_guard.rs` keeps that list honest and keeps wasm-hostile std
-APIs (`std::time::Instant`, `std::fs`, `std::thread::spawn`) out of runtime
-code everywhere else.
-
-## Testing
+Browse every component in the showcase:
 
 ```sh
-cargo test --lib
+cargo run --example showcase --features examples
 ```
 
-That is the whole suite, and it is what `.tasks/verify` runs. `--lib` is not a
-shortcut: `--all-features` re-enables the `examples` feature and links eight
-copies of gpui at once, and a bare `cargo test` links one binary per doctest,
-both of which get the linker OOM-killed on a small machine. There are no
-integration tests, so `--lib` skips nothing but doctests.
+More examples, and how to run them, in [examples/](examples/README.md). API
+docs are at [docs.rs/gpuikit](https://docs.rs/gpuikit).
 
-Judging a run by its exit status alone has misreported this repository twice —
-in both directions. `scripts/run-tests.sh --lib` decides from the harness's own
-`test result:` lines instead; [docs/running-tests.md](docs/running-tests.md)
-explains when that matters.
+## Feature flags
+
+All off by default:
+
+| Flag              | What it adds                                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| `editor`          | The `Editor` component, and syntect-based syntax highlighting for markdown code fences                       |
+| `stitch`          | Flicker-free streaming markdown: unterminated syntax (`**bold`) is closed before parsing. Requires Rust 1.95 |
+| `runtime_shaders` | Compiles Metal shaders at runtime, so macOS builds don't need the Xcode Metal toolchain                      |
+| `schema`          | Adds the `schemars` dependency                                                                               |
+
+## Web
+
+gpuikit runs in the browser on gpui's web platform (WebGPU via wgpu):
+[live demo](https://nate.rip/gpuikit-demo/), built from
+[gpuikit-demo](https://github.com/iamnbutler/gpuikit-demo), which also
+documents the wasm build setup.
+
+## Minimum Rust version
+
+1.85, or 1.95 with the `stitch` feature. Some dependencies require newer
+stables, so prefer a recent toolchain.
 
 ## License
 
-Licensed under either of:
-
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-- MIT License ([LICENSE-MIT](LICENSE-MIT))
-
-at your option.
-
-## Components
-
-Nearly 40 components including: Accordion, Alert, Avatar, Badge, Breadcrumb, Button, Card, Checkbox, Collapsible, Context Menu, Dialog, Field, Input, Popover, Progress, Radio Group, Scroll Area, Select, Slider, Switch, Tabs, Textarea, Toast, Toggle, Tooltip, and more.
-
-See [todo.md](todo.md) for the full list, and
-[docs/component-triage.md](docs/component-triage.md) for a decision — shipped,
-issue, or rejected with a reason — on every component that was once on the
-deferred roster.
+Licensed under either of the [Apache License 2.0](LICENSE-APACHE) or the
+[MIT license](LICENSE-MIT), at your option.

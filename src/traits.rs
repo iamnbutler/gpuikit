@@ -2,12 +2,9 @@
 //! click handler, a disabled flag — rather than a place for a trait per idea.
 //!
 //! There is deliberately **no `portal` module**. Positioning an overlay is
-//! `gpui::anchored()`'s job, and the crate's convention for using it —
-//! `deferred()` over `anchored()`, `.offset()` rather than a margin on the
-//! child, the fit modes, the draw-priority ladder — is written down in
-//! `docs/overlays.md` and checked by `overlay_coverage` in `src/elements.rs`.
-//! A 486-line `Portal` trait lived here for a year with zero callers; see that
-//! document for why it could not have had any.
+//! `gpui::anchored()`'s job; the crate's convention is `deferred()` over
+//! `anchored()`, with `.offset()` rather than a margin on the child. A
+//! 486-line `Portal` trait lived here for a year with zero callers.
 
 pub mod accessible;
 pub mod button;

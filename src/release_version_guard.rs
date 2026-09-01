@@ -27,7 +27,7 @@
 //! correctly* and that the invariant it depends on holds today.
 //!
 //! They live in the lib rather than `tests/`, for the reason stated at
-//! `src/elements.rs`'s `triage_coverage`: `cargo test --lib` is the command
+//! `src/elements.rs`'s `showcase_coverage`: `cargo test --lib` is the command
 //! that works in a constrained environment. Each parser asserts it matched
 //! something before anything else is trusted, for the same reason that module
 //! does — a parser that silently found nothing reports success.

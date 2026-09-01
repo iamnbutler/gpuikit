@@ -3,11 +3,10 @@
 //! This module is `pub(crate)` and deliberately not `pub`. It is not a
 //! component: it is the thing [`crate::elements::select`] and
 //! [`crate::elements::combobox`] are both built out of, which is exactly the
-//! lift `docs/menus-and-listboxes.md` §2 prescribed for the moment a second
-//! caller appeared — *"lift `Listbox` into a `pub(crate)` module named by both
-//! callers, do not make it `pub` where it sits"*. Being `pub(crate)` also keeps
-//! it out of `showcase_coverage`'s and `family_coverage`'s tables, both of
-//! which key off the literal string `pub mod `. That is the right answer rather
+//! lift #154 prescribed for the moment a second caller appeared — *"lift
+//! `Listbox` into a `pub(crate)` module named by both callers, do not make it
+//! `pub` where it sits"*. Being `pub(crate)` also keeps it out of
+//! `showcase_coverage`'s table, which keys off the literal string `pub mod `. That is the right answer rather
 //! than a convenient one: a showcase page for "the inside of a select" would
 //! be a page for something nobody can build.
 //!

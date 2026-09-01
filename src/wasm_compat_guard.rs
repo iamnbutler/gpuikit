@@ -84,7 +84,6 @@ const FORBIDDEN: &[ForbiddenApi] = &[
             ("editor/syntax_highlighter.rs", "`load_theme_from_file` reads a .tmTheme from disk; native-only by design and documented as such"),
             ("a11y.rs", "test-only: golden-file assertions inside `#[cfg(test)] mod tests`"),
             ("element_id.rs", "test-only: source scan inside `#[cfg(test)] mod tests`"),
-            ("elements.rs", "test-only: coverage scans inside `#[cfg(test)]` modules"),
             ("build_profile_guard.rs", "test-only guard module"),
             ("release_input_validation.rs", "test-only guard module"),
             ("release_version_guard.rs", "test-only guard module"),

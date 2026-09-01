@@ -41,7 +41,7 @@
 //! manifest.
 //!
 //! These live in the lib rather than `tests/`, for the reason stated at
-//! `src/elements.rs`'s `triage_coverage` and repeated in
+//! `src/elements.rs`'s `showcase_coverage` and repeated in
 //! `src/release_version_guard.rs`: `cargo test --lib` is the command that works
 //! in a constrained environment — which is precisely the subject here. Each
 //! parser asserts it matched something before anything is trusted, for the same

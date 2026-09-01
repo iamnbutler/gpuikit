@@ -377,7 +377,9 @@ impl<T: Clone + PartialEq + 'static> ComboboxState<T> {
         if let Some(selected) = &combobox.selected {
             if let Some((_, label)) = combobox.options.iter().find(|(v, _)| v == selected) {
                 let label = label.to_string();
-                input.update(cx, |state, cx| state.set_content(label, cx));
+                // Silent: this is the control seeding its own field, not the
+                // user typing — it must not route back through `text_changed`.
+                input.update(cx, |state, cx| state.set_content_silent(label, cx));
             }
         }
 
@@ -485,8 +487,12 @@ impl<T: Clone + PartialEq + 'static> ComboboxState<T> {
             return;
         };
         let label_text = label.to_string();
+        // Silent: committing writes the chosen label into the field itself.
+        // Emitting `TextChanged` here would re-enter `text_changed` a flush
+        // later, which would clear the value we are about to set and reopen the
+        // popup — the bug this fixes.
         self.input
-            .update(cx, |state, cx| state.set_content(label_text, cx));
+            .update(cx, |state, cx| state.set_content_silent(label_text, cx));
         self.set_value(Some(value), window, cx);
         self.listbox = None;
         // Committing rebuilds the unfiltered list, so the next press of Down
@@ -529,8 +535,11 @@ impl<T: Clone + PartialEq + 'static> ComboboxState<T> {
         match self.unmatched {
             UnmatchedText::Revert => {
                 let restored = self.selected_label().unwrap_or_default().to_string();
+                // Silent: restoring the value's label is the control's own
+                // write. Emitting would re-enter `text_changed` and reopen the
+                // popup a flush after the user blurred away from it.
                 self.input
-                    .update(cx, |state, cx| state.set_content(restored, cx));
+                    .update(cx, |state, cx| state.set_content_silent(restored, cx));
             }
             UnmatchedText::Keep => {}
             UnmatchedText::Create => {
@@ -841,6 +850,64 @@ mod tests {
                 this.blurred(window, cx);
                 assert_eq!(this.text(cx), SharedString::from("Banana"));
                 assert_eq!(this.selected, Some(2));
+            });
+        });
+    }
+
+    /// The bug this issue is about: committing a row set the value, but the
+    /// commit's own `set_content` re-entered `text_changed` one flush later and
+    /// cleared it. Every prior commit test asserted *inside* the mutating
+    /// `cx.update`, before the flush, so none of them saw it. This one crosses
+    /// the flush.
+    #[gpui::test]
+    fn a_committed_value_survives_the_effect_flush(cx: &mut TestAppContext) {
+        let (state, cx) = open(cx, |builder| builder);
+        type_into(&state, "an", cx);
+
+        cx.update(|window, cx| {
+            state.update(cx, |this, cx| {
+                assert_eq!(this.visible, vec![2], "\"an\" matches only Banana");
+                this.choose_row(0, window, cx);
+            });
+        });
+        cx.run_until_parked();
+
+        cx.update(|_window, cx| {
+            state.update(cx, |this, cx| {
+                assert_eq!(
+                    this.selected,
+                    Some(2),
+                    "the committed value must survive the effect flush"
+                );
+                assert_eq!(this.text(cx), SharedString::from("Banana"));
+                assert!(
+                    !this.is_open(),
+                    "committing must not reopen the popup after the flush"
+                );
+            });
+        });
+    }
+
+    /// The same mechanism on the blur path: `Revert` writes the restored label
+    /// with `set_content`, which re-entered `text_changed` and reopened the
+    /// popup a flush after the user blurred away from it.
+    #[gpui::test]
+    fn blur_revert_stays_closed_across_the_flush(cx: &mut TestAppContext) {
+        let (state, cx) = open(cx, |builder| builder.selected(0));
+        type_into(&state, "nonsense", cx);
+
+        cx.update(|window, cx| {
+            state.update(cx, |this, cx| this.blurred(window, cx));
+        });
+        cx.run_until_parked();
+
+        cx.update(|_window, cx| {
+            state.update(cx, |this, cx| {
+                assert!(
+                    !this.is_open(),
+                    "reverting on blur must not reopen the popup after the flush"
+                );
+                assert_eq!(this.text(cx), SharedString::from(""));
             });
         });
     }

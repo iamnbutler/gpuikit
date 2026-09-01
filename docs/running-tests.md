@@ -58,3 +58,23 @@ the separate problem of *piping* a build's output and reading the pipeline's
 status instead of the command's — that belongs to whatever does the piping, and
 adding a recommendation about it here would only make this file look like the
 place it was solved.
+
+## One rule for state tests: assert after the flush
+
+An entity test that mutates state and then asserts **inside the same
+`cx.update`** proves nothing about what subscribers do. gpui delivers emitted
+events and runs `cx.subscribe`/`cx.observe` callbacks on the *next effect
+flush*, not synchronously — so an assertion in the same block sees the state
+before any subscriber has reacted.
+
+```rust
+cx.update(|window, cx| state.update(cx, |s, cx| s.do_the_thing(window, cx)));
+cx.run_until_parked(); // let subscribers react
+cx.update(|_window, cx| state.read_with(cx, |s, _| assert!(/* … */)));
+```
+
+This is not a style preference. The combobox bug in gpuikit#223 — a committed
+value that un-committed itself one flush later — survived eight dedicated tests
+because every one of them asserted before the flush. When a test's whole point
+is a reaction (a value that must survive, a popup that must stay closed), the
+`run_until_parked` between the act and the assert is the test.

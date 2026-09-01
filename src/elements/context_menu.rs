@@ -256,11 +256,12 @@ fn next_focus(selectable: &[usize], current: Option<usize>, delta: isize) -> Opt
     if selectable.is_empty() {
         return None;
     }
-    match current.and_then(|ix| selectable.iter().position(|&s| s == ix)) {
-        Some(pos) => {
-            let moved = (pos as isize + delta).rem_euclid(selectable.len() as isize);
-            selectable.get(moved as usize).copied()
-        }
+    // The wrap arithmetic lives once, in `crate::selection`; this maps a focus
+    // index to its position among the selectable rows, wraps, and maps back.
+    let position = current.and_then(|ix| selectable.iter().position(|&s| s == ix));
+    match position {
+        Some(pos) => crate::selection::wrap_index(Some(pos), delta, selectable.len())
+            .and_then(|moved| selectable.get(moved).copied()),
         None if delta >= 0 => selectable.first().copied(),
         None => selectable.last().copied(),
     }

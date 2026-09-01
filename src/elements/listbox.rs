@@ -60,26 +60,10 @@ pub(crate) enum ListboxFocus {
     Caller,
 }
 
-/// Move a highlight `delta` rows through a list of `count` rows, wrapping at
-/// both ends.
-///
-/// Shared by [`Listbox`] and [`crate::elements::command`], which move a
-/// selection through two different collections with the same arithmetic.
-/// Wrapping is `rem_euclid` rather than a pair of bounds checks because the two
-/// ends are the same case, and a signed remainder would send `-1` off the front
-/// of the list. `None` means there is nothing to highlight — an empty list —
-/// rather than an index no row happens to have.
-pub(crate) fn wrapped_index(current: Option<usize>, delta: isize, count: usize) -> Option<usize> {
-    if count == 0 {
-        return None;
-    }
-    Some(match current {
-        Some(current) => (current as isize + delta).rem_euclid(count as isize) as usize,
-        // Entering from the near end is the answer that reads right.
-        None if delta < 0 => count - 1,
-        None => 0,
-    })
-}
+/// The highlight-wrap arithmetic, shared with [`crate::elements::command`] and
+/// [`crate::elements::context_menu`]. Lives once, in [`crate::selection`]; this
+/// re-export keeps the name the listbox and command call sites already use.
+pub(crate) use crate::selection::wrap_index as wrapped_index;
 
 /// The default match: a case-insensitive substring test.
 ///

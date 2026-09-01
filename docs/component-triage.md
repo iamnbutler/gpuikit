@@ -259,6 +259,41 @@ Not built, and named here so the next person does not go looking: a pane tree,
 nested groups, persisted layout, a collapse gesture, or any notion of more than
 two panes. Three panes is two splitters, nested by the caller.
 
+## Beyond #59: the SwiftUI triage
+
+#59's roster was shadcn/ui's, and shadcn's vocabulary is a web application's.
+A second triage was taken in August 2026 against SwiftUI's — Lists with
+selection, `OutlineGroup`, `NavigationSplitView`, `.toolbar`, `.searchable`,
+`Stepper`, `SecureField` — because a desktop toolkit's consumers reach for
+that vocabulary and the first triage never asked about it. These entries are
+not #59 rows and get no verdict-table rows; each has a complete issue body,
+written to the same standard the three-verdicts section demands, and the
+rejections its research produced are named inside the bodies (swipe actions,
+edit mode, alignment guides, transitions) rather than in the table below.
+
+- `docs/issues/tree-view.md` — hierarchical list: flatten visible nodes into
+  a uniform list, the Zed project-panel technique made reusable
+- `docs/issues/list-upgrades.md` — a selection model, scroll-to-item in item
+  coordinates, and an opt-in non-uniform mode on gpui's `list()`
+- `docs/issues/toolbar.md` — one tab stop over grouped controls; explicitly
+  not the rejected Menubar, and the buyer of the roving-focus convention
+- `docs/issues/split-view.md` — column coordination over Sidebar and
+  Splitter; the pane-tree rejection stands
+- `docs/issues/navigation-stack.md` — a caller-owned `NavPath` value plus the
+  one element a recipe cannot supply: the page container that moves focus
+- `docs/issues/layout.md` — `zstack()` and `spacer()`; parameters argued
+  against on usage evidence
+- `docs/issues/searchable.md` — a recipe document, not an element; the
+  settled-question-becomes-a-doc precedent applied to filtering
+- `docs/issues/stepper.md` — the APG spinbutton shape, not SwiftUI's
+  buttons-only one
+- `docs/issues/secure-field.md` — a masked mode of `TextField`, on the Input
+  OTP rejection's own reasoning
+- `docs/issues/color-picker.md` — a drawn editor, since the platform panel is
+  not gpui's to give
+- `docs/issues/gauge.md` — a meter, standing apart from Progress on the role
+  boundary
+
 ## The rejections, argued
 
 **Hover Card.** A card that appears on hover and nowhere else has no keyboard

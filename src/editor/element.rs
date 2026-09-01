@@ -51,7 +51,7 @@ impl EditorElement {
         let line = editor
             .get_buffer()
             .get_line(cursor_pos.row)
-            .unwrap_or_else(|| String::new());
+            .unwrap_or_default();
 
         let text_before_cursor = &line[..cursor_pos.col.min(line.len())];
         let text_x = bounds.origin.x + config.gutter_width + config.gutter_padding;

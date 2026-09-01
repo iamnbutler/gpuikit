@@ -8,7 +8,6 @@ use gpui::{
     div, prelude::*, px, size, App, Application, Bounds, Context, Entity, FocusHandle, Focusable,
     ParentElement, Render, Styled, Window, WindowBounds, WindowOptions,
 };
-use gpui_platform;
 use gpuikit::elements::button::button;
 use gpuikit::elements::dialog::{dialog, DialogClosed, DialogOpened, DialogState};
 use gpuikit::layout::h_stack;

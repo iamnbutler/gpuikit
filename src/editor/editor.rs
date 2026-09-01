@@ -650,7 +650,7 @@ impl Editor {
 
     pub fn scroll_by(&mut self, delta: isize) {
         if delta < 0 {
-            self.scroll_row = self.scroll_row.saturating_sub(delta.abs() as usize);
+            self.scroll_row = self.scroll_row.saturating_sub(delta.unsigned_abs());
         } else {
             let max_scroll = self.buffer.line_count().saturating_sub(1);
             self.scroll_row = (self.scroll_row + delta as usize).min(max_scroll);

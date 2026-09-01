@@ -126,9 +126,9 @@
 //! options that share it.
 
 use crate::a11y::{A11y, Announce};
-use crate::elements::listbox::{Listbox, ListboxFocus, LISTBOX_GAP};
 #[cfg(test)]
 use crate::elements::listbox::option_a11y;
+use crate::elements::listbox::{Listbox, ListboxFocus, LISTBOX_GAP};
 use crate::theme::{focus_ring, ActiveTheme, ControlSize, Themeable};
 use crate::traits::accessible::Accessible;
 use crate::traits::control_sized::ControlSized;
@@ -179,7 +179,6 @@ const MIN_TRIGGER_WIDTH: Rems = Rems(6.25);
 
 /// Event emitted when the select value changes.
 pub struct SelectChanged;
-
 
 /// Builder for creating a select component.
 ///

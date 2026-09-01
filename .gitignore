@@ -41,7 +41,6 @@
 /target/release/
 /tmp/
 /vendor/
-Cargo.lock
 Thumbs.db
 ehthumbs.db
 logs/

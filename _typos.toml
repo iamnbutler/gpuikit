@@ -1,0 +1,10 @@
+# Exceptions for the `typos` CI gate. Every entry is a word typos would
+# "correct" that is right as written — say why when adding one.
+
+[default.extend-words]
+# GapBuffer deletion tests assert on "Hello World" with a letter removed.
+worl = "worl"
+# German text in a markdown parser fixture.
+ein = "ein"
+# "mis-highlight" in prose; typos splits at the hyphen and judges the prefix.
+mis = "mis"

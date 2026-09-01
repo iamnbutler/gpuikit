@@ -6,7 +6,6 @@ use gpui::{
     IntoElement, MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement,
     Styled, TitlebarOptions, Window, WindowBounds, WindowOptions,
 };
-use gpui_platform;
 use gpuikit::{
     elements::{
         badge::{badge, BadgeVariant},
@@ -364,7 +363,7 @@ impl TasksApp {
     }
 
     fn total_pages(&self) -> usize {
-        (self.tasks.len() + self.rows_per_page - 1) / self.rows_per_page
+        self.tasks.len().div_ceil(self.rows_per_page)
     }
 
     fn visible_tasks(&self) -> impl Iterator<Item = (usize, &Task)> {
@@ -450,8 +449,8 @@ impl Render for TasksApp {
                                             .text_color(theme.fg_muted())
                                             .child("Filter..."),
                                     )
-                                    .child(filter_button("Status", &theme))
-                                    .child(filter_button("Priority", &theme)),
+                                    .child(filter_button("Status", theme))
+                                    .child(filter_button("Priority", theme)),
                             )
                             .child(
                                 h_stack()
@@ -488,7 +487,7 @@ impl Render for TasksApp {
                             )
                             .children(visible_tasks.iter().map(|(index, task)| {
                                 let checkbox = self.row_checkboxes[*index].clone();
-                                task_row(task, checkbox, *index, &theme)
+                                task_row(task, checkbox, *index, theme)
                             })),
                     )
                     .child(
@@ -516,28 +515,28 @@ impl Render for TasksApp {
                                                 "first",
                                                 "<<",
                                                 current_page > 0,
-                                                &theme,
+                                                theme,
                                                 cx.listener(|this, _, _, cx| this.first_page(cx)),
                                             ))
                                             .child(pagination_button(
                                                 "prev",
                                                 "<",
                                                 current_page > 0,
-                                                &theme,
+                                                theme,
                                                 cx.listener(|this, _, _, cx| this.prev_page(cx)),
                                             ))
                                             .child(pagination_button(
                                                 "next",
                                                 ">",
                                                 current_page < total_pages - 1,
-                                                &theme,
+                                                theme,
                                                 cx.listener(|this, _, _, cx| this.next_page(cx)),
                                             ))
                                             .child(pagination_button(
                                                 "last",
                                                 ">>",
                                                 current_page < total_pages - 1,
-                                                &theme,
+                                                theme,
                                                 cx.listener(|this, _, _, cx| this.last_page(cx)),
                                             )),
                                     ),

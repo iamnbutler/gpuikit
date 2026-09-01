@@ -216,7 +216,7 @@ impl MarkdownSelection {
             };
             let distance = vertical_distance(entry.layout.bounds(), point);
             let position = SelectionPosition { run, offset };
-            if best.map_or(true, |(best_distance, _)| distance < best_distance) {
+            if best.is_none_or(|(best_distance, _)| distance < best_distance) {
                 best = Some((distance, position));
             }
         }

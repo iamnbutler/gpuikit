@@ -343,10 +343,7 @@ impl InputState {
 
     /// Sets the text style used for layout. Marks layout as dirty if the style changed.
     pub(crate) fn set_text_style(&mut self, style: &TextStyle) {
-        let changed = self
-            .text_style
-            .as_ref()
-            .map_or(true, |current| current != style);
+        let changed = self.text_style.as_ref() != Some(style);
 
         if changed {
             self.text_style = Some(style.clone());
@@ -2038,7 +2035,7 @@ mod tests {
         content: &str,
         range: std::ops::Range<usize>,
     ) -> WindowHandle<TestView> {
-        let view = cx.add_window(|window, cx| {
+        cx.add_window(|window, cx| {
             let input = cx.new(|cx| {
                 let mut input = InputState::new_multiline(cx);
                 input.content = content.to_string();
@@ -2047,8 +2044,7 @@ mod tests {
                 input
             });
             TestView { input }
-        });
-        view
+        })
     }
 
     // ============================================================

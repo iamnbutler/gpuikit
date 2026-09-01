@@ -11,6 +11,9 @@
 //! - **EditorView**: A complete view with keyboard handling (see examples)
 
 pub mod buffer;
+// `editor::editor` is a public path; renaming the module is a semver break,
+// not a lint fix.
+#[allow(clippy::module_inception)]
 pub mod editor;
 pub mod element;
 mod tests;

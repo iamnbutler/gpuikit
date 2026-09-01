@@ -15,7 +15,8 @@ use crate::traits::disableable::Disableable;
 use crate::traits::labelable::Labelable;
 use gpui::{
     div, prelude::FluentBuilder, rems, AnyElement, App, ElementId, InteractiveElement, IntoElement,
-    ParentElement, Rems, RenderOnce, Role, SharedString, StatefulInteractiveElement, Styled, Window,
+    ParentElement, Rems, RenderOnce, Role, SharedString, StatefulInteractiveElement, Styled,
+    Window,
 };
 
 /// Width of the label column in the beside layout.
@@ -242,9 +243,7 @@ impl RenderOnce for Field {
                 None => context,
             }
         };
-        let child = self
-            .child
-            .map(|child| WithFormContext::new(context, child));
+        let child = self.child.map(|child| WithFormContext::new(context, child));
 
         match self.label_position {
             LabelPosition::Above => {
@@ -320,9 +319,8 @@ mod tests {
         cx.update(crate::theme::init);
         let cx = cx.add_empty_window();
 
-        let announced = cx.update(|window, cx| {
-            announced(field("street").label("Street"), window, cx)
-        });
+        let announced =
+            cx.update(|window, cx| announced(field("street").label("Street"), window, cx));
 
         assert_eq!(announced.role, Some(Role::Group));
         assert_eq!(announced.name(), Some("Street"));

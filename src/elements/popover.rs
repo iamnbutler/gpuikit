@@ -265,11 +265,10 @@ impl PopoverState {
 
 impl Render for PopoverState {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let trigger_element = if let Some(ref render) = self.trigger_render {
-            Some(render(window, cx))
-        } else {
-            None
-        };
+        let trigger_element = self
+            .trigger_render
+            .as_ref()
+            .map(|render| render(window, cx));
 
         let offset = self.offset;
 

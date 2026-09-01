@@ -58,7 +58,10 @@ impl Weekday {
 
     /// This weekday as an index from Sunday.
     pub fn index(self) -> usize {
-        Weekday::ALL.iter().position(|day| *day == self).unwrap_or(0)
+        Weekday::ALL
+            .iter()
+            .position(|day| *day == self)
+            .unwrap_or(0)
     }
 
     /// How many days this weekday is *after* `start`, wrapping.
@@ -192,10 +195,9 @@ impl Date {
         let era = year.div_euclid(400);
         let year_of_era = year - era * 400;
         let month = self.month as i64;
-        let day_of_year = (153 * (month + if month > 2 { -3 } else { 9 }) + 2) / 5 + self.day as i64
-            - 1;
-        let day_of_era =
-            year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+        let day_of_year =
+            (153 * (month + if month > 2 { -3 } else { 9 }) + 2) / 5 + self.day as i64 - 1;
+        let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
         era * 146_097 + day_of_era - 719_468
     }
 
@@ -204,9 +206,8 @@ impl Date {
         let days = days + 719_468;
         let era = days.div_euclid(146_097);
         let day_of_era = days - era * 146_097;
-        let year_of_era = (day_of_era - day_of_era / 1460 + day_of_era / 36_524
-            - day_of_era / 146_096)
-            / 365;
+        let year_of_era =
+            (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
         let year = year_of_era + era * 400;
         let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
         let month_prime = (5 * day_of_year + 2) / 153;
@@ -340,7 +341,10 @@ mod tests {
     #[test]
     fn add_months_clamps_and_does_not_round_trip() {
         assert_eq!(date(2026, 1, 31).add_months(1), date(2026, 2, 28));
-        assert_eq!(date(2026, 1, 31).add_months(1).add_months(-1), date(2026, 1, 28));
+        assert_eq!(
+            date(2026, 1, 31).add_months(1).add_months(-1),
+            date(2026, 1, 28)
+        );
         assert_eq!(date(2024, 1, 31).add_months(1), date(2024, 2, 29));
         assert_eq!(date(2026, 12, 15).add_months(1), date(2027, 1, 15));
     }

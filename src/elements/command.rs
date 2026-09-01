@@ -297,7 +297,10 @@ impl CommandState {
     /// Install the matcher. Without one the palette shows every item in order,
     /// which is the right behaviour for a caller who answers
     /// [`CommandEvent::QueryChanged`] instead.
-    pub fn matcher(mut self, matcher: impl Fn(&str, &[CommandItem]) -> Vec<usize> + 'static) -> Self {
+    pub fn matcher(
+        mut self,
+        matcher: impl Fn(&str, &[CommandItem]) -> Vec<usize> + 'static,
+    ) -> Self {
         self.matcher = Some(Rc::new(matcher));
         self
     }
@@ -311,7 +314,10 @@ impl CommandState {
     /// Answer a [`CommandEvent::QueryChanged`] with the matched item indices,
     /// in display order. The asynchronous half of the matcher hook.
     pub fn set_matches(&mut self, matches: Vec<usize>, cx: &mut Context<Self>) {
-        self.matches = matches.into_iter().filter(|i| *i < self.items.len()).collect();
+        self.matches = matches
+            .into_iter()
+            .filter(|i| *i < self.items.len())
+            .collect();
         self.selected = self.first_runnable();
         cx.notify();
     }
@@ -524,8 +530,8 @@ impl Render for CommandState {
                     });
 
                 #[cfg(test)]
-                let element = element
-                    .debug_selector(move || format!("gpuikit-command-row-{index}"));
+                let element =
+                    element.debug_selector(move || format!("gpuikit-command-row-{index}"));
                 #[cfg(not(test))]
                 let _ = index;
 
@@ -650,7 +656,7 @@ mod tests {
 
     #[test]
     fn the_selection_wraps_at_both_ends() {
-        let runnable = vec![0usize, 2, 3];
+        let runnable = [0usize, 2, 3];
         assert_eq!(wrapped_index(Some(2), 1, runnable.len()), Some(0));
         assert_eq!(wrapped_index(Some(0), -1, runnable.len()), Some(2));
     }
@@ -671,8 +677,8 @@ mod tests {
     #[test]
     fn a_row_index_is_not_an_item_index() {
         // Matched: items 2 and 3 only. Row 0 is item 2.
-        let matches = vec![2usize, 3];
-        assert_eq!(matches.get(0).copied(), Some(2));
+        let matches = [2usize, 3];
+        assert_eq!(matches.first().copied(), Some(2));
         assert_eq!(matches.get(1).copied(), Some(3));
     }
 

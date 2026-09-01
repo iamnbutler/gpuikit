@@ -303,7 +303,8 @@ impl Render for Checkbox {
                 // `track_focus` does not make the handle a tab stop by itself
                 // — the same thing `a11y::Announce` has to do for a
                 // caller-supplied handle.
-                this.track_focus(&handle.tab_stop(true)).moves_focus_on_tab()
+                this.track_focus(&handle.tab_stop(true))
+                    .moves_focus_on_tab()
             })
             .h(metrics.height)
             // A label outside the control's own box wants more room than the

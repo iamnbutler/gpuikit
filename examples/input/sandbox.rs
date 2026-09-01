@@ -15,7 +15,6 @@ use gpui::{
     Background, Bounds, Context, DefiniteLength, Div, Entity, FocusHandle, Focusable, FontWeight,
     Hsla, KeyBinding, SharedString, Stateful, Window, WindowBounds, WindowOptions,
 };
-use gpui_platform;
 use gpuikit::elements::input::{input, text_area};
 use gpuikit::elements::select::{select, SelectChanged, SelectState};
 use gpuikit::elements::slider::{Slider, SliderChanged};
@@ -119,7 +118,7 @@ impl FontWeightOption {
         }
     }
 
-    fn to_font_weight(&self) -> FontWeight {
+    fn to_font_weight(self) -> FontWeight {
         match self {
             Self::Thin => FontWeight::THIN,
             Self::ExtraLight => FontWeight::EXTRA_LIGHT,

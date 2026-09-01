@@ -1,0 +1,84 @@
+# cargo-deny configuration — the supply-chain gate CI runs.
+# `cargo deny check` locally reproduces it (cargo install cargo-deny).
+
+[graph]
+# Judge the tree for every platform gpui ships, not just the machine running
+# the check — a Linux-only dependency with a bad license or advisory should
+# fail on a macOS runner too.
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "wasm32-unknown-unknown",
+]
+all-features = true
+
+[advisories]
+# Unmaintained advisories are judged for direct dependencies only. gpui's
+# transitive text stack (rustybuzz, ttf-parser), syntect's (yaml-rust,
+# bincode) and paste are all flagged unmaintained upstream; none are this
+# crate's to replace, and failing every PR over them teaches people to
+# ignore the gate.
+unmaintained = "workspace"
+# Each entry names the advisory and why it does not gate this crate. Remove
+# an entry the moment the dependency that pins the vulnerable version moves.
+ignore = [
+    # quick-xml DoS advisories (quadratic duplicate-attribute check,
+    # unbounded namespace allocation). Reached only through gpui's tree —
+    # wayland-protocols-wlr pins 0.30, resvg's usvg pins its own — where the
+    # XML parsed is local, trusted data (wayland protocol specs at build
+    # time, bundled SVGs), not attacker input. Nothing this crate can bump.
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+]
+
+[licenses]
+# The crate itself is MIT OR Apache-2.0. This list is what the dependency
+# tree actually uses; extend it deliberately, per license, when a new
+# dependency arrives with something new.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "MPL-2.0",
+    "OFL-1.1",
+    "Ubuntu-font-1.0",
+    # libbz2-rs-sys, via gpui's wasm platform crate.
+    "bzip2-1.0.6",
+]
+
+# Per-crate carve-outs. THE GPL ENTRIES ARE A PROBLEM, NOT A PRECEDENT:
+# zlog/ztracing are Zed app crates (GPL-3.0-or-later) that the
+# gpui-unofficial packaging republishes as gpui's logging layer, so every
+# gpuikit build links them. A GPL dependency inside a MIT OR Apache-2.0
+# library contradicts the license this crate offers its consumers. These
+# exceptions exist so the gate can hold the line everywhere else while that
+# contradiction is resolved upstream — they are not an acceptance of it.
+[[licenses.exceptions]]
+name = "zlog-gpui-unofficial"
+allow = ["GPL-3.0-or-later"]
+
+[[licenses.exceptions]]
+name = "ztracing-gpui-unofficial"
+allow = ["GPL-3.0-or-later"]
+
+[[licenses.exceptions]]
+name = "ztracing-macro-gpui-unofficial"
+allow = ["GPL-3.0-or-later"]
+
+[bans]
+# Duplicate versions are the reality of gpui's tree; a hard deny would be
+# noise. Highlight them in the report without failing.
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

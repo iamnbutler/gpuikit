@@ -534,7 +534,7 @@ pub mod dialog {
     impl FileDialogExt for FileHandle {
         fn prompt_open_file(&mut self, cx: &mut Context<Self>) {
             cx.spawn(async move |this, cx| {
-                if let Some(file) = open_file(&cx).await? {
+                if let Some(file) = open_file(cx).await? {
                     this.update(cx, |this, cx| {
                         this.file = Some(file);
                         cx.notify();
@@ -550,7 +550,7 @@ pub mod dialog {
                 let current_path = file.path().to_path_buf();
 
                 cx.spawn(async move |this, cx| {
-                    let path = prompt_for_save(&cx, Some(current_path)).await?;
+                    let path = prompt_for_save(cx, Some(current_path)).await?;
 
                     if let Some(path) = path {
                         this.update(cx, |this, cx| {

@@ -270,7 +270,10 @@ impl<T: Clone + PartialEq + 'static> Combobox<T> {
 
     /// Register a callback for when the **value** changes. `None` is a real
     /// change: it is what typing does.
-    pub fn on_change(mut self, handler: impl Fn(Option<T>, &mut Window, &mut App) + 'static) -> Self {
+    pub fn on_change(
+        mut self,
+        handler: impl Fn(Option<T>, &mut Window, &mut App) + 'static,
+    ) -> Self {
         self.on_change = Some(Rc::new(handler));
         self
     }
@@ -293,7 +296,10 @@ impl<T: Clone + PartialEq + 'static> Combobox<T> {
     ///
     /// Setting the handler is what selects the mode, so there is no way to ask
     /// for `Create` and not answer it.
-    pub fn on_create(mut self, handler: impl Fn(SharedString, &mut Window, &mut App) + 'static) -> Self {
+    pub fn on_create(
+        mut self,
+        handler: impl Fn(SharedString, &mut Window, &mut App) + 'static,
+    ) -> Self {
         self.on_create = Some(Rc::new(handler));
         self.unmatched = UnmatchedText::Create;
         self
@@ -375,11 +381,15 @@ impl<T: Clone + PartialEq + 'static> ComboboxState<T> {
             }
         }
 
-        cx.subscribe_in(&input, window, |this, _input, event, window, cx| match event {
-            InputStateEvent::TextChanged => this.text_changed(window, cx),
-            InputStateEvent::Blur => this.blurred(window, cx),
-            _ => {}
-        })
+        cx.subscribe_in(
+            &input,
+            window,
+            |this, _input, event, window, cx| match event {
+                InputStateEvent::TextChanged => this.text_changed(window, cx),
+                InputStateEvent::Blur => this.blurred(window, cx),
+                _ => {}
+            },
+        )
         .detach();
 
         let visible = (0..combobox.options.len()).collect();
@@ -446,7 +456,10 @@ impl<T: Clone + PartialEq + 'static> ComboboxState<T> {
     /// option index. `None` when the chosen option did not survive the filter.
     fn selected_row(&self) -> Option<usize> {
         let selected = self.selected.as_ref()?;
-        let option_index = self.options.iter().position(|(value, _)| value == selected)?;
+        let option_index = self
+            .options
+            .iter()
+            .position(|(value, _)| value == selected)?;
         self.visible.iter().position(|index| *index == option_index)
     }
 
@@ -669,9 +682,11 @@ impl<T: Clone + PartialEq + 'static> Render for ComboboxState<T> {
             .on_action(cx.listener(|this, _: &ComboboxHighlightNext, window, cx| {
                 this.move_highlight(1, window, cx);
             }))
-            .on_action(cx.listener(|this, _: &ComboboxHighlightPrevious, window, cx| {
-                this.move_highlight(-1, window, cx);
-            }))
+            .on_action(
+                cx.listener(|this, _: &ComboboxHighlightPrevious, window, cx| {
+                    this.move_highlight(-1, window, cx);
+                }),
+            )
             .on_action(cx.listener(|this, _: &ComboboxChoose, window, cx| {
                 this.choose_highlighted(window, cx);
             }))
@@ -694,7 +709,9 @@ impl<T: Clone + PartialEq + 'static> Render for ComboboxState<T> {
             // Rung 1 of `docs/overlays.md`'s ladder, the same one select,
             // popover and context menu use. A chooser's popup is not a new
             // layer.
-            this.child(deferred(anchored().offset(point(px(0.), gap)).child(popup)).with_priority(1))
+            this.child(
+                deferred(anchored().offset(point(px(0.), gap)).child(popup)).with_priority(1),
+            )
         })
     }
 }
@@ -743,11 +760,7 @@ mod tests {
         (state, cx)
     }
 
-    fn type_into(
-        state: &Entity<ComboboxState<usize>>,
-        text: &str,
-        cx: &mut VisualTestContext,
-    ) {
+    fn type_into(state: &Entity<ComboboxState<usize>>, text: &str, cx: &mut VisualTestContext) {
         let text = text.to_string();
         cx.update(|_window, cx| {
             state.update(cx, |this, cx| {

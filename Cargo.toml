@@ -84,6 +84,9 @@ log = "0.4"
 # Input module dependencies
 unicode-bidi = "0.3"
 unicode-segmentation = "1.10"
+# `std::time::Instant::now()` panics on wasm32-unknown-unknown; web-time
+# re-exports the std types unchanged on native targets.
+web-time = "1"
 # No async runtime here on purpose. `smol::Timer` is `async_io::Timer`, and
 # constructing one spawns the process-global `async-io` OS thread, whose
 # `main_loop` has no exit path — it was still in the reactor at process exit
@@ -104,6 +107,14 @@ gpui_util = { package = "gpui-util-gpui-unofficial", version = "1.14.2", optiona
 
 # Schema generation (optional)
 schemars = { version = "0.8", optional = true }
+
+# rust-embed's default debug behavior reads assets from disk at runtime, and
+# the browser has no disk — a debug wasm build would fail to load every icon
+# and font. `debug-embed` compiles the assets in for every profile; gating it
+# to wasm keeps native debug builds' fast from-disk iteration. Consumers get
+# this via feature unification without knowing the trick exists.
+[target.'cfg(target_family = "wasm")'.dependencies]
+rust-embed = { version = "8.2.0", features = ["debug-embed"] }
 
 [dev-dependencies]
 gpui = { package = "gpui-unofficial", version = "1.14.2", features = ["test-support"] }

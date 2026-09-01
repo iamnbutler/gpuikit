@@ -606,8 +606,12 @@ impl SyntaxHighlighter {
             .unwrap_or_else(|| gpui::rgba(0x3e4451aa).into())
     }
 
-    // Load custom themes from a directory
-    // Example: highlighter.load_theme_from_file("./themes/my-theme.tmTheme")
+    /// Loads a custom `.tmTheme` from disk, e.g.
+    /// `highlighter.load_theme_from_file("./themes/my-theme.tmTheme")`.
+    ///
+    /// **Native-only**: reads via `std::fs`, which fails at runtime on
+    /// `wasm32-unknown-unknown`. `src/wasm_compat_guard.rs` tracks this
+    /// exemption.
     #[allow(dead_code)]
     pub fn load_theme_from_file(&mut self, path: &str) -> Result<(), String> {
         use std::fs::File;

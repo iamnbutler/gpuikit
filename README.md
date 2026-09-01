@@ -87,6 +87,32 @@ follow-up parse. The `stitch` feature additionally closes unterminated syntax
 document flickering between literal markers and styled text. See
 `examples/markdown_streaming.rs`.
 
+## Web (wasm)
+
+gpuikit runs in the browser on gpui's web platform
+(`gpui-web-gpui-unofficial`, WebGPU via wgpu) — live demo at
+<https://nate.rip/gpuikit-demo/>, built from
+[iamnbutler/gpuikit-demo](https://github.com/iamnbutler/gpuikit-demo), which
+is also the reference for the build setup (trunk, nightly + `build-std`, wasm
+atomics, COOP/COEP headers).
+
+Two things to know beyond that recipe:
+
+- **Boot with `run_embedded`, not `run`.** The browser owns the event loop,
+  so `Platform::run` returns immediately and plain `Application::run` drops
+  the app right after launch — a blank page with no error. Keep the handle
+  alive: `std::mem::forget(app.run_embedded(boot))`. (Upstream:
+  [gpui-unofficial#297](https://github.com/iamnbutler/gpui-unofficial/issues/297).)
+- **Assets embed automatically.** On wasm targets this crate turns on
+  rust-embed's `debug-embed`, so debug builds don't try to read icons and
+  fonts from a disk that isn't there.
+
+A few APIs are native-only by design — `gpuikit::fs`, keymap-from-file, the
+editor's theme-from-file — and say so in their docs;
+`src/wasm_compat_guard.rs` keeps that list honest and keeps wasm-hostile std
+APIs (`std::time::Instant`, `std::fs`, `std::thread::spawn`) out of runtime
+code everywhere else.
+
 ## Testing
 
 ```sh

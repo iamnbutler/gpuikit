@@ -590,7 +590,7 @@ impl Render for Calendar {
                     .when(!is_selected && is_focused, |this| {
                         this.border_1().border_color(accent)
                     })
-                    // Today is an underline rather than a second fill: a fill
+                    // Today is drawn bold rather than a second fill: a fill
                     // would be indistinguishable from the selection.
                     .when(is_today && !is_selected, |this| {
                         this.font_weight(gpui::FontWeight::BOLD)

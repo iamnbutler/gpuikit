@@ -14,10 +14,9 @@
 #     the doctests — runs on runners with the memory to pay for it, and the
 #     examples link on Linux's 16 GB runner rather than macOS's 7 GB one.
 #   * macOS is the primary platform; Linux proves consumers there build and
-#     pass; Windows is a `cargo check` only, `continue-on-error` until a run
-#     proves it green, and deliberately outside the `ci` gate; wasm is a
-#     first-class check because gpui ships a wasm platform crate and this
-#     library compiles for it today.
+#     pass; wasm is a first-class check because gpui ships a wasm platform
+#     crate and this library compiles for it today. No Windows job — see the
+#     note above the `ci` gate.
 #   * The toolchain is pinned so clippy's lint set changes when this repo
 #     chooses, not when rustup does. Bump it deliberately, in its own change.
 #
@@ -199,23 +198,9 @@ jobs:
       - name: check
         run: cargo check --locked --target wasm32-unknown-unknown
 
-  # Advisory until a run proves it green: nothing local can verify a Windows
-  # build, so this job may not block merges (`continue-on-error`) and the `ci`
-  # gate does not `need` it. To promote it once green: delete the
-  # `continue-on-error` line and add `windows` to the gate's `needs`.
-  windows:
-    name: check (Windows)
-    runs-on: windows-latest
-    timeout-minutes: 40
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: '1.98'
-      - uses: Swatinem/rust-cache@v2
-      - name: check
-        run: cargo check --locked --all-targets --all-features
+  # No Windows job on purpose: the hosted runners are slow enough to dominate
+  # every run, and nothing here targets Windows today. If that changes, a
+  # `cargo check` job is the cheapest first claim.
 
   # The one status branch protection points at. Everything above must succeed
   # (or be skipped); adding a job means adding it to `needs`, and the jq

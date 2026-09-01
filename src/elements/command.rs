@@ -330,7 +330,11 @@ impl CommandState {
     /// Show the palette, empty the query and put focus in it.
     pub fn open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.open = true;
-        self.query.update(cx, |state, cx| state.set_content("", cx));
+        // Silent: `open` resets the query itself and rematches below, so the
+        // palette must not hear this write back through its own `TextChanged`
+        // subscription as a user edit (which would re-emit `QueryChanged("")`).
+        self.query
+            .update(cx, |state, cx| state.set_content_silent("", cx));
         self.rematch(cx);
         let handle = self.query.read(cx).focus_handle(cx);
         window.focus(&handle, cx);
@@ -619,6 +623,97 @@ impl Render for CommandState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui::{
+        div, px, size, AppContext, Entity, IntoElement, Render, TestAppContext, VisualTestContext,
+    };
+    use std::cell::RefCell;
+    use std::ops::Deref;
+    use std::rc::Rc;
+
+    struct CommandTestView {
+        command: Entity<CommandState>,
+    }
+
+    impl Render for CommandTestView {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+        }
+    }
+
+    /// A live `CommandState` in a real window, with a matcher installed, and a
+    /// sink that records every `CommandEvent` it emits.
+    fn open_command(
+        cx: &mut TestAppContext,
+    ) -> (
+        Entity<CommandState>,
+        Rc<RefCell<Vec<String>>>,
+        gpui::Subscription,
+        &'static mut VisualTestContext,
+    ) {
+        cx.update(crate::init);
+        let window = cx.open_window(size(px(400.), px(300.)), |window, cx| {
+            let command = cx.new(|cx| {
+                CommandState::new("cmd", "Commands", items(), window, cx).matcher(|query, items| {
+                    items
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, item)| {
+                            item.haystack()
+                                .to_lowercase()
+                                .contains(&query.to_lowercase())
+                        })
+                        .map(|(index, _)| index)
+                        .collect()
+                })
+            });
+            CommandTestView { command }
+        });
+        let command = window
+            .read_with(cx, |view, _cx| view.command.clone())
+            .expect("the window's root view is the command test view");
+        let sink = Rc::new(RefCell::new(Vec::new()));
+        let sub = cx.update(|cx| {
+            let sink = sink.clone();
+            cx.subscribe(&command, move |_command, event: &CommandEvent, _cx| {
+                if let CommandEvent::QueryChanged(query) = event {
+                    sink.borrow_mut().push(query.to_string());
+                }
+            })
+        });
+        let cx = VisualTestContext::from_window(*window.deref(), cx).into_mut();
+        cx.run_until_parked();
+        (command, sink, sub, cx)
+    }
+
+    /// Opening the palette when the query is already dirty must not fire a
+    /// `QueryChanged` — that is the palette hearing its own programmatic reset
+    /// as if the user typed. Assert *after* `run_until_parked`, since the event
+    /// only reaches the subscriber on the effect flush (#224's house rule).
+    #[gpui::test]
+    fn opening_does_not_emit_query_changed(cx: &mut TestAppContext) {
+        let (command, sink, _sub, cx) = open_command(cx);
+
+        // Dirty the query the way a user would leave it from a prior session.
+        cx.update(|_window, cx| {
+            command.update(cx, |this, cx| {
+                let query = this.query.clone();
+                query.update(cx, |query, cx| query.set_content("quit", cx));
+            });
+        });
+        cx.run_until_parked();
+        sink.borrow_mut().clear();
+
+        cx.update(|window, cx| {
+            command.update(cx, |this, cx| this.open(window, cx));
+        });
+        cx.run_until_parked();
+
+        assert!(
+            sink.borrow().is_empty(),
+            "opening the palette must not emit QueryChanged; it heard its own reset: {:?}",
+            sink.borrow(),
+        );
+    }
 
     fn items() -> Vec<CommandItem> {
         vec![

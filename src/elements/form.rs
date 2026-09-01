@@ -293,7 +293,7 @@ pub fn field_focus_handle(id: &ElementId, cx: &mut App) -> FocusHandle {
 
 /// Drop every cached field focus handle on this thread.
 ///
-/// The explicit eviction [`FIELD_FOCUS_HANDLES`] describes: a long-lived view
+/// The explicit eviction `FIELD_FOCUS_HANDLES` describes: a long-lived view
 /// that derives field ids from a changing collection (a row, a record, a task)
 /// calls this when that collection changes, so the map does not grow one handle
 /// per id ever seen for the life of the process. The next

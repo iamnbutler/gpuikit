@@ -10,7 +10,7 @@
 //! scroll area and all — at the display refresh rate, whether or not the
 //! spinner's glyph actually changed.
 //!
-//! Indicators therefore share one [`LoadingClock`]. It wakes at the union of
+//! Indicators therefore share one `LoadingClock`. It wakes at the union of
 //! the frame boundaries its subscribers asked for — 2–10 times a second rather
 //! than 60–120 — and notifies exactly the views that are displaying an
 //! indicator, which is the same invalidation gpui was doing, just at the rate
@@ -130,7 +130,7 @@ pub enum LoadingIndicatorSize {
 
 /// A text spinner.
 ///
-/// Frames come from the shared [`LoadingClock`] rather than from a per-element
+/// Frames come from the shared `LoadingClock` rather than from a per-element
 /// animation, so an indicator costs its window one redraw per glyph rather than
 /// one per display refresh. See the [module docs](self).
 #[derive(IntoElement)]

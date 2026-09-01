@@ -274,7 +274,7 @@ impl GapBuffer {
     ///
     /// - The line *count* is identical to [`to_lines`](Self::to_lines), so a
     ///   row index means the same thing in both.
-    /// - Concatenating the result reproduces [`to_string`](Self::to_string)
+    /// - Concatenating the result reproduces `to_string` (via [`std::fmt::Display`])
     ///   byte for byte, so a line-by-line pass sees exactly the document a
     ///   whole-text pass would.
     ///

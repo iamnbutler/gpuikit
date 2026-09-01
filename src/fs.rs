@@ -279,7 +279,7 @@ impl File {
 }
 
 /// Helper struct for managing file operations within a GPUI entity
-/// This provides safe async file operations when used with Entity<FileHandle>
+/// This provides safe async file operations when used with `Entity<FileHandle>`
 pub struct FileHandle {
     file: Option<File>,
 }

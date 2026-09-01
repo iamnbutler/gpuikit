@@ -64,7 +64,7 @@
 //! than being inherited.
 //!
 //! Each of the four actions calls `cx.propagate()` when the popup is closed and
-//! it has nothing to do — the [`InputState::copy`] shape. So Escape in a
+//! it has nothing to do — the `InputState::copy` shape. So Escape in a
 //! combobox inside a dialog closes the popup if one is open and the dialog if
 //! not, which is the behaviour a user expects and the one an unconditional
 //! consume would break.

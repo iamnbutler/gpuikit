@@ -122,7 +122,6 @@ impl HistoryEntry {
 /// - Selection and cursor management
 /// - Keyboard navigation and editing actions
 /// - IME (Input Method Editor) support via `EntityInputHandler`
-/// ```
 pub struct InputState {
     focus_handle: FocusHandle,
     content: String,

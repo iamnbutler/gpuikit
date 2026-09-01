@@ -10,7 +10,7 @@
 //!
 //! # Why the adornments live here and not on `Input`
 //!
-//! `input()` is a hand-written [`Element`](gpui::Element) that paints text and
+//! `input()` is a hand-written [`Element`] that paints text and
 //! nothing else: no border, no background, no focus ring, no notion of
 //! disabled, no intrinsic size. Folding adornments into it would mean teaching
 //! that element — text layout, IME, mouse-to-text-position mapping — to lay

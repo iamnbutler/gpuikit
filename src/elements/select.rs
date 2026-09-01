@@ -156,7 +156,7 @@ pub use crate::elements::listbox::{
 
 /// The key context the listbox popup declares.
 ///
-/// Re-exported from [`crate::elements::listbox`], where the popup now lives.
+/// Re-exported from `crate::elements::listbox`, where the popup now lives.
 /// Public because the bindings are: an app assembling its own keymap needs both
 /// halves. It is deeper than `Dialog`, which is what lets a select inside a
 /// dialog keep Escape for itself.
@@ -164,7 +164,7 @@ pub const LISTBOX_CONTEXT: &str = crate::elements::listbox::LISTBOX_CONTEXT;
 
 /// Bind the listbox popup's keys — arrows, Home / End, Enter, Space, Escape.
 ///
-/// A one-line delegate to [`crate::elements::listbox::bind_listbox_keys`],
+/// A one-line delegate to `crate::elements::listbox::bind_listbox_keys`,
 /// which is where the bindings live now that the popup has two callers. Kept
 /// under this name because it is public API and [`crate::init`] calls it; the
 /// bindings it registers are the popup's, not this element's, which is what

@@ -13,7 +13,7 @@
 //! operation. `tests::round_trips_every_day_from_1800_to_2200` walks every day
 //! in four centuries rather than sampling.
 //!
-//! There is deliberately no time, no zone and no clock: [`Date::today`] does
+//! There is deliberately no time, no zone and no clock: `Date::today` does
 //! not exist. A calendar is given its `today` by the caller, because a UI
 //! toolkit reading the system clock is a UI toolkit that cannot be tested and
 //! cannot be told about the user's zone.

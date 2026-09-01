@@ -187,16 +187,25 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      # Nightly on purpose, and only here: gpui's web platform runs background
+      # executors on web workers over a shared wasm memory, so std itself is
+      # rebuilt with atomics — `-Z build-std`, which is unstable cargo. A
+      # stable check of this target cannot pass (wasm_thread needs a feature
+      # gate). The recipe is the working wasm example's rust-toolchain.toml +
+      # .cargo/config.toml, minus the link args a check never reaches. Pinned
+      # to the nightly it was verified against; bump deliberately.
+      - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: '1.98'
+          toolchain: nightly-2026-08-30
+          components: rust-src
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      # gpui ships a wasm platform crate and this library compiles against it
-      # today; this keeps that true. Checking only — running wasm needs the
-      # trunk harness documented in the wasm example repo.
+      # Checking only — running wasm needs the trunk harness documented in the
+      # wasm example repo.
       - name: check
-        run: cargo check --locked --target wasm32-unknown-unknown
+        env:
+          RUSTFLAGS: -C target-feature=+atomics,+bulk-memory,+mutable-globals
+        run: cargo check --locked --target wasm32-unknown-unknown -Z build-std=std,panic_abort
 
   # No Windows job on purpose: the hosted runners are slow enough to dominate
   # every run, and nothing here targets Windows today. If that changes, a

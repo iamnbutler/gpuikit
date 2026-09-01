@@ -87,7 +87,7 @@ pub struct DialogCancelled;
 /// one guarding something unrecoverable. That default has a cost worth
 /// knowing: a library whose every confirmation is red teaches people that red
 /// means nothing. A confirmation that merely needs acknowledging — "Save
-/// changes?", "Continue?" — should say [`Dialog::destructive(false)`], and
+/// changes?", "Continue?" — should say `Dialog::destructive(false)`, and
 /// that is what the flag is for.
 #[derive(Clone)]
 pub struct Confirmation {

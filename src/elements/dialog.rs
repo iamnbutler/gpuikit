@@ -263,6 +263,12 @@ impl Dialog {
     }
 
     /// Configure whether pressing Escape closes the dialog.
+    ///
+    /// Passing `false` to a **confirmation** dialog voids the "Escape cancels"
+    /// promise this module's docs make for it: the Escape handler gates on this
+    /// flag, so Escape becomes inert and the only way out is a footer button.
+    /// Turn it off for a plain dialog if you like; leave it on for a
+    /// confirmation.
     pub fn close_on_escape(mut self, close: bool) -> Self {
         self.close_on_escape = close;
         self

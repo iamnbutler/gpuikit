@@ -124,7 +124,13 @@ const MONTH_NAMES: [&str; 12] = [
 
 /// The English name of a month, `1..=12`. Out of range returns `""`.
 pub fn month_name(month: u32) -> &'static str {
-    MONTH_NAMES.get(month as usize - 1).copied().unwrap_or("")
+    // `checked_sub`, not `month - 1`: month 0 would underflow and panic in
+    // debug, contradicting the "out of range returns `\"\"`" promise above.
+    month
+        .checked_sub(1)
+        .and_then(|index| MONTH_NAMES.get(index as usize))
+        .copied()
+        .unwrap_or("")
 }
 
 /// Whether `year` is a leap year in the proleptic Gregorian calendar.
@@ -282,6 +288,17 @@ mod tests {
 
     fn date(year: i32, month: u32, day: u32) -> Date {
         Date::new(year, month, day).expect("a date the test wrote by hand exists")
+    }
+
+    #[test]
+    fn month_name_is_empty_out_of_range_and_never_panics() {
+        assert_eq!(month_name(1), "January");
+        assert_eq!(month_name(12), "December");
+        // 0 underflowed `month as usize - 1` and panicked in debug, against the
+        // doc's promise of `""`.
+        assert_eq!(month_name(0), "");
+        assert_eq!(month_name(13), "");
+        assert_eq!(month_name(u32::MAX), "");
     }
 
     #[test]

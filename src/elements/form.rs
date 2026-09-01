@@ -269,10 +269,9 @@ thread_local! {
     /// considered and not done: `FocusHandle` exposes no reference count, so
     /// "nobody else holds this" is not a question that can be asked from here,
     /// and dropping a handle a control still tracks would silently unfocus it.
-    /// The fix that is actually available is an explicit one — a
-    /// `clear_field_focus_handles()` a long-lived list view calls when its
-    /// backing collection changes — and it is not written until something
-    /// needs it.
+    /// The fix that is actually available is an explicit one:
+    /// [`clear_field_focus_handles`], which a long-lived list view calls when
+    /// its backing collection changes.
     static FIELD_FOCUS_HANDLES: RefCell<HashMap<ElementId, FocusHandle>> =
         RefCell::new(HashMap::new());
 }
@@ -290,6 +289,20 @@ pub fn field_focus_handle(id: &ElementId, cx: &mut App) -> FocusHandle {
             .or_insert_with(|| cx.focus_handle())
             .clone()
     })
+}
+
+/// Drop every cached field focus handle on this thread.
+///
+/// The explicit eviction [`FIELD_FOCUS_HANDLES`] describes: a long-lived view
+/// that derives field ids from a changing collection (a row, a record, a task)
+/// calls this when that collection changes, so the map does not grow one handle
+/// per id ever seen for the life of the process. The next
+/// [`field_focus_handle`] for any id mints a fresh handle; call it only when no
+/// field currently on screen still needs its handle to stay put (e.g. between
+/// tearing down one list and building the next), since a control that is still
+/// tracking a dropped handle would be silently unfocused.
+pub fn clear_field_focus_handles() {
+    FIELD_FOCUS_HANDLES.with(|handles| handles.borrow_mut().clear());
 }
 
 /// Wraps one child so that everything drawn inside it sees `context`.
@@ -807,5 +820,24 @@ mod tests {
 
         assert_eq!(first, second);
         assert_ne!(first, other);
+    }
+
+    #[gpui::test]
+    fn clearing_field_focus_handles_mints_fresh_ones(cx: &mut TestAppContext) {
+        let id = ElementId::Name("clear_field_focus_handles_test".into());
+        let before = cx.update(|cx| field_focus_handle(&id, cx));
+        assert_eq!(
+            before,
+            cx.update(|cx| field_focus_handle(&id, cx)),
+            "the handle is stable until cleared"
+        );
+
+        clear_field_focus_handles();
+
+        let after = cx.update(|cx| field_focus_handle(&id, cx));
+        assert_ne!(
+            before, after,
+            "clearing evicts the cache, so the same id mints a new handle"
+        );
     }
 }

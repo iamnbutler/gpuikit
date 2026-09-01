@@ -361,15 +361,49 @@ impl InputState {
     /// Sets the text content, resetting selection to the beginning.
     /// This clears the undo/redo history.
     ///
+    /// Emits [`InputStateEvent::TextChanged`] only when the content actually
+    /// changes; setting the current content back is a no-op. If the caller is a
+    /// component writing its *own* field and does not want to hear the write
+    /// back through its `TextChanged` subscription, use
+    /// [`set_content_silent`](Self::set_content_silent).
+    ///
     /// Programmatic, so [`read_only`](Self::read_only) does not apply.
     pub fn set_content(&mut self, content: impl Into<String>, cx: &mut Context<Self>) {
+        self.set_content_inner(content, true, cx);
+    }
+
+    /// Like [`set_content`](Self::set_content), but does not emit
+    /// [`InputStateEvent::TextChanged`].
+    ///
+    /// For components that both subscribe to their input's `TextChanged` and
+    /// write to it programmatically (a combobox committing a selection into its
+    /// field, a command palette resetting its query). Without this they would
+    /// hear their own writes as if the user typed them and re-enter their
+    /// change handler. Still re-renders and clears undo/redo history like
+    /// `set_content`; only the event is suppressed.
+    pub fn set_content_silent(&mut self, content: impl Into<String>, cx: &mut Context<Self>) {
+        self.set_content_inner(content, false, cx);
+    }
+
+    fn set_content_inner(
+        &mut self,
+        content: impl Into<String>,
+        emit: bool,
+        cx: &mut Context<Self>,
+    ) {
         let content = content.into();
-        self.content = if self.multiline {
+        let normalized = if self.multiline {
             content
         } else {
             // Strip newlines for single-line input
             content.replace('\n', " ").replace('\r', "")
         };
+        // Setting the current content back changes nothing — don't reset
+        // selection/history and, above all, don't emit as if the text moved.
+        if normalized == self.content {
+            return;
+        }
+        self.content = normalized;
         self.selected_range = 0..0;
         self.selection_reversed = false;
         self.marked_range = None;
@@ -378,7 +412,9 @@ impl InputState {
         self.redo_stack.clear();
         self.cached_utf16_len = None;
         self.pause_cursor_blink(cx);
-        cx.emit(InputStateEvent::TextChanged);
+        if emit {
+            cx.emit(InputStateEvent::TextChanged);
+        }
         cx.notify();
     }
 
@@ -1950,6 +1986,7 @@ mod tests {
         TestAppContext, TextStyle, WindowHandle,
     };
     use std::cell::Cell;
+    use std::cell::RefCell;
     use std::rc::Rc;
 
     struct TestView {
@@ -3420,6 +3457,94 @@ mod tests {
             });
         })
         .unwrap();
+    }
+
+    /// Subscribes to `input`'s events for the life of the returned
+    /// `Subscription`, recording every one into `sink`.
+    fn record_events(
+        view: &WindowHandle<TestView>,
+        cx: &mut TestAppContext,
+    ) -> (Rc<RefCell<Vec<InputStateEvent>>>, gpui::Subscription) {
+        let sink = Rc::new(RefCell::new(Vec::new()));
+        let sub = view
+            .update(cx, |view, _window, cx| {
+                let sink = sink.clone();
+                cx.subscribe(&view.input, move |_this, _input, event, _cx| {
+                    sink.borrow_mut().push(event.clone());
+                })
+            })
+            .unwrap();
+        (sink, sub)
+    }
+
+    fn text_changed_count(events: &Rc<RefCell<Vec<InputStateEvent>>>) -> usize {
+        events
+            .borrow()
+            .iter()
+            .filter(|e| matches!(e, InputStateEvent::TextChanged))
+            .count()
+    }
+
+    #[gpui::test]
+    fn test_set_content_unchanged_does_not_emit_text_changed(cx: &mut TestAppContext) {
+        let view = create_test_input(cx, "hello", 5..5);
+        let (events, _sub) = record_events(&view, cx);
+
+        view.update(cx, |view, _window, cx| {
+            view.input
+                .update(cx, |input, cx| input.set_content("hello", cx));
+        })
+        .unwrap();
+        cx.run_until_parked();
+
+        assert_eq!(
+            text_changed_count(&events),
+            0,
+            "set_content with unchanged content must not emit TextChanged"
+        );
+    }
+
+    #[gpui::test]
+    fn test_set_content_changed_still_emits_text_changed(cx: &mut TestAppContext) {
+        let view = create_test_input(cx, "hello", 5..5);
+        let (events, _sub) = record_events(&view, cx);
+
+        view.update(cx, |view, _window, cx| {
+            view.input
+                .update(cx, |input, cx| input.set_content("world", cx));
+        })
+        .unwrap();
+        cx.run_until_parked();
+
+        assert_eq!(
+            text_changed_count(&events),
+            1,
+            "set_content with new content must still emit TextChanged"
+        );
+    }
+
+    #[gpui::test]
+    fn test_set_content_silent_updates_without_emitting(cx: &mut TestAppContext) {
+        let view = create_test_input(cx, "hello", 5..5);
+        let (events, _sub) = record_events(&view, cx);
+
+        view.update(cx, |view, _window, cx| {
+            view.input
+                .update(cx, |input, cx| input.set_content_silent("world", cx));
+        })
+        .unwrap();
+        cx.run_until_parked();
+
+        view.update(cx, |view, _window, cx| {
+            view.input
+                .update(cx, |input, _cx| assert_eq!(input.content(), "world"));
+        })
+        .unwrap();
+        assert_eq!(
+            text_changed_count(&events),
+            0,
+            "set_content_silent must update content without emitting TextChanged"
+        );
     }
 
     #[gpui::test]

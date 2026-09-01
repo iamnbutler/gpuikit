@@ -65,6 +65,7 @@ pub mod keymap;
 pub mod layout;
 pub mod markdown;
 pub mod resource;
+pub mod selection;
 pub mod theme;
 pub mod traits;
 pub mod utils;

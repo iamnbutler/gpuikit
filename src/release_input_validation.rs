@@ -38,6 +38,7 @@ use std::process::Command;
 const RELEASE_YML: &str = include_str!("../.github/workflows/release.yml");
 const RELEASE_DEPLOY_YML: &str = include_str!("../.github/workflows/release-deploy.yml");
 const CI_YML: &str = include_str!("../.github/workflows/ci.yml");
+const PAGES_YML: &str = include_str!("../.github/workflows/pages.yml");
 
 /// The validator `release.yml` calls, and the one statement of the version
 /// grammar in this repository. Named once so a rename fails in one place.
@@ -60,10 +61,11 @@ const DEPLOY_SCRIPT: &str = ".github/scripts/validate-deploy-inputs.sh";
 /// Adding a file here is not what puts it under the rule — being in
 /// `.github/workflows/` is. `every_workflow_in_the_directory_is_accounted_for`
 /// compares this list against the directory.
-const WORKFLOWS: [(&str, &str, usize); 3] = [
+const WORKFLOWS: [(&str, &str, usize); 4] = [
     ("release.yml", RELEASE_YML, 10),
     ("release-deploy.yml", RELEASE_DEPLOY_YML, 8),
     ("ci.yml", CI_YML, 12),
+    ("pages.yml", PAGES_YML, 2),
 ];
 
 /// Workflows deliberately outside the rule, each with the reason it is outside

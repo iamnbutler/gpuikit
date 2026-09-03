@@ -122,9 +122,15 @@ schemars = { version = "0.8", optional = true }
 rust-embed = { version = "8.2.0", features = ["debug-embed"] }
 
 [dev-dependencies]
-gpui = { package = "gpui-unofficial", version = "1.14.2", features = ["test-support"] }
 tempfile = "3.8"
 pretty_assertions = "1.4"
+
+# Examples build with dev-dependencies unified in, and gpui's `test-support`
+# (leak detection → backtrace → proptest → rusty-fork → wait-timeout) does not
+# compile for wasm32. Tests never run on wasm, so the feature is asked for only
+# where they do; the showcase, built as an example for the web, gets plain gpui.
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+gpui = { package = "gpui-unofficial", version = "1.14.2", features = ["test-support"] }
 
 [features]
 default = []

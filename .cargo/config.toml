@@ -20,3 +20,21 @@ rustflags = ["-Csplit-debuginfo=unpacked"]
 
 [target.aarch64-unknown-linux-gnu]
 rustflags = ["-Csplit-debuginfo=unpacked"]
+
+# The web build. gpui's web platform runs background executors on web workers
+# over a shared wasm memory, so the target needs atomics and a std rebuilt with
+# them. Rebuilding std is `build-std`, nightly-only and not target-scoped, so
+# it is *not* set here — a `[unstable]` table would rebuild std for native
+# nightly builds too. `scripts/showcase-web.sh` sets it, with the nightly, for
+# the one build that needs it. Flags copied from gpui-unofficial's `hello_web`.
+[target.wasm32-unknown-unknown]
+rustflags = [
+    "-C", "target-feature=+atomics,+bulk-memory,+mutable-globals",
+    "-C", "link-arg=--shared-memory",
+    "-C", "link-arg=--max-memory=1073741824",
+    "-C", "link-arg=--import-memory",
+    "-C", "link-arg=--export=__wasm_init_tls",
+    "-C", "link-arg=--export=__tls_size",
+    "-C", "link-arg=--export=__tls_align",
+    "-C", "link-arg=--export=__tls_base",
+]

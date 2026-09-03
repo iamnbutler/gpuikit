@@ -1,0 +1,82 @@
+# The hosted showcase: examples/showcase.rs built for wasm32 and published to
+# GitHub Pages on every push to main. Separate from ci.yml on purpose — this
+# needs `pages: write` and `id-token: write`, and a broken deploy must block
+# neither a merge nor a release (#245).
+#
+# The build is `scripts/showcase-web.sh`, the same command a developer runs
+# locally, which is where the nightly is named and `build-std` is set. The
+# trunk harness is examples/showcase-web/; the wasm flags are
+# .cargo/config.toml's. Bump the nightly here, in that script and in ci.yml's
+# wasm job together.
+#
+# Repository rule: no `${{ }}` inside a `run:` body, anywhere, ever. Values a
+# script needs are bound under `env:` and read as `"$NAME"`.
+# `src/release_input_validation.rs` holds this file to that rule on every
+# `cargo test --lib`; this file is registered in its `WORKFLOWS` list.
+
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time, and a newer push supersedes a build still running.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: '0'
+
+jobs:
+  build:
+    name: build (wasm32)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      # The script sets RUSTUP_TOOLCHAIN to this same nightly; the action is
+      # what installs it, with the pieces build-std needs.
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-08-30
+          components: rust-src
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: install trunk
+        env:
+          TRUNK_VERSION: 0.21.14
+        run: |
+          curl -sSfL "https://github.com/trunk-rs/trunk/releases/download/v${TRUNK_VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xzf- -C /usr/local/bin trunk
+          trunk --version
+      # PUBLIC_URL is the project-pages path under the account's custom
+      # domain. The `page_url` the deploy job reports is the authority if the
+      # two ever disagree.
+      - name: build
+        env:
+          GPUIKIT_SHOWCASE_SHA: ${{ github.sha }}
+          PUBLIC_URL: /gpuikit/
+        run: scripts/showcase-web.sh build --release --public-url "$PUBLIC_URL"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: examples/showcase-web/dist
+
+  deploy:
+    name: deploy
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

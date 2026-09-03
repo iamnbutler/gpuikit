@@ -8,7 +8,7 @@
 
 A UI toolkit for [gpui](https://www.gpui.rs) applications. Targeting a conceptual union of SwiftUI and web-style component libraries to make building modern gpui applications seamless.
 
-[See it in action &rarr;](https://nate.rip/gpuikit-demo/)
+[See it in action &rarr;](https://nate.rip/gpuikit/)
 
 ![The gpuikit showcase](https://raw.githubusercontent.com/iamnbutler/gpuikit/main/.github/media/showcase.png)
 
@@ -37,7 +37,10 @@ fn main() {
 }
 ```
 
-Browse every component in the showcase:
+Browse every component in the [showcase](https://nate.rip/gpuikit/), built
+from this repository on every push to `main` — a component can be linked to,
+as in [`#table`](https://nate.rip/gpuikit/#table). Offline, the same binary
+runs natively:
 
 ```sh
 cargo run --example showcase --features examples
@@ -59,10 +62,20 @@ All off by default:
 
 ## Web
 
-gpuikit runs in the browser on gpui's web platform (WebGPU via wgpu):
-[live demo](https://nate.rip/gpuikit-demo/), built from
-[gpuikit-demo](https://github.com/iamnbutler/gpuikit-demo), which also
-documents the wasm build setup.
+gpuikit runs in the browser on gpui's web platform (WebGPU via wgpu). The
+[hosted showcase](https://nate.rip/gpuikit/) is `examples/showcase.rs` built
+for `wasm32-unknown-unknown` by [`examples/showcase-web/`](examples/showcase-web),
+a [trunk](https://trunkrs.dev) harness. It needs nightly, because gpui's web
+platform runs background work on web workers over a shared wasm memory and
+std has to be rebuilt with atomics; `scripts/showcase-web.sh` names the
+nightly and sets that up:
+
+```sh
+scripts/showcase-web.sh serve
+```
+
+Then open <http://127.0.0.1:8081> in a WebGPU-capable browser. Nothing in
+your own app needs nightly unless it, too, is built for the web.
 
 ## Minimum Rust version
 

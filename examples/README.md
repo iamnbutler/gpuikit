@@ -5,7 +5,9 @@ Two kinds of example live here, and the difference decides where new work goes.
 **`showcase.rs` covers components.** One binary, one nav, one page per element:
 what it looks like, what its variants are, what it does when you click it. If
 you want to know whether `gpuikit` has a slider and what it looks like, this is
-the only place you should have to look.
+the only place you should have to look. It is also the hosted showcase at
+<https://nate.rip/gpuikit/>: the same file, built for the browser by
+`showcase-web/` on every push to `main`.
 
 **Every other example covers an interaction or an integration** — something
 that needs its own window, its own keymap, its own running loop, or a whole
@@ -65,6 +67,15 @@ Every example is behind the `examples` feature, which enables nothing else:
 cargo run --example showcase --features examples                     # every page, plain code fences
 cargo run --example showcase --features examples,editor              # + highlighted fences, live editor buffer
 cargo run --example markdown_streaming --features examples,stitch
+```
+
+The showcase for the browser is a [trunk](https://trunkrs.dev) build on
+nightly — std is rebuilt with wasm atomics, and the script is where that
+toolchain is named. `.github/workflows/pages.yml` runs the same script:
+
+```sh
+scripts/showcase-web.sh serve              # http://127.0.0.1:8081
+scripts/showcase-web.sh build --release    # examples/showcase-web/dist/
 ```
 
 Checks, in the order they are quickest to run:

@@ -1,20 +1,19 @@
 //! Tests for the rule that runtime code stays compilable *and runnable* on
 //! `wasm32-unknown-unknown`.
 //!
-//! gpuikit runs in the browser on gpui's web platform (see the demo at
-//! <https://github.com/iamnbutler/gpuikit-demo>, live at
-//! <https://nate.rip/gpuikit-demo/>). The failure mode this guards against is
-//! quiet: several std APIs *compile* for wasm and then fail at runtime —
-//! `std::time::Instant::now()` panics outright, and `std::fs` returns errors
-//! on a filesystem that does not exist. The first symptom is a crashed or
-//! broken page in a browser, on a target no local `cargo test` exercises.
+//! gpuikit runs in the browser on gpui's web platform: the showcase is hosted
+//! at <https://nate.rip/gpuikit/>, built by `examples/showcase-web/`. The
+//! failure mode this guards against is quiet: several std APIs *compile* for
+//! wasm and then fail at runtime — `std::time::Instant::now()` panics
+//! outright, and `std::fs` returns errors on a filesystem that does not
+//! exist. The first symptom is a crashed or broken page in a browser, on a
+//! target no local `cargo test` exercises.
 //!
-//! The real check would be `cargo check --target wasm32-unknown-unknown` in
-//! CI, but that build needs nightly, `build-std`, and the wasm-atomics
-//! rustflags (see the demo repo's `.cargo/config.toml`) — a heavier lift than
-//! this repository's CI carries today. Until it does, this scan is the guard:
-//! it forbids the APIs by name in source, with an explicit per-file allowlist
-//! for the uses that are legitimate.
+//! CI's wasm job proves the crate and the showcase *compile* for the target.
+//! Compiling is exactly what these APIs do, so that job cannot catch them;
+//! this scan is the guard for the runtime half: it forbids the APIs by name
+//! in source, with an explicit per-file allowlist for the uses that are
+//! legitimate.
 //!
 //! Two kinds of use are allowed, and each allowlist entry says which it is:
 //!

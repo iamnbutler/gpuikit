@@ -191,21 +191,29 @@ jobs:
       # executors on web workers over a shared wasm memory, so std itself is
       # rebuilt with atomics — `-Z build-std`, which is unstable cargo. A
       # stable check of this target cannot pass (wasm_thread needs a feature
-      # gate). The recipe is the working wasm example's rust-toolchain.toml +
-      # .cargo/config.toml, minus the link args a check never reaches. Pinned
-      # to the nightly it was verified against; bump deliberately.
+      # gate). Pinned to the nightly it was verified against; bump it and
+      # pages.yml's together, deliberately.
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2026-08-30
           components: rust-src
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      # Checking only — running wasm needs the trunk harness documented in the
-      # wasm example repo.
+      # Checking only. The flags restate `.cargo/config.toml`'s wasm table
+      # because a `RUSTFLAGS` environment replaces a config file's rustflags
+      # rather than adding to them, and the link args a check never reaches
+      # are the ones left out.
       - name: check
         env:
           RUSTFLAGS: -C target-feature=+atomics,+bulk-memory,+mutable-globals
         run: cargo check --locked --target wasm32-unknown-unknown -Z build-std=std,panic_abort
+      # The hosted showcase (pages.yml) is this example built for this target.
+      # Checked here so a PR that breaks the web build fails before merge; the
+      # deploy links it, this does not.
+      - name: check showcase
+        env:
+          RUSTFLAGS: -C target-feature=+atomics,+bulk-memory,+mutable-globals
+        run: cargo check --locked --example showcase --features examples --target wasm32-unknown-unknown -Z build-std=std,panic_abort
 
   # No Windows job on purpose: the hosted runners are slow enough to dominate
   # every run, and nothing here targets Windows today. If that changes, a

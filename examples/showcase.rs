@@ -329,6 +329,59 @@ fn section_of(page: &str) -> Option<&'static str> {
         .find_map(|(label, _, items)| items.iter().any(|(id, _)| *id == page).then_some(*label))
 }
 
+/// Whether `page` is a page the nav can reach. Only the URL hash asks, and
+/// the hash is user input.
+#[cfg(target_family = "wasm")]
+fn is_nav_page(page: &str) -> bool {
+    NAV_SECTIONS
+        .iter()
+        .any(|(_, _, items)| items.iter().any(|(id, _)| *id == page))
+}
+
+/// The page the URL hash names, when running in a browser and the hash names
+/// a real page. `None` everywhere else, so a native run opens where it always
+/// has.
+fn page_from_location() -> Option<SharedString> {
+    #[cfg(target_family = "wasm")]
+    {
+        let hash = web_sys::window()?.location().hash().ok()?;
+        let page = hash.strip_prefix('#')?;
+        is_nav_page(page).then(|| SharedString::from(page.to_string()))
+    }
+    #[cfg(not(target_family = "wasm"))]
+    None
+}
+
+/// Mirror the active page to the URL hash, so the page can be linked to.
+/// `set_hash` pushes a history entry and reloads nothing.
+fn publish_page_to_location(page: &str) {
+    #[cfg(target_family = "wasm")]
+    if let Some(window) = web_sys::window() {
+        let _ = window.location().set_hash(page);
+    }
+    #[cfg(not(target_family = "wasm"))]
+    let _ = page;
+}
+
+/// The one way the active page changes: the nav rows and the rail both come
+/// here, so the URL hash cannot fall out of step with the cell `render` reads.
+fn navigate_to(cell: &Rc<RefCell<SharedString>>, page: SharedString, window: &mut Window) {
+    publish_page_to_location(&page);
+    *cell.borrow_mut() = page;
+    window.refresh();
+}
+
+/// What this build is: the crate version, and the commit when the deploy job
+/// says (`GPUIKIT_SHOWCASE_SHA`, set in `.github/workflows/pages.yml`). The
+/// hosted page can be ahead of the crates.io release; this is how it says so.
+fn build_stamp() -> String {
+    let version = env!("CARGO_PKG_VERSION");
+    match option_env!("GPUIKIT_SHOWCASE_SHA") {
+        Some(sha) if sha.len() >= 7 => format!("gpuikit {version} · {}", &sha[..7]),
+        _ => format!("gpuikit {version}"),
+    }
+}
+
 /// A `Select`'s value as the page prints it. Every select holds an
 /// `Option<T>`, including the ones built with `.selected(…)`, so "nothing
 /// chosen" is a state the page has to be able to say out loud.
@@ -370,10 +423,7 @@ fn nav_entries(active_page: &Rc<RefCell<SharedString>>) -> Vec<NavEntry> {
                     SharedString::from(format!("nav-{id}")),
                     move |_window, _cx| div().px_2().child(label.clone()).into_any_element(),
                 )
-                .on_click(move |_, window, _cx| {
-                    *cell.borrow_mut() = target.clone();
-                    window.refresh();
-                }),
+                .on_click(move |_, window, _cx| navigate_to(&cell, target.clone(), window)),
             });
         }
     }
@@ -1045,7 +1095,10 @@ impl Showcase {
         cx.observe(&table_filter, |_this, _filter, cx| cx.notify())
             .detach();
 
-        let active_page = Rc::new(RefCell::new(SharedString::from("button")));
+        // The URL decides on the web; native opens on Button.
+        let active_page = Rc::new(RefCell::new(
+            page_from_location().unwrap_or_else(|| SharedString::from("button")),
+        ));
         let nav = nav_entries(&active_page);
 
         let fruits = || {
@@ -4099,6 +4152,7 @@ impl Render for Showcase {
         // and border now, so only the window's own two colors are needed here.
         let bg = cx.theme().bg();
         let fg = cx.theme().fg();
+        let fg_muted = cx.theme().fg_muted();
 
         // The sidebar was built once in `Showcase::new`; a frame only decides
         // which row is highlighted.
@@ -4130,8 +4184,7 @@ impl Render for Showcase {
                     .tooltip(tooltip(*label))
                     .on_click(move |_, window, _cx| {
                         if let Some(page) = first.clone() {
-                            *cell.borrow_mut() = page;
-                            window.refresh();
+                            navigate_to(&cell, page, window);
                         }
                     })
             }));
@@ -4160,7 +4213,15 @@ impl Render for Showcase {
                     .flex_1()
                     .child(List::new("nav-list", entries).render(window, cx)),
             )
-            .child(self.theme_select.clone());
+            .child(self.theme_select.clone())
+            .child(
+                div()
+                    .px_2()
+                    .py_1()
+                    .text_xs()
+                    .text_color(fg_muted)
+                    .child(build_stamp()),
+            );
 
         let content = match current_page.as_ref() {
             "button" => v_stack()

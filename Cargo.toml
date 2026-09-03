@@ -132,6 +132,11 @@ pretty_assertions = "1.4"
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 gpui = { package = "gpui-unofficial", version = "1.14.2", features = ["test-support"] }
 
+# The hosted showcase mirrors its active page to the URL hash, so a component
+# can be linked to. A dev-dependency: only the example reads the location.
+[target.'cfg(target_family = "wasm")'.dev-dependencies]
+web-sys = { version = "0.3", features = ["Window", "Location"] }
+
 [features]
 default = []
 editor = ["dep:syntect", "dep:gpui_util"]

@@ -371,6 +371,33 @@ fn navigate_to(cell: &Rc<RefCell<SharedString>>, page: SharedString, window: &mu
     window.refresh();
 }
 
+/// The other direction: the hash changing under the app — the back button,
+/// an edited address bar — moves the page. The browser calls this between
+/// frames, the same way it delivers gpui-web's own input events, so updating
+/// the window from here is the same thing those handlers do. The listener
+/// lives as long as the page does.
+#[cfg(target_family = "wasm")]
+fn follow_location(showcase: gpui::WindowHandle<Showcase>, cx: &mut App) {
+    use wasm_bindgen::{closure::Closure, JsCast};
+
+    let Some(browser_window) = web_sys::window() else {
+        return;
+    };
+    let mut cx = cx.to_async();
+    let on_hash_change = Closure::<dyn FnMut()>::new(move || {
+        let Some(page) = page_from_location() else {
+            return;
+        };
+        let _ = showcase.update(&mut cx, |showcase, window, _cx| {
+            *showcase.active_page.borrow_mut() = page;
+            window.refresh();
+        });
+    });
+    let _ = browser_window
+        .add_event_listener_with_callback("hashchange", on_hash_change.as_ref().unchecked_ref());
+    on_hash_change.forget();
+}
+
 /// What this build is: the crate version, and the commit when the deploy job
 /// says (`GPUIKIT_SHOWCASE_SHA`, set in `.github/workflows/pages.yml`). The
 /// hosted page can be ahead of the crates.io release; this is how it says so.
@@ -4365,6 +4392,9 @@ fn boot(cx: &mut App) {
             cx.activate(true);
         })
         .unwrap();
+
+    #[cfg(target_family = "wasm")]
+    follow_location(window, cx);
 }
 
 fn main() {

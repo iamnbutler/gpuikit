@@ -2460,6 +2460,7 @@ dependencies = [
  "tempfile",
  "unicode-bidi",
  "unicode-segmentation",
+ "wasm-bindgen",
  "web-sys",
  "web-time",
 ]

@@ -133,9 +133,11 @@ pretty_assertions = "1.4"
 gpui = { package = "gpui-unofficial", version = "1.14.2", features = ["test-support"] }
 
 # The hosted showcase mirrors its active page to the URL hash, so a component
-# can be linked to. A dev-dependency: only the example reads the location.
+# can be linked to, and listens for the hash changing under it (back button,
+# an edited address bar). Dev-dependencies: only the example reads the location.
 [target.'cfg(target_family = "wasm")'.dev-dependencies]
-web-sys = { version = "0.3", features = ["Window", "Location"] }
+web-sys = { version = "0.3", features = ["Window", "Location", "EventTarget"] }
+wasm-bindgen = "0.2"
 
 [features]
 default = []

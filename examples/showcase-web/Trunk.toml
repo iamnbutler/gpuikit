@@ -12,6 +12,11 @@ example = "showcase"
 features = ["examples"]
 dist = "dist"
 
+# Trunk watches the config's own directory by default, which is not where
+# the code is. Paths are relative to this file.
+[watch]
+watch = ["index.html", "coi-serviceworker.js", "../showcase.rs", "../../src", "../../Cargo.toml"]
+
 [serve]
 addresses = ["127.0.0.1"]
 port = 8081

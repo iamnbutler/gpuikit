@@ -32,9 +32,19 @@
 //!     .label("Navigation")
 //!     .state(self.nav_open)
 //!     .width(rems(12.5))
-//!     .rail(v_stack().child(icon_button("nav-home", Icons::home())))
+//!     .rail(
+//!         v_stack()
+//!             .child(sidebar_trigger("app-nav-rail-trigger", self.nav_open).on_click(toggle))
+//!             .child(icon_button("nav-home", Icons::home())),
+//!     )
+//!     .child(sidebar_trigger("app-nav-trigger", self.nav_open).on_click(toggle))
 //!     .child(List::new("nav", entries).render(window, cx))
 //! ```
+//!
+//! The panel shows its children when expanded and only the rail when
+//! collapsed. A trigger that lives among the children is gone the moment it
+//! is used, so either the rail carries one too, or the trigger lives outside
+//! the panel altogether.
 //!
 //! # Overlays
 //!

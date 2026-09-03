@@ -4200,8 +4200,19 @@ impl Render for Showcase {
         let nav_state = SidebarState::from(!self.nav_collapsed);
         let current_section = section_of(&current_page);
 
+        // The panel shows its children when expanded and only the rail when
+        // collapsed, so a trigger that lives among the children is gone the
+        // moment it is used. The rail carries its own, or there is no way back.
         let rail = v_stack()
             .gap_1()
+            .child(
+                sidebar_trigger("showcase-nav-rail-trigger", nav_state)
+                    .label("Toggle navigation")
+                    .on_click(cx.listener(|this, _, _window, cx| {
+                        this.nav_collapsed = !this.nav_collapsed;
+                        cx.notify();
+                    })),
+            )
             .children(NAV_SECTIONS.iter().map(|(label, icon, items)| {
                 let first = items.first().map(|(id, _)| SharedString::from(*id));
                 let cell = self.active_page.clone();

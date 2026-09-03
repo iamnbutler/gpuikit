@@ -4266,46 +4266,62 @@ impl Render for Showcase {
     }
 }
 
+fn boot(cx: &mut App) {
+    gpuikit::init(cx);
+
+    // Syntax highlighting for the Markdown page's ```rust fence.
+    // Opt-in, and itself gated on the feature that pulls in syntect,
+    // so this cannot be called unconditionally.
+    #[cfg(feature = "editor")]
+    gpuikit::markdown::init_code_highlighting(cx);
+
+    cx.set_menus(vec![Menu {
+        name: "GPUIKit Showcase".into(),
+        items: vec![],
+        disabled: false,
+    }]);
+
+    let window = cx
+        .open_window(
+            WindowOptions {
+                titlebar: Some(TitlebarOptions {
+                    title: Some("GPUIKit Component Showcase".into()),
+                    ..Default::default()
+                }),
+                window_bounds: Some(WindowBounds::Windowed(Bounds {
+                    origin: Default::default(),
+                    size: size(px(1200.0), px(680.0)),
+                })),
+                ..Default::default()
+            },
+            |window, cx| cx.new(|cx| Showcase::new(window, cx)),
+        )
+        .unwrap();
+
+    window
+        .update(cx, |showcase, window, cx| {
+            window.focus(&showcase.focus_handle, cx);
+            cx.activate(true);
+        })
+        .unwrap();
+}
+
 fn main() {
-    Application::with_platform(gpui_platform::current_platform(false))
-        .with_assets(gpuikit::assets())
-        .run(|cx: &mut App| {
-            gpuikit::init(cx);
+    let app = Application::with_platform(gpui_platform::current_platform(false))
+        .with_assets(gpuikit::assets());
 
-            // Syntax highlighting for the Markdown page's ```rust fence.
-            // Opt-in, and itself gated on the feature that pulls in syntect,
-            // so this cannot be called unconditionally.
-            #[cfg(feature = "editor")]
-            gpuikit::markdown::init_code_highlighting(cx);
+    // The browser owns the event loop: `Platform::run` schedules launch and
+    // returns at once, so plain `run` would drop the app right after boot —
+    // the canvas appears and vanishes. `run_embedded` hands back the owner;
+    // leaking it makes the page own the app for the lifetime of the tab.
+    // The menu and titlebar above are ignored there; the canvas fills the
+    // viewport whatever bounds are asked for.
+    #[cfg(target_family = "wasm")]
+    {
+        gpui_platform::web_init();
+        std::mem::forget(app.run_embedded(boot));
+    }
 
-            cx.set_menus(vec![Menu {
-                name: "GPUIKit Showcase".into(),
-                items: vec![],
-                disabled: false,
-            }]);
-
-            let window = cx
-                .open_window(
-                    WindowOptions {
-                        titlebar: Some(TitlebarOptions {
-                            title: Some("GPUIKit Component Showcase".into()),
-                            ..Default::default()
-                        }),
-                        window_bounds: Some(WindowBounds::Windowed(Bounds {
-                            origin: Default::default(),
-                            size: size(px(1200.0), px(680.0)),
-                        })),
-                        ..Default::default()
-                    },
-                    |window, cx| cx.new(|cx| Showcase::new(window, cx)),
-                )
-                .unwrap();
-
-            window
-                .update(cx, |showcase, window, cx| {
-                    window.focus(&showcase.focus_handle, cx);
-                    cx.activate(true);
-                })
-                .unwrap();
-        });
+    #[cfg(not(target_family = "wasm"))]
+    app.run(boot);
 }

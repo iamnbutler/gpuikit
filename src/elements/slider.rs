@@ -24,30 +24,17 @@
 
 use crate::element_id::scoped;
 use crate::layout::{h_stack, v_stack};
-use crate::theme::{ActiveTheme, Themeable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use crate::traits::labelable::Labelable;
 use crate::utils::element_manager::ElementManagerExt;
 use gpui::{
-    canvas, div, prelude::*, px, rems, App, Bounds, Context, DispatchPhase, ElementId,
-    EventEmitter, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    ParentElement, Pixels, Point, Rems, Render, SharedString, Styled, Window,
+    canvas, div, prelude::*, px, App, Bounds, Context, DispatchPhase, ElementId, EventEmitter,
+    IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels,
+    Point, Rems, Render, SharedString, Styled, Window,
 };
 use std::ops::RangeInclusive;
-
-/// The thumb's diameter — the one place it is written down.
-///
-/// The thumb is drawn at this size and `value_from_position` insets the usable
-/// track by half of it at each end, so the two are the same length by
-/// construction rather than by two literals agreeing. They only agreed at
-/// gpui's default 16px rem before: the inset was a hardcoded `px(6.)` while the
-/// thumb was `rems(0.75)`, which skewed the mapping at any other rem size.
-///
-/// **Both `render` and `value_from_position` must keep reading this.** If one
-/// of them goes back to a literal the drawn thumb and the mapping's inset can
-/// disagree again, and nothing in the test module catches it — the tests
-/// exercise the mapping only, never the painted thumb's bounds.
-const THUMB_SIZE: Rems = rems(0.75);
 
 /// Event emitted when the slider value changes
 pub struct SliderChanged {
@@ -65,6 +52,7 @@ pub struct Slider {
     track_bounds: Option<Bounds<Pixels>>,
     show_value: bool,
     disabled: bool,
+    size: ControlSize,
 }
 
 impl EventEmitter<SliderChanged> for Slider {}
@@ -81,6 +69,7 @@ impl Slider {
             track_bounds: None,
             show_value: true,
             disabled: false,
+            size: ControlSize::default(),
         }
     }
 
@@ -124,12 +113,36 @@ impl Slider {
         }
     }
 
-    fn value_from_position(&self, position: Point<Pixels>, rem_size: Pixels) -> f32 {
+    /// The thumb's diameter — the one place it is read.
+    ///
+    /// It is the rung's ink, the same quantity a checkbox's box and a switch's
+    /// track are: the thumb is what the slider *fills* its row with, not the
+    /// row. `render` draws the thumb at this and `value_from_position` insets
+    /// the usable track by half of it at each end, so the drawn thumb and the
+    /// mapping are the same length by construction rather than by two literals
+    /// agreeing. They only agreed at gpui's default 16px rem before: the inset
+    /// was a hardcoded `px(6.)` while the thumb was `rems(0.75)`, which skewed
+    /// the mapping at any other rem size.
+    ///
+    /// **Both `render` and `value_from_position` must keep reading this.** If
+    /// one of them goes back to a literal the two can disagree again, and
+    /// nothing in the test module catches it — the tests exercise the mapping
+    /// only, never the painted thumb's bounds.
+    fn thumb_size(&self, cx: &App) -> Rems {
+        cx.theme().control(self.size).ink
+    }
+
+    fn value_from_position(
+        &self,
+        position: Point<Pixels>,
+        rem_size: Pixels,
+        thumb_size: Rems,
+    ) -> f32 {
         let Some(bounds) = self.track_bounds else {
             return self.value;
         };
 
-        let thumb_radius = THUMB_SIZE.to_pixels(rem_size) / 2.;
+        let thumb_radius = thumb_size.to_pixels(rem_size) / 2.;
         let usable_width = bounds.size.width - thumb_radius * 2.;
         let relative_x = (position.x - bounds.origin.x - thumb_radius).max(px(0.));
         let percentage = (relative_x / usable_width).clamp(0., 1.);
@@ -164,7 +177,8 @@ impl Slider {
         // mouse-down over an id'd hitbox, so a simulated press repaints either
         // way and cannot tell the two apart.
         cx.notify();
-        let new_value = self.value_from_position(event.position, window.rem_size());
+        let thumb_size = self.thumb_size(cx);
+        let new_value = self.value_from_position(event.position, window.rem_size(), thumb_size);
         self.set_value(new_value, cx);
     }
 
@@ -198,7 +212,8 @@ impl Slider {
             self.end_drag(cx);
             return;
         }
-        let new_value = self.value_from_position(event.position, window.rem_size());
+        let thumb_size = self.thumb_size(cx);
+        let new_value = self.value_from_position(event.position, window.rem_size(), thumb_size);
         self.set_value(new_value, cx);
     }
 
@@ -214,6 +229,7 @@ impl Slider {
 impl Render for Slider {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
+        let metrics = theme.control(self.size);
         let percentage = self.percentage();
         let label = self.label.clone();
         let display_value = self.display_value();
@@ -221,8 +237,15 @@ impl Render for Slider {
         let show_value = self.show_value;
         let disabled = self.disabled;
 
-        let track_height = rems(0.25);
-        let thumb_size = THUMB_SIZE;
+        // Shapes specific to this control, derived from the rung rather than
+        // named here: the thumb is the rung's ink, and the rail it slides on
+        // is a quarter of that. Both used to be literals, so a slider matched
+        // the button beside it on no rung and moved with the scale on none.
+        let thumb_size = metrics.ink;
+        let track_height = metrics.ink / 4.;
+        // The thumb is centred in the rung by hand: it is absolutely
+        // positioned, so `items_center` on the row does not reach it.
+        let thumb_top = (metrics.height - metrics.ink) / 2.;
 
         let track_color = theme.surface_secondary();
         let fill_color = if disabled {
@@ -240,7 +263,7 @@ impl Render for Slider {
         v_stack()
             .id(self.id.clone())
             .w_full()
-            .gap(rems(0.25))
+            .gap(metrics.gap)
             .when(label.is_some() || show_value, |this| {
                 this.child(
                     h_stack()
@@ -276,7 +299,7 @@ impl Render for Slider {
                     // `.id(self.id)`; it derives from that id directly now.
                     .id(scoped(&self.id, "track"))
                     .relative()
-                    .h(thumb_size)
+                    .h(metrics.height)
                     .w_full()
                     .flex()
                     .items_center()
@@ -346,7 +369,7 @@ impl Render for Slider {
                         div()
                             .absolute()
                             .left(gpui::relative(percentage))
-                            .top(px(0.))
+                            .top(thumb_top)
                             .size(thumb_size)
                             .bg(thumb_color)
                             .rounded_full()
@@ -386,6 +409,13 @@ impl Labelable for Slider {
     }
 }
 
+impl ControlSized for Slider {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -402,17 +432,18 @@ mod tests {
     const TRACK_LEFT: f32 = 100.;
     const TRACK_WIDTH: f32 = 200.;
     /// `value_from_position` insets the track by the thumb radius at each end.
-    const THUMB_RADIUS: f32 = 6.;
-    /// The track is `rems(0.75)` tall and is the slider's only row, since these
-    /// sliders show no label and no value.
-    const TRACK_Y: f32 = 6.;
+    /// The thumb is the `Medium` rung's ink, `rems(0.875)`.
+    const THUMB_RADIUS: f32 = 7.;
+    /// The track row is the `Medium` rung, `rems(1.25)`, and is the slider's
+    /// only row, since these sliders show no label and no value.
+    const TRACK_Y: f32 = 10.;
     /// The rem size `the_mapping_holds_at_a_non_default_rem_size` draws at, and
-    /// the thumb radius that follows from it: `rems(0.75) * 32 / 2`.
+    /// the thumb radius that follows from it: `rems(0.875) * 32 / 2`.
     const BIG_REM_SIZE: f32 = 32.;
-    const BIG_THUMB_RADIUS: f32 = 12.;
+    const BIG_THUMB_RADIUS: f32 = 14.;
     // These three restate the geometry by hand on purpose. A test that derived
-    // its expected x from `THUMB_SIZE` would agree with any value the constant
-    // took, including a wrong one, and so would pin nothing.
+    // its expected x from `Slider::thumb_size` would agree with any value the
+    // rung took, including a wrong one, and so would pin nothing.
 
     struct Harness {
         slider: Entity<Slider>,

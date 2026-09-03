@@ -1,10 +1,11 @@
 //! Radio group component for gpuikit
 
-use crate::theme::{ActiveTheme, Themeable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use crate::traits::orientable::{Orientable, Orientation};
 use gpui::{
-    div, prelude::*, rems, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
+    div, prelude::*, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
     MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
 };
 
@@ -43,6 +44,7 @@ pub struct RadioGroup<T: Clone + PartialEq + 'static> {
     selected: Option<T>,
     disabled: bool,
     orientation: Orientation,
+    size: ControlSize,
 }
 
 impl<T: Clone + PartialEq + 'static> EventEmitter<RadioGroupChanged<T>> for RadioGroup<T> {}
@@ -55,6 +57,7 @@ impl<T: Clone + PartialEq + 'static> RadioGroup<T> {
             selected: None,
             disabled: false,
             orientation: Orientation::default(),
+            size: ControlSize::default(),
         }
     }
 
@@ -97,17 +100,27 @@ impl<T: Clone + PartialEq + 'static> RadioGroup<T> {
 impl<T: Clone + PartialEq + 'static> Render for RadioGroup<T> {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
+        let metrics = theme.control(self.size);
         let group_disabled = self.disabled;
         let selected = self.selected.clone();
         let orientation = self.orientation;
 
-        let radio_size = rems(1.0);
-        let dot_size = rems(0.5);
+        // The radio is the ink inside the rung, exactly as a checkbox's box
+        // is — the two are the same control with a different shape, and a
+        // radio that named `rems(1.0)` for itself lined up with a checkbox on
+        // no rung and moved with the scale on none either. The dot is half the
+        // ink, which is the ratio the old pair already had.
+        let radio_size = metrics.ink;
+        let dot_size = metrics.ink / 2.;
 
         let container = if orientation == Orientation::Vertical {
-            div().flex().flex_col().gap(rems(0.5))
+            div().flex().flex_col().gap(metrics.gap * 2.0)
         } else {
-            div().flex().flex_row().gap(rems(1.0)).items_center()
+            div()
+                .flex()
+                .flex_row()
+                .gap(metrics.gap * 4.0)
+                .items_center()
         };
 
         container.id(self.id.clone()).children(
@@ -149,7 +162,11 @@ impl<T: Clone + PartialEq + 'static> Render for RadioGroup<T> {
                         .id(ElementId::NamedInteger("radio-option".into(), index as u64))
                         .flex()
                         .flex_row()
-                        .gap(rems(0.5))
+                        // The row is the rung, so a radio lines up with the
+                        // checkbox beside it; a label outside the control's
+                        // own box wants more room than the gap inside one.
+                        .h(metrics.height)
+                        .gap(metrics.gap * 2.0)
                         .items_center()
                         .when(!is_disabled, |this| {
                             this.cursor_pointer()
@@ -185,7 +202,13 @@ impl<T: Clone + PartialEq + 'static> Render for RadioGroup<T> {
                                     this.child(div().size(dot_size).bg(dot_color).rounded_full())
                                 }),
                         )
-                        .child(div().text_sm().text_color(text_color).child(label))
+                        .child(
+                            div()
+                                .text_size(metrics.text_size)
+                                .line_height(metrics.line_height)
+                                .text_color(text_color)
+                                .child(label),
+                        )
                 })
                 .collect::<Vec<_>>(),
         )
@@ -230,6 +253,13 @@ impl<T: Clone> Disableable for RadioOption<T> {
 impl<T: Clone + PartialEq + 'static> Orientable for RadioGroup<T> {
     fn orientation(mut self, orientation: Orientation) -> Self {
         self.orientation = orientation;
+        self
+    }
+}
+
+impl<T: Clone + PartialEq + 'static> ControlSized for RadioGroup<T> {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
         self
     }
 }

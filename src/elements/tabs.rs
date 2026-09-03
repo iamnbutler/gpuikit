@@ -3,10 +3,11 @@
 //! A tabbed interface for organizing content into multiple panels.
 
 use crate::layout::h_stack;
-use crate::theme::{ActiveTheme, Themeable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use gpui::{
-    div, prelude::*, px, rems, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
+    div, prelude::*, px, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
     MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
 };
 
@@ -55,6 +56,7 @@ pub struct Tabs {
     tabs: Vec<Tab>,
     selected: Option<SharedString>,
     disabled: bool,
+    size: ControlSize,
 }
 
 impl EventEmitter<TabChanged> for Tabs {}
@@ -67,6 +69,7 @@ impl Tabs {
             tabs: Vec::new(),
             selected: None,
             disabled: false,
+            size: ControlSize::default(),
         }
     }
 
@@ -125,14 +128,18 @@ impl Tabs {
 impl Render for Tabs {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
+        let metrics = theme.control(self.size);
         let group_disabled = self.disabled;
         let selected = self.selected.clone();
 
+        // The strip's own border is the rule the tabs sit on, and the tabs
+        // overlap it by the 1px they are pulled down. A tab is therefore the
+        // rung exactly, and so is the strip — a tab bar lines up with a button
+        // beside it instead of standing 15px taller than one.
         let tab_list = h_stack()
-            .gap(rems(0.25))
+            .gap(metrics.gap)
             .border_b_1()
-            .border_color(theme.border())
-            .pb(px(1.0));
+            .border_color(theme.border());
 
         div().id(self.id.clone()).flex().flex_col().child(
             tab_list.children(
@@ -169,15 +176,16 @@ impl Render for Tabs {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .px(rems(0.75))
-                            .py(rems(0.5))
-                            .text_sm()
+                            .h(metrics.height)
+                            .px(metrics.padding_x)
+                            .text_size(metrics.text_size)
+                            .line_height(metrics.line_height)
                             .text_color(text_color)
                             .bg(bg)
                             .border_b_2()
                             .border_color(border_color)
                             .mb(px(-1.0)) // Overlap with container border
-                            .rounded_t(px(4.0))
+                            .rounded_t(metrics.radius)
                             .when(!is_disabled, |this| {
                                 this.cursor_pointer()
                                     .on_mouse_down(MouseButton::Left, |_, window, _| {
@@ -222,6 +230,13 @@ impl Disableable for Tabs {
 
     fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+}
+
+impl ControlSized for Tabs {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
         self
     }
 }

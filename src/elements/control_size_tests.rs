@@ -17,22 +17,27 @@ use crate::elements::button::button;
 use crate::elements::checkbox::{checkbox, Checkbox};
 use crate::elements::icon_button::icon_button;
 use crate::elements::kbd::kbd;
+use crate::elements::radio_group::{radio_group, radio_option, RadioGroup};
 use crate::elements::select::{select, SelectState};
+use crate::elements::slider::{slider, Slider};
 use crate::elements::switch::{switch, Switch};
+use crate::elements::tabs::{tab, tabs, Tabs};
 use crate::elements::text_field::text_field;
 use crate::elements::toggle::{toggle, Toggle};
+use crate::elements::toggle_group::{toggle_group, toggle_option, ToggleGroup};
 use crate::icons::Icons;
 use crate::input::InputState;
 use crate::layout::h_stack;
 use crate::theme::{ActiveTheme, ControlSize, Themeable};
 use crate::traits::control_sized::ControlSized;
+use crate::traits::orientable::{Orientable, Orientation};
 
 /// The controls the row draws, in the order it draws them. Each name is also
 /// the `debug_selector` its box is measured through.
 ///
-/// Nine of the crate's seventeen `ControlSized` implementors. The other eight,
-/// and the six elements that are not on the scale at all, are enumerated on
-/// [`every_sized_control_on_a_row_is_the_same_height`].
+/// Thirteen of the crate's twenty-one `ControlSized` implementors. The other
+/// eight, and the two elements that are not on the scale at all, are
+/// enumerated on [`every_sized_control_on_a_row_is_the_same_height`].
 const CONTROLS: &[&str] = &[
     "button",
     "icon-button",
@@ -43,6 +48,10 @@ const CONTROLS: &[&str] = &[
     "toggle",
     "select",
     "text-field",
+    "tabs",
+    "toggle-group",
+    "radio-group",
+    "slider",
 ];
 
 /// A toolbar: one of every control *on the scale* that can share a row, on
@@ -54,6 +63,10 @@ struct Toolbar {
     toggle: Entity<Toggle>,
     select: Entity<SelectState<u8>>,
     field: Entity<InputState>,
+    tabs: Entity<Tabs>,
+    toggle_group: Entity<ToggleGroup<u8>>,
+    radio_group: Entity<RadioGroup<u8>>,
+    slider: Entity<Slider>,
 }
 
 impl Toolbar {
@@ -71,6 +84,41 @@ impl Toolbar {
                 )
             }),
             field: cx.new(InputState::new_singleline),
+            tabs: cx.new(|_cx| {
+                tabs("tabs")
+                    .tab(tab("one", "One"))
+                    .tab(tab("two", "Two"))
+                    .control_size(size)
+            }),
+            toggle_group: cx.new(|_cx| {
+                toggle_group(
+                    "tg-group",
+                    vec![toggle_option(0u8, "Left"), toggle_option(1u8, "Right")],
+                )
+                .selected_value(0u8)
+                .control_size(size)
+            }),
+            // Horizontal, because that is the form that shares a row: a
+            // `RadioGroup` defaults to `Orientation::Vertical`, which is a
+            // stack of rungs rather than one, and has no single height to
+            // agree with — the same reason `Textarea` is not in this row.
+            radio_group: cx.new(|_cx| {
+                radio_group(
+                    "rg",
+                    vec![radio_option(0u8, "Zero"), radio_option(1u8, "One")],
+                )
+                .selected(0u8)
+                .orientation(Orientation::Horizontal)
+                .control_size(size)
+            }),
+            // No label and no value, so the slider is the one track row a
+            // toolbar would put it on. With either it is two rows and has no
+            // single height to agree with, the same as `Textarea`.
+            slider: cx.new(|_cx| {
+                slider("slider", 50., 0.0..=100.)
+                    .show_value(false)
+                    .control_size(size)
+            }),
         }
     }
 }
@@ -111,6 +159,16 @@ impl Render for Toolbar {
                     .placeholder("Field")
                     .control_size(size),
             ))
+            .child(measured("tabs", self.tabs.clone()))
+            .child(measured("toggle-group", self.toggle_group.clone()))
+            .child(measured("radio-group", self.radio_group.clone()))
+            // A slider is `w_full`, and `measured` is `flex_none`, so without
+            // a width it collapses and the thumb has nowhere to sit. The width
+            // is arbitrary; only the height is asserted.
+            .child(measured(
+                "slider",
+                div().w(px(120.)).child(self.slider.clone()),
+            ))
     }
 }
 
@@ -130,26 +188,30 @@ fn measure_row(cx: &mut TestAppContext, size: ControlSize) -> Vec<(&'static str,
         .collect()
 }
 
-/// The whole point of the scale, as one assertion — over the nine controls
-/// [`CONTROLS`] names, which is **not** every control in the crate.
+/// The whole point of the scale, as one assertion — over the thirteen
+/// controls [`CONTROLS`] names, which is **not** every control in the crate.
 ///
 /// The name says "sized" rather than "control" because both halves of that
 /// gap are real, and neither is visible from the row itself. `grep "impl
-/// ControlSized"` finds seventeen implementors; this row measures nine. Someone
-/// who adds a tenth needs to be able to tell unfinished coverage from a broken
-/// scale, and this comment is the only thing that tells them.
+/// ControlSized"` finds twenty-one implementors; this row measures thirteen.
+/// Someone who adds a fourteenth needs to be able to tell unfinished coverage
+/// from a broken scale, and this comment is the only thing that tells them.
 ///
-/// **Six elements are not on the scale at all**, and would fail here for a
-/// reason that is not a bug in the scale. None of them mentions `ControlSized`
-/// or `control_size` anywhere in its module:
+/// **Two elements are not on the scale at all**, and would fail here for a
+/// reason that is not a bug in the scale. Neither mentions `ControlSized` or
+/// `control_size` anywhere in its module, and both are deliberate:
 ///
-/// - `elements::toggle_group`, `elements::tabs`, `elements::alert` — their
-///   height is whatever their padding plus a line box comes to
-///   (`rems(0.375)`, `rems(0.5)` and `rems(0.75)` respectively).
-/// - `elements::slider`, `elements::progress`, `elements::radio_group` — each
-///   hard-codes a track or glyph size instead: a `rems(0.75)` thumb, a
-///   `px(8.)` bar, a `rems(1.0)` radio. Not padding-derived, whatever the
-///   shorthand in iamnbutler/gpuikit#152 says.
+/// - `elements::alert` — a banner, not a row control. Its height is a
+///   `rems(0.75)` padding plus however many lines of message it was given, and
+///   there is no rung a two-line alert could sit on.
+/// - `elements::progress` — a `px(8.)` bar. Called out in iamnbutler/gpuikit#230
+///   as legitimately local under `crate::theme::control`'s "what belongs here"
+///   note: the bar is a graphic with no text and no interaction, and the
+///   element is being superseded by Gauge (iamnbutler/gpuikit#222) anyway.
+///
+/// `Tabs`, `ToggleGroup`, `RadioGroup` and `Slider` used to be on that list —
+/// they are the four #230 named as the ones that genuinely sit beside a
+/// `Button`, and they are in the row above now.
 ///
 /// **Eight more do implement `ControlSized` and are still not measured here**,
 /// which is the half that is easy to miss:
@@ -159,7 +221,9 @@ fn measure_row(cx: &mut TestAppContext, size: ControlSize) -> Vec<(&'static str,
 ///   the same box twice.
 /// - `CheckboxBox` — an internal sub-part, reached through `Checkbox`.
 /// - `Textarea` — multi-line by definition, so it has no single row height to
-///   agree with; its rung sets its text metrics, not its box.
+///   agree with; its rung sets its text metrics, not its box. A `Slider` with
+///   a label or a value readout is the same shape, which is why the one in the
+///   row above has neither.
 /// - `Table`, `Sidebar`, `SidebarTrigger` — containers rather than row
 ///   controls. `SidebarTrigger` is the arguable one: it is an `IconButton` in
 ///   all but name and could join the row.
@@ -167,10 +231,12 @@ fn measure_row(cx: &mut TestAppContext, size: ControlSize) -> Vec<(&'static str,
 ///   action buttons of a confirmation and the gap between them; the panel's
 ///   own padding is component-specific.
 ///
-/// Closing the gap is separate work, tracked as iamnbutler/gpuikit#152. The
-/// three worth doing first are `Tabs`, `ToggleGroup` and `Slider`: all three
-/// genuinely do sit on a toolbar next to a `Button`, and all three are visibly
-/// off it today.
+/// What is left of iamnbutler/gpuikit#230 after this row grew: `list`'s px
+/// constants, `context_menu`'s `px(180.)`/`px(420.)`/`px(14.)` literals, and
+/// the icon-slot literals repeated across `context_menu`, `accordion` and
+/// `collapsible`. None of the four is a control that shares a row, so none of
+/// them can be held by a test shaped like this one; #230's `metrics_coverage`
+/// guard is what would.
 #[gpui::test]
 fn every_sized_control_on_a_row_is_the_same_height(cx: &mut TestAppContext) {
     for size in ControlSize::ALL {

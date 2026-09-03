@@ -2,12 +2,13 @@
 //!
 //! A toggle group allows selecting one or multiple options from a group of toggle buttons.
 
-use crate::theme::{ActiveTheme, Themeable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable};
+use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use crate::traits::orientable::{Orientable, Orientation};
 use gpui::{
-    div, prelude::*, rems, Context, Div, ElementId, EventEmitter, FontWeight, Hsla,
-    InteractiveElement, IntoElement, MouseButton, ParentElement, Render, SharedString, Stateful,
+    div, prelude::*, Context, Div, ElementId, EventEmitter, FontWeight, Hsla, InteractiveElement,
+    IntoElement, MouseButton, ParentElement, Render, SharedString, Stateful,
     StatefulInteractiveElement, Styled, Window,
 };
 
@@ -99,6 +100,7 @@ pub struct ToggleGroup<T: Clone + PartialEq + 'static> {
     mode: ToggleGroupMode,
     disabled: bool,
     orientation: Orientation,
+    size: ControlSize,
 }
 
 impl<T: Clone + PartialEq + 'static> EventEmitter<ToggleGroupChanged<T>> for ToggleGroup<T> {}
@@ -113,6 +115,7 @@ impl<T: Clone + PartialEq + 'static> ToggleGroup<T> {
             mode: ToggleGroupMode::default(),
             disabled: false,
             orientation: Orientation::Horizontal,
+            size: ControlSize::default(),
         }
     }
 
@@ -193,15 +196,23 @@ impl<T: Clone + PartialEq + 'static> ToggleGroup<T> {
 impl<T: Clone + PartialEq + 'static> Render for ToggleGroup<T> {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
+        let metrics = theme.control(self.size);
         let group_disabled = self.disabled;
         let selected = self.selected.clone();
         let orientation = self.orientation;
         let num_options = self.options.len();
 
+        // The group is the control, and the options fill it. The old shape put
+        // 2px of padding inside the border and let each option's own padding
+        // decide the height, which is the emergent-size failure
+        // `crate::theme::control` exists to end: a segmented control matched a
+        // `Button` on no rung. A horizontal group is the rung exactly; a
+        // vertical one is a rung per option, which is the only reading of a
+        // stack of them that keeps each option the height of a button.
         let container = if orientation == Orientation::Vertical {
             div().flex().flex_col()
         } else {
-            div().flex().flex_row()
+            div().flex().flex_row().h(metrics.height)
         };
 
         container
@@ -209,9 +220,7 @@ impl<T: Clone + PartialEq + 'static> Render for ToggleGroup<T> {
             .bg(theme.surface_secondary())
             .border_1()
             .border_color(theme.border())
-            .rounded_md()
-            .p(rems(0.125))
-            .gap(rems(0.125))
+            .rounded(metrics.radius)
             .children(
                 self.options
                     .iter()
@@ -247,25 +256,37 @@ impl<T: Clone + PartialEq + 'static> Render for ToggleGroup<T> {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .px(rems(0.75))
-                            .py(rems(0.375))
-                            .text_sm()
+                            // A vertical group has no outer height to divide,
+                            // so each option declares the rung itself: a stack
+                            // of options is a stack of rungs, and the group is
+                            // taller than the sum only by its own border.
+                            .when(orientation == Orientation::Vertical, |this| {
+                                this.h(metrics.height)
+                            })
+                            .px(metrics.padding_x)
+                            .text_size(metrics.text_size)
+                            .line_height(metrics.line_height)
                             .font_weight(FontWeight::MEDIUM)
                             .when_some(bg, |this, bg| this.bg(bg))
                             .text_color(text_color)
                             .when(is_selected && !is_disabled, |this: Stateful<Div>| {
                                 this.shadow_sm()
                             })
-                            // Apply rounded corners based on orientation and position
-                            .when(orientation == Orientation::Horizontal, |this| {
-                                this.when(is_first, |t| t.rounded_l_sm())
-                                    .when(is_last, |t| t.rounded_r_sm())
-                                    .when(!is_first && !is_last, |t| t.rounded_none())
-                            })
-                            .when(orientation == Orientation::Vertical, |this| {
-                                this.when(is_first, |t| t.rounded_t_sm())
-                                    .when(is_last, |t| t.rounded_b_sm())
-                                    .when(!is_first && !is_last, |t| t.rounded_none())
+                            // The group's radius, less its own border, is what
+                            // an option's outer corner has to be to sit inside
+                            // the border rather than cut across it.
+                            .map(|this| {
+                                let radius = metrics.inner_radius();
+                                match orientation {
+                                    Orientation::Horizontal => this
+                                        .when(is_first, |t| t.rounded_l(radius))
+                                        .when(is_last, |t| t.rounded_r(radius))
+                                        .when(!is_first && !is_last, |t| t.rounded_none()),
+                                    Orientation::Vertical => this
+                                        .when(is_first, |t| t.rounded_t(radius))
+                                        .when(is_last, |t| t.rounded_b(radius))
+                                        .when(!is_first && !is_last, |t| t.rounded_none()),
+                                }
                             })
                             .when(!is_disabled, |this| {
                                 this.cursor_pointer()
@@ -318,6 +339,13 @@ impl<T: Clone + PartialEq + 'static> Disableable for ToggleGroup<T> {
 impl<T: Clone + PartialEq + 'static> Orientable for ToggleGroup<T> {
     fn orientation(mut self, orientation: Orientation) -> Self {
         self.orientation = orientation;
+        self
+    }
+}
+
+impl<T: Clone + PartialEq + 'static> ControlSized for ToggleGroup<T> {
+    fn control_size(mut self, size: ControlSize) -> Self {
+        self.size = size;
         self
     }
 }

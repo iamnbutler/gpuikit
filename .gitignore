@@ -45,3 +45,4 @@ Thumbs.db
 ehthumbs.db
 logs/
 scratch/
+/examples/showcase-web/dist/

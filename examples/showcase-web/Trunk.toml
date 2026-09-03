@@ -1,0 +1,21 @@
+# The web build of `examples/showcase.rs` — the same binary the README's
+# `cargo run --example showcase` runs, compiled for the browser. Run from the
+# repository root through the script that pins the toolchain:
+#
+#   scripts/showcase-web.sh serve
+#
+# `.github/workflows/pages.yml` runs `scripts/showcase-web.sh build --release`
+# with the `--public-url` GitHub Pages serves it from.
+[build]
+target = "index.html"
+example = "showcase"
+features = ["examples"]
+dist = "dist"
+
+[serve]
+addresses = ["127.0.0.1"]
+port = 8081
+open = false
+# Cross-origin isolation, for SharedArrayBuffer (wasm threads) and WebGPU.
+# GitHub Pages cannot send these headers; coi-serviceworker.js covers that.
+headers = { "Cross-Origin-Embedder-Policy" = "require-corp", "Cross-Origin-Opener-Policy" = "same-origin" }

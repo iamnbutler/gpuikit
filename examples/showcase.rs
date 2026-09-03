@@ -62,7 +62,7 @@ use gpuikit::{
     traits::control_sized::ControlSized,
     traits::disableable::Disableable,
     traits::labelable::Labelable,
-    traits::orientable::Orientable,
+    traits::orientable::{Orientable, Orientation},
     DefaultIcons,
 };
 use std::cell::RefCell;
@@ -719,6 +719,10 @@ struct Showcase {
     control_row_toggles: [Entity<Toggle>; 3],
     control_row_selects: [Entity<SelectState<Size>>; 3],
     control_row_fields: [Entity<InputState>; 3],
+    control_row_tabs: [Entity<Tabs>; 3],
+    control_row_toggle_groups: [Entity<ToggleGroup<Alignment>>; 3],
+    control_row_radios: [Entity<RadioGroup<Size>>; 3],
+    control_row_sliders: [Entity<Slider>; 3],
     textarea_example: Entity<InputState>,
     /// Its own state: sharing the live example's was both a duplicate element
     /// id and, now that `read_only` writes through to the state, a clobber
@@ -1044,6 +1048,61 @@ impl Showcase {
             })
         });
         let control_row_fields = ControlSize::ALL.map(|_| cx.new(InputState::new_singleline));
+
+        let control_row_tabs = ControlSize::ALL.map(|size| {
+            cx.new(|_cx| {
+                tabs(SharedString::from(format!(
+                    "control-row-tabs-{}",
+                    size.name()
+                )))
+                .tab(tab("edit", "Edit"))
+                .tab(tab("preview", "Preview"))
+                .control_size(size)
+            })
+        });
+
+        let control_row_toggle_groups = ControlSize::ALL.map(|size| {
+            cx.new(|_cx| {
+                toggle_group(
+                    SharedString::from(format!("control-row-toggle-group-{}", size.name())),
+                    vec![
+                        toggle_option(Alignment::Left, "Left"),
+                        toggle_option(Alignment::Center, "Center"),
+                    ],
+                )
+                .selected_value(Alignment::Left)
+                .control_size(size)
+            })
+        });
+
+        let control_row_radios = ControlSize::ALL.map(|size| {
+            cx.new(|_cx| {
+                radio_group(
+                    SharedString::from(format!("control-row-radio-{}", size.name())),
+                    vec![
+                        radio_option(Size::Small, "One"),
+                        radio_option(Size::Medium, "Two"),
+                    ],
+                )
+                .selected(Size::Small)
+                .orientation(Orientation::Horizontal)
+                .control_size(size)
+            })
+        });
+
+        // No label and no value: with either, a slider is two rows and has no
+        // single height to line up with the rest of the row.
+        let control_row_sliders = ControlSize::ALL.map(|size| {
+            cx.new(|_cx| {
+                slider(
+                    SharedString::from(format!("control-row-slider-{}", size.name())),
+                    60.,
+                    0.0..=100.,
+                )
+                .show_value(false)
+                .control_size(size)
+            })
+        });
         let textarea_example = cx.new(InputState::new_multiline);
         let textarea_disabled = cx.new(InputState::new_multiline);
         let textarea_read_only = cx.new(|cx| {
@@ -1291,6 +1350,10 @@ impl Showcase {
             control_row_toggles,
             control_row_selects,
             control_row_fields,
+            control_row_tabs,
+            control_row_toggle_groups,
+            control_row_radios,
+            control_row_sliders,
             textarea_example,
             textarea_disabled,
             textarea_read_only,
@@ -3956,6 +4019,16 @@ impl Showcase {
                                                 text_field(&self.control_row_fields[index], cx)
                                                     .placeholder("Field")
                                                     .control_size(size),
+                                            )
+                                            .child(self.control_row_tabs[index].clone())
+                                            .child(self.control_row_toggle_groups[index].clone())
+                                            .child(self.control_row_radios[index].clone())
+                                            // A slider is `w_full`, so it needs
+                                            // a width or it collapses to nothing.
+                                            .child(
+                                                div()
+                                                    .w(px(96.))
+                                                    .child(self.control_row_sliders[index].clone()),
                                             ),
                                     ),
                             )

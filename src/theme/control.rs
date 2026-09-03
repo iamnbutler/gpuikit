@@ -104,6 +104,16 @@ impl ControlMetrics {
         Rems(((self.height.0 - self.line_height.0) / 2.0 - BORDER_REMS).max(0.0))
     }
 
+    /// The corner radius for a child drawn *inside* a bordered control's
+    /// border — a segmented control's end options against its group.
+    ///
+    /// The rung's own radius is the outer one. A child that reuses it draws a
+    /// curve one pixel wider than the hole it sits in, and the border shows
+    /// through at the corner.
+    pub fn inner_radius(&self) -> Rems {
+        Rems((self.radius.0 - BORDER_REMS).max(0.0))
+    }
+
     /// The line height for text that is allowed to wrap — a textarea, a
     /// multi-line input. The rung's own `line_height` is tuned to fit *inside*
     /// the rung, which is too tight once there is a second line.

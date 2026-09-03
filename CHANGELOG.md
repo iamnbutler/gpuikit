@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **`Tabs`, `ToggleGroup`, `RadioGroup` and `Slider` are on the shared control
+  size scale.** All four implement `ControlSized`, so `.small()` / `.medium()`
+  / `.large()` work on them and they resolve every dimension through
+  `Themeable::control` instead of naming their own. Each was previously
+  padding-derived or hard-coded, which meant a tab bar stood 15px taller than
+  the button beside it, a radio lined up with a checkbox on no rung, and
+  changing the scale moved neither. `Medium` is the default, so a call site
+  that names no size keeps working — but the drawn heights change: a tab strip
+  and a segmented control are now 20px rather than ~35px, a radio is the
+  rung's ink rather than a fixed `rems(1.0)`, and a slider's row is the rung
+  with a thumb of the rung's ink. The row test in
+  `src/elements/control_size_tests.rs` measures all four now, so they cannot
+  drift back.
+- `ControlMetrics::inner_radius()` is new: the corner radius for a child drawn
+  inside a bordered control's border, which is what a segmented control's end
+  options need to sit in the border rather than cut across it.
+
 ## [0.8.0] - 2026-09-01
 
 The release 0.8.0 was always going to be, plus everything that landed while it

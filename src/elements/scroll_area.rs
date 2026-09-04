@@ -4,27 +4,36 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```
+//! # use gpui::{Context, IntoElement, Render, Window, div, prelude::*, px};
 //! use gpuikit::elements::scroll_area::scroll_area;
-//!
+//! # struct D;
+//! # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+//! # let (long_content, wide_content, large_content) = (div(), div(), div());
+//! # let _ =
 //! // Vertical scroll area with max height
 //! scroll_area("my-scroll-area")
 //!     .max_h(px(300.))
 //!     .vertical()
 //!     .child(long_content)
-//!
+//! # ;
+//! # let _ =
 //! // Horizontal scroll area
 //! scroll_area("horiz-scroll")
 //!     .max_w(px(400.))
 //!     .horizontal()
 //!     .child(wide_content)
-//!
+//! # ;
 //! // Both directions
 //! scroll_area("both-scroll")
 //!     .max_h(px(300.))
 //!     .max_w(px(400.))
 //!     .both()
 //!     .child(large_content)
+//! # }}
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(gpuikit::init);
+//! # let _ = tcx.add_window_view(|_, _| D);
 //! ```
 
 use gpui::{
@@ -50,14 +59,6 @@ pub enum ScrollDirection {
 ///
 /// * `id` - Unique identifier for the scroll area
 ///
-/// # Example
-///
-/// ```ignore
-/// scroll_area("my-scroll-area")
-///     .max_h(px(300.))
-///     .vertical()
-///     .child(content)
-/// ```
 pub fn scroll_area(id: impl Into<ElementId>) -> ScrollArea {
     ScrollArea::new(id)
 }

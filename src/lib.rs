@@ -5,7 +5,7 @@
 //!
 //! # Quick Start
 //!
-//! ```ignore
+//! ```no_run
 //! use gpui::Application;
 //! use gpuikit::init;
 //!
@@ -125,6 +125,17 @@ mod build_profile_guard;
 #[cfg(test)]
 mod undying_thread_guard;
 
+/// Tests for the rule that a rustdoc example which is not checked does not
+/// exist — no `` ```ignore `` anywhere in `src/`, and `no_run` only with a
+/// reason on record. rustdoc never compiles an `ignore`d block, so the crate's
+/// own Quick Start went on naming `Application::new()` long after that
+/// function stopped existing.
+///
+/// No runtime code, and nothing outside a test build. Its docs carry the
+/// hidden prelude a new example should copy.
+#[cfg(test)]
+mod doctest_fence_guard;
+
 /// Tests for the rule that runtime code stays runnable on
 /// `wasm32-unknown-unknown` — no `std::time::Instant`/`SystemTime`,
 /// `std::fs`, or `std::thread::spawn` outside an explicit allowlist of
@@ -144,7 +155,8 @@ pub struct Assets;
 /// Returns the gpuikit asset source, for `Application::with_assets`.
 ///
 /// # Example
-/// ```ignore
+/// ```no_run
+/// # use gpui::Application;
 /// Application::with_platform(gpui_platform::current_platform(false))
 ///     .with_assets(gpuikit::assets())
 ///     .run(|cx| {

@@ -48,12 +48,12 @@ echo
 # `Running …` and `Doc-tests …` each announce one binary; `test result: …` is
 # one summary. Every announced binary owes *at least* one summary — the
 # comparison below is `<`, not `!=`, and since edition 2024 it has to be.
-# Edition 2024 merges a crate's doctests into a single binary, but rustdoc
-# cannot merge every block (one with its own `fn main`, or a `compile_fail`,
-# still compiles standalone), so one `Doc-tests` line now reports two
-# `test result:` lines: the merged group, then the leftovers. A binary killed
-# without reporting still shows up as fewer summaries than binaries, which is
-# the direction this guard exists to catch.
+# Edition 2024 merges a crate's doctests into a single binary, and rustdoc
+# compiles standalone whatever it cannot merge — a `compile_fail` block, for
+# one — reporting a `test result:` line per group. So a single `Doc-tests`
+# line can owe one summary or several, and only the shortfall means anything.
+# A binary killed without reporting still shows up as fewer summaries than
+# binaries, which is the direction this guard exists to catch.
 binaries=$(grep -c -E '^[[:space:]]*(Running|Doc-tests) ' "$log" || true)
 summaries=$(grep -c '^test result:' "$log" || true)
 failed=$(grep -c '^test result: FAILED' "$log" || true)

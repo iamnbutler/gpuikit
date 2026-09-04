@@ -26,10 +26,17 @@ pub struct SwitchChanged {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// # use gpui::{Context, IntoElement, Render, Window, prelude::*};
 /// use gpuikit::elements::switch::switch;
-///
-/// switch("dark-mode", true).label("Dark Mode")
+/// use gpuikit::traits::labelable::Labelable;
+/// # struct D;
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+/// cx.new(|_cx| switch("dark-mode", true).label("Dark Mode"))
+/// # }}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, _| D);
 /// ```
 pub struct Switch {
     id: ElementId,

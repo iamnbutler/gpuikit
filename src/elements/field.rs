@@ -44,14 +44,23 @@ pub enum LabelPosition {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// # use gpui::{Context, Entity, IntoElement, Render, Window, prelude::*};
+/// use gpuikit::elements::field::field;
+/// use gpuikit::elements::input::input;
 /// use gpuikit::traits::labelable::Labelable;
-///
+/// # use gpuikit::input::InputState;
+/// # struct D { username: Entity<InputState> }
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 /// field("username")
 ///     .label("Username")
 ///     .description("Enter your username")
 ///     .required(true)
 ///     .child(input(&self.username, cx))
+/// # }}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, cx| D { username: cx.new(InputState::new_singleline) });
 /// ```
 ///
 /// The child is any element. `input` takes the `Entity<InputState>` holding

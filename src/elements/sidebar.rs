@@ -27,7 +27,18 @@
 //! caller owns, which is what makes the width persistable and what lets the
 //! same collapse button live anywhere in the app.
 //!
-//! ```ignore
+//! ```
+//! # use gpui::{Context, IntoElement, Render, Window, prelude::*, rems};
+//! use gpuikit::elements::icon_button::icon_button;
+//! use gpuikit::elements::list::{List, ListEntry};
+//! use gpuikit::elements::sidebar::{SidebarState, sidebar, sidebar_trigger};
+//! use gpuikit::icons::Icons;
+//! use gpuikit::layout::v_stack;
+//! use gpuikit::traits::labelable::Labelable;
+//! # struct D { nav_open: SidebarState }
+//! # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+//! # let entries: Vec<ListEntry> = Vec::new();
+//! # let toggle = |_: &gpui::ClickEvent, _: &mut Window, _: &mut gpui::App| {};
 //! sidebar("app-nav")
 //!     .label("Navigation")
 //!     .state(self.nav_open)
@@ -39,6 +50,10 @@
 //!     )
 //!     .child(sidebar_trigger("app-nav-trigger", self.nav_open).on_click(toggle))
 //!     .child(List::new("nav", entries).render(window, cx))
+//! # }}
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(gpuikit::init);
+//! # let _ = tcx.add_window_view(|_, _| D { nav_open: SidebarState::Expanded });
 //! ```
 //!
 //! The panel shows its children when expanded and only the rail when

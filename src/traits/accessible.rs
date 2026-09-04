@@ -12,7 +12,14 @@ use crate::a11y::A11y;
 /// first thing after `.id(…)`, since gpui only offers a role to an element
 /// that has an id.
 ///
-/// ```ignore
+/// ```
+/// # use gpui::{App, ElementId, IntoElement, RenderOnce, Role, SharedString, Window, prelude::*};
+/// use gpuikit::a11y::{A11y, Announce};
+/// use gpuikit::layout::h_stack;
+/// use gpuikit::traits::accessible::Accessible;
+/// # #[derive(IntoElement)]
+/// struct Button { id: ElementId, label: SharedString }
+///
 /// impl Accessible for Button {
 ///     fn a11y(&self) -> A11y {
 ///         A11y::new(Role::Button).name(self.label.clone()).focusable()

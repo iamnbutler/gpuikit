@@ -366,7 +366,7 @@ impl InputBindings {
     ///
     /// Use this as a starting point when you want to override only specific bindings:
     ///
-    /// ```ignore
+    /// ```
     /// use gpui::KeyBinding;
     /// use gpuikit::input::bindings::{InputBindings, SelectAll, INPUT_CONTEXT};
     ///
@@ -525,35 +525,53 @@ impl InputBindings {
 ///
 /// Use all platform defaults:
 ///
-/// ```ignore
+/// ```
+/// # use gpuikit::input::bind_input_keys;
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(|cx| {
 /// bind_input_keys(cx, None);
+/// # });
 /// ```
 ///
 /// Unbind a specific key while keeping other defaults:
 ///
-/// ```ignore
+/// ```
+/// # use gpuikit::input::{InputBindings, bind_input_keys};
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(|cx| {
 /// bind_input_keys(cx, InputBindings {
 ///     up: None, // Unbind up arrow
 ///     ..Default::default()
 /// });
+/// # });
 /// ```
 ///
 /// Override a specific binding while keeping other defaults:
 ///
-/// ```ignore
+/// ```
+/// # use gpui::KeyBinding;
+/// # use gpuikit::input::bindings::{INPUT_CONTEXT, InputBindings, SelectAll, bind_input_keys};
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(|cx| {
 /// bind_input_keys(cx, InputBindings {
 ///     select_all: Some(KeyBinding::new("ctrl-shift-a", SelectAll, Some(INPUT_CONTEXT))),
 ///     ..Default::default()
 /// });
+/// # });
 /// ```
 ///
 /// Use [`InputBindings::empty()`] with [`merged_with_defaults()`](InputBindings::merged_with_defaults)
 /// if you only want to specify a few custom bindings and fill in the rest with defaults:
 ///
-/// ```ignore
+/// ```
+/// # use gpui::KeyBinding;
+/// # use gpuikit::input::bindings::{INPUT_CONTEXT, InputBindings, SelectAll, bind_input_keys};
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(|cx| {
 /// let mut bindings = InputBindings::empty();
 /// bindings.select_all = Some(KeyBinding::new("ctrl-shift-a", SelectAll, Some(INPUT_CONTEXT)));
 /// bind_input_keys(cx, bindings.merged_with_defaults());
+/// # });
 /// ```
 pub fn bind_input_keys(cx: &mut App, bindings: impl Into<Option<InputBindings>>) {
     let bindings = bindings.into().unwrap_or_default();

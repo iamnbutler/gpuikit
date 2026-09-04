@@ -7,24 +7,8 @@
 //! subtly different mechanisms. Each numbered section below answers one of
 //! that issue's questions, next to the code that implements it.
 //!
-//! ```ignore
-//! use gpuikit::a11y::{A11y, Announce};
-//! use gpuikit::traits::accessible::Accessible;
-//! use gpui::Role;
-//!
-//! impl Accessible for Button {
-//!     fn a11y(&self) -> A11y {
-//!         A11y::new(Role::Button).name(self.label.clone()).focusable()
-//!     }
-//! }
-//!
-//! impl RenderOnce for Button {
-//!     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
-//!         let a11y = self.a11y();
-//!         h_stack().id(self.id).announce(a11y)/* … */
-//!     }
-//! }
-//! ```
+//! The worked example lives on the trait itself,
+//! [`Accessible`](crate::traits::accessible::Accessible).
 //!
 //! # 1. Where a role is declared
 //!

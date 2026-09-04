@@ -30,8 +30,14 @@
 //! has to re-derive its rows for sorting. `examples/showcase.rs`'s Table page
 //! demonstrates the intended shape.
 //!
-//! ```ignore
-//! use gpuikit::elements::table::{column, row, table, SortRequest};
+//! ```
+//! # use gpui::{Context, IntoElement, Render, Window, div, prelude::*, px};
+//! use gpuikit::elements::table::{column, row, table};
+//! # #[derive(Clone)]
+//! # struct Repo { name: String, stars: u32 }
+//! # struct D { rows: Vec<Repo> }
+//! # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+//! # let (visible_rows, current_sort) = (self.rows.clone(), None);
 //!
 //! table("repositories")
 //!     .column(column("Repository", |repo: &Repo, _, _| {
@@ -44,6 +50,10 @@
 //!     .sorted_by(current_sort)
 //!     .on_sort(move |request, _, _| { /* re-sort your own rows */ })
 //!     .max_h(px(320.))
+//! # }}
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(gpuikit::init);
+//! # let _ = tcx.add_window_view(|_, _| D { rows: vec![Repo { name: "gpuikit".into(), stars: 1 }] });
 //! ```
 //!
 //! # Accessibility

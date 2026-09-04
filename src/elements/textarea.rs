@@ -36,13 +36,23 @@ fn textarea_element_id(state_id: EntityId) -> ElementId {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// # use gpui::{Context, IntoElement, Render, Window, prelude::*};
+/// use gpuikit::elements::textarea::textarea;
+/// use gpuikit::input::InputState;
+/// use gpuikit::traits::disableable::Disableable;
+/// # struct D;
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 /// let state = cx.new(|cx| InputState::new_multiline(cx));
 ///
 /// textarea(&state, cx)
 ///     .placeholder("Enter your message...")
 ///     .rows(4)
 ///     .disabled(false)
+/// # }}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, _| D);
 /// ```
 pub fn textarea(state: &Entity<InputState>, cx: &App) -> Textarea {
     Textarea::new(state, cx)

@@ -165,12 +165,22 @@ pub enum CalendarEvent {
 /// Built with [`Calendar::new`] inside `cx.new`, because it owns focus and the
 /// month it is showing:
 ///
-/// ```ignore
+/// ```
+/// # use gpui::{Context, IntoElement, Render, Window, prelude::*};
+/// use gpuikit::date::Date;
+/// use gpuikit::elements::calendar::Calendar;
+/// # struct D;
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 /// let calendar = cx.new(|cx| {
 ///     Calendar::new("calendar", Date::new(2026, 8, 1).unwrap(), cx)
 ///         .today(Date::new(2026, 8, 20).unwrap())
 ///         .selected(Date::new(2026, 8, 20))
 /// });
+/// # calendar
+/// # }}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, _| D);
 /// ```
 pub struct Calendar {
     id: ElementId,

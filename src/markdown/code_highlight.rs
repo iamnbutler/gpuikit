@@ -15,12 +15,6 @@
 //! [`MAX_HIGHLIGHT_BYTES`](self) all render exactly what they rendered
 //! before this module existed.
 //!
-//! ```ignore
-//! Application::with_platform(gpui_platform::current_platform(false)).run(|cx| {
-//!     gpuikit::init(cx);
-//!     gpuikit::markdown::init_code_highlighting(cx);
-//! });
-//! ```
 
 use std::ops::Range;
 
@@ -307,6 +301,14 @@ mod editor_bridge {
     /// document with no code in it should not pay for them.
     ///
     /// Calling it twice replaces the highlighter, discarding the cache.
+    ///
+    /// ```no_run
+    /// # use gpui::Application;
+    /// Application::with_platform(gpui_platform::current_platform(false)).run(|cx| {
+    ///     gpuikit::init(cx);
+    ///     gpuikit::markdown::init_code_highlighting(cx);
+    /// });
+    /// ```
     pub fn init_code_highlighting(cx: &mut App) {
         cx.set_global(GlobalCodeHighlighter(Rc::new(CodeHighlighter::new())));
     }

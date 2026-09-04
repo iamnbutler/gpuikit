@@ -5,17 +5,25 @@
 //!
 //! # Example
 //!
-//! ```ignore
-//! use gpuikit::markdown::{markdown, MarkdownStyle};
-//!
+//! ```
+//! # use gpui::{Context, IntoElement, Render, Window, div, prelude::*};
+//! use gpuikit::markdown::{MarkdownStyle, markdown};
+//! # struct D;
+//! # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+//! # let _ =
 //! // Simple usage - create markdown element inline
 //! div().child(markdown("# Hello\n\nThis is **bold** text.", cx))
+//! # ;
 //!
 //! // With custom style
 //! div().child(
 //!     markdown("# Hello", cx)
 //!         .style(MarkdownStyle::new().code_font("Monaco"))
 //! )
+//! # }}
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(gpuikit::init);
+//! # let _ = tcx.add_window_view(|_, _| D);
 //! ```
 
 mod code_highlight;
@@ -78,8 +86,18 @@ fn run_element_id(index: usize) -> ElementId {
 /// new parse lands, so the document never blanks, and deltas arriving during a
 /// parse coalesce into a single follow-up parse rather than one each.
 ///
-/// ```ignore
+/// ```
+/// # use gpui::AppContext as _;
+/// use gpuikit::markdown::Markdown;
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let markdown = tcx.update(|cx| cx.new(|cx| Markdown::new("# Hello", cx)));
+/// # let delta = String::from(" world");
+/// # tcx.update(|cx| {
 /// markdown.update(cx, |markdown, cx| markdown.append(&delta, cx));
+/// # });
+/// # // The re-parse runs on the background executor; a test drives it by hand.
+/// # tcx.run_until_parked();
 /// ```
 pub struct Markdown {
     source: SharedString,

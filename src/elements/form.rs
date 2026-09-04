@@ -40,11 +40,8 @@
 //!
 //! # Reading it from a control
 //!
-//! One line in `render`, before the element's fields are moved:
-//!
-//! ```ignore
-//! let disabled = form::disabled_here(self.disabled);
-//! ```
+//! One line in `render`, before the element's fields are moved: bind
+//! [`disabled_here`]'s result and pass it down.
 //!
 //! `render` runs during `request_layout`, which is *inside* the scope. That is
 //! the only place a control should read it.
@@ -394,13 +391,25 @@ impl gpui::Element for WithFormContext {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// # use gpui::{Context, IntoElement, Render, Window, div, prelude::*};
+/// use gpuikit::elements::field::field;
+/// use gpuikit::elements::form::fieldset;
+/// use gpuikit::traits::disableable::Disableable;
+/// use gpuikit::traits::labelable::Labelable;
+/// # struct D { editable: bool }
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+/// # let (street_input, city_input) = (div(), div());
 /// fieldset("billing")
 ///     .legend("Billing address")
 ///     .error("This address could not be verified")
 ///     .disabled(!self.editable)
 ///     .child(field("street").label("Street").child(street_input))
 ///     .child(field("city").label("City").child(city_input))
+/// # }}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, _| D { editable: true });
 /// ```
 ///
 /// The `disabled(!self.editable)` is the point: neither field, and neither

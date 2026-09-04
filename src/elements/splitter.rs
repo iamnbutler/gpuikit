@@ -22,7 +22,15 @@
 //! [`on_resize`](Splitter::on_resize), which is what lets a layout be
 //! persisted, restored or reset from outside the element.
 //!
-//! ```ignore
+//! ```
+//! # use gpui::{AnyElement, Context, IntoElement, Render, Window, div, prelude::*, px};
+//! use gpuikit::elements::splitter::splitter;
+//! # struct D { ratio: f32 }
+//! # impl D {
+//! #     fn editor(&self, _cx: &mut Context<Self>) -> AnyElement { div().into_any_element() }
+//! #     fn preview(&self, _cx: &mut Context<Self>) -> AnyElement { div().into_any_element() }
+//! # }
+//! # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 //! splitter("editor-split", "Editor and preview", self.ratio)
 //!     .start(self.editor(cx))
 //!     .end(self.preview(cx))
@@ -32,6 +40,10 @@
 //!         this.ratio = *ratio;
 //!         cx.notify();
 //!     }))
+//! # }}
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(gpuikit::init);
+//! # let _ = tcx.add_window_view(|_, _| D { ratio: 0.5 });
 //! ```
 //!
 //! # The drawn line and the band you can hit

@@ -32,7 +32,7 @@ impl TextDirection {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```
 /// use gpuikit::input::detect_base_direction;
 ///
 /// // English text is LTR

@@ -70,12 +70,6 @@ pub struct AspectRatio {
 
 impl AspectRatio {
     /// Create a new AspectRatio container with the given ratio (width / height).
-    ///
-    /// # Example
-    /// ```ignore
-    /// aspect_ratio(16.0 / 9.0)
-    ///     .child(video_player)
-    /// ```
     pub fn new(ratio: f32) -> Self {
         Self {
             ratio: ratio.max(0.001), // Prevent division by zero
@@ -163,65 +157,44 @@ impl RenderOnce for AspectRatio {
 /// Create an AspectRatio container with a custom ratio (width / height).
 ///
 /// # Example
-/// ```ignore
+/// ```
+/// # use gpui::{Context, IntoElement, Render, Window, div, prelude::*};
+/// use gpuikit::elements::aspect_ratio::aspect_ratio;
+/// # struct D;
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+/// # let video_thumbnail = div();
 /// aspect_ratio(16.0 / 9.0)
 ///     .child(video_thumbnail)
+/// # }}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, _| D);
 /// ```
 pub fn aspect_ratio(ratio: f32) -> AspectRatio {
     AspectRatio::new(ratio)
 }
 
 /// Create a 1:1 square aspect ratio container.
-///
-/// # Example
-/// ```ignore
-/// aspect_ratio_square()
-///     .child(avatar)
-/// ```
 pub fn aspect_ratio_square() -> AspectRatio {
     AspectRatio::preset(AspectRatioPreset::Square)
 }
 
 /// Create a 16:9 widescreen video aspect ratio container.
-///
-/// # Example
-/// ```ignore
-/// aspect_ratio_video()
-///     .child(video_player)
-/// ```
 pub fn aspect_ratio_video() -> AspectRatio {
     AspectRatio::preset(AspectRatioPreset::Video)
 }
 
 /// Create a 3:4 portrait aspect ratio container.
-///
-/// # Example
-/// ```ignore
-/// aspect_ratio_portrait()
-///     .child(profile_image)
-/// ```
 pub fn aspect_ratio_portrait() -> AspectRatio {
     AspectRatio::preset(AspectRatioPreset::Portrait)
 }
 
 /// Create a 4:3 standard aspect ratio container.
-///
-/// # Example
-/// ```ignore
-/// aspect_ratio_standard()
-///     .child(photo)
-/// ```
 pub fn aspect_ratio_standard() -> AspectRatio {
     AspectRatio::preset(AspectRatioPreset::Standard)
 }
 
 /// Create a 21:9 ultrawide aspect ratio container.
-///
-/// # Example
-/// ```ignore
-/// aspect_ratio_ultrawide()
-///     .child(cinematic_content)
-/// ```
 pub fn aspect_ratio_ultrawide() -> AspectRatio {
     AspectRatio::preset(AspectRatioPreset::Ultrawide)
 }

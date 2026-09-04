@@ -76,8 +76,16 @@ use gpui::{ElementId, EntityId, SharedString};
 /// a changed node id as a different element, so an id that moves every frame
 /// reads as the element being replaced every frame.
 ///
-/// ```ignore
+/// ```
+/// # use gpui::{Context, IntoElement, Render, Window, div, prelude::*};
+/// use gpuikit::element_id;
+/// # struct D;
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 /// div().id(element_id::for_entity("select-listbox", cx.entity_id()))
+/// # }}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, _| D);
 /// ```
 pub fn for_entity(name: impl Into<SharedString>, entity_id: EntityId) -> ElementId {
     ElementId::NamedInteger(name.into(), entity_id.as_u64())
@@ -90,8 +98,16 @@ pub fn for_entity(name: impl Into<SharedString>, entity_id: EntityId) -> Element
 /// is not actually a descendant — a deferred panel, an element whose root
 /// carries no id — and it is harmless where it is.
 ///
-/// ```ignore
+/// ```
+/// # use gpui::{Context, ElementId, IntoElement, Render, Window, div, prelude::*};
+/// use gpuikit::element_id;
+/// # struct D { id: ElementId }
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 /// div().id(element_id::scoped(&self.id, "dismiss"))
+/// # }}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, _| D { id: "panel".into() });
 /// ```
 pub fn scoped(parent: &ElementId, part: impl Into<SharedString>) -> ElementId {
     ElementId::NamedChild(Arc::new(parent.clone()), part.into())

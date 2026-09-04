@@ -23,9 +23,12 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```
+//! # use gpui::{Context, IntoElement, Render, Window, prelude::*};
+//! use gpuikit::elements::select::{SelectState, select};
 //! use gpuikit::traits::disableable::Disableable;
-//!
+//! # struct D;
+//! # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 //! // Create a select with enum options
 //! #[derive(Clone, Debug, PartialEq)]
 //! enum Country { US, UK, CA }
@@ -49,6 +52,11 @@
 //!         .disabled(false)
 //!     )
 //! });
+//! # select_state
+//! # }}
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(gpuikit::init);
+//! # let _ = tcx.add_window_view(|_, _| D);
 //! ```
 //!
 //! # Accessibility
@@ -208,7 +216,12 @@ pub struct Select<T: Clone + PartialEq + 'static> {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// # use gpui::{Context, IntoElement, Render, Window, prelude::*};
+/// use gpuikit::elements::select::{SelectState, select};
+/// # struct D;
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+/// # cx.new(|_cx| SelectState::new(
 /// select(
 ///     "my-select",
 ///     "Option",
@@ -216,6 +229,10 @@ pub struct Select<T: Clone + PartialEq + 'static> {
 /// )
 /// .selected("a")
 /// .placeholder("Choose an option...")
+/// # ))}}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, _| D);
 /// ```
 pub fn select<T: Clone + PartialEq + 'static>(
     id: impl Into<ElementId>,
@@ -297,8 +314,17 @@ impl<T: Clone + PartialEq + 'static> ControlSized for Select<T> {
 ///
 /// Create using [`Select`] and wrap in an Entity:
 ///
-/// ```ignore
-/// let state = cx.new(|_cx| SelectState::new(select(...)));
+/// ```
+/// # use gpui::{Context, IntoElement, Render, Window, prelude::*};
+/// use gpuikit::elements::select::{SelectState, select};
+/// # struct D;
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+/// let state = cx.new(|_cx| SelectState::new(select("size", "Size", vec![("s", "Small")])));
+/// # state
+/// # }}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, _| D);
 /// ```
 pub struct SelectState<T: Clone + PartialEq + 'static> {
     id: ElementId,

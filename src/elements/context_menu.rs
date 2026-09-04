@@ -6,15 +6,26 @@
 //! whatever a view renders — a list row, a card, a piece of text — without
 //! restructuring that view:
 //!
-//! ```ignore
+//! ```
+//! # use gpui::{Context, IntoElement, Render, Window, actions, div, prelude::*};
 //! use gpuikit::elements::context_menu::{context_menu, menu_item};
-//!
+//! use gpuikit::traits::disableable::Disableable;
+//! # actions!(doc, [Rename]);
+//! # struct D;
+//! # impl D { fn render_row(&self, _ix: usize, _cx: &mut Context<Self>) -> gpui::AnyElement {
+//! #     div().child("a row").into_any_element() } }
+//! # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+//! # let (ix, can_delete) = (0usize, true);
 //! context_menu("row", self.render_row(ix, cx)).menu(move |menu, _window, _cx| {
 //!     menu.item(menu_item("Copy").kbd("⌘C").on_click(|_window, _cx| { /* … */ }))
 //!         .item(menu_item("Rename").action(Box::new(Rename)))
 //!         .separator()
 //!         .item(menu_item("Delete").destructive().disabled(!can_delete))
 //! })
+//! # }}
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(gpuikit::init);
+//! # let _ = tcx.add_window_view(|_, _| D);
 //! ```
 //!
 //! Entries are built once, when the menu opens, so they see the state at the

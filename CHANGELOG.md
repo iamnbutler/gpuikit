@@ -15,6 +15,38 @@ All notable changes to this project will be documented in this file.
   items go) are derived from that state on each frame. It is the first entry
   in the nav and the page a native run opens on; the URL hash still wins on
   the web.
+- **`ThemeExtension`: tokens gpuikit does not define.** A crate built on this
+  one invariably needs colours this one has never heard of — a diff view wants
+  an added and a removed fill, a terminal wants sixteen ANSI colours. Before
+  this there was nowhere to put them that a theme could see. An extension is a
+  struct of whatever the component needs plus a `derive` written in the
+  theme's own tokens, so *every* theme answers for it, including the six
+  bundled ones that predate the extension: `theme.extension::<DiffColors>()`
+  never fails and needs no `Option` at the call site. A theme author who
+  disagrees says so with `Theme::with_extension`. Values are keyed by
+  `TypeId`, so two extensions cannot collide, and an unset one is derived on
+  read rather than cached — read it once per render, not once per row.
+- **`Theme::from_themeable`, for a theme type of your own.** Implement
+  `Themeable` on your type and resolve it into a concrete `Theme`. The
+  snapshot is lossless and a test asserts it: `Theme` now carries an override
+  field for *every* token the trait defines, so the result answers identically
+  to its source, `control_scale` included. The global stays `Arc<Theme>`
+  deliberately — a theme changes when someone picks one and is read several
+  hundred times a frame, so resolving the vtable once here beats a dispatch on
+  every read. Behaviour does not survive the snapshot; a `Themeable` that
+  varies wants re-snapshotting when it moves.
+
+### Changed
+
+- **`Theme` gains five override fields and an `extensions` field.**
+  `placeholder_color`, `destructive_bg_color`, `destructive_bg_hover_color`,
+  `destructive_bg_active_color` and `destructive_fg_color` existed as
+  `Themeable` methods with no way to override them on a `Theme`; they are now
+  `Option<Hsla>` like every other token, which is what makes
+  `from_themeable` lossless. Themes built through `Theme::new` — which is all
+  of the bundled ones — are unaffected. A struct-literal `Theme { … }` has to
+  name the six new fields, the same way `controls` required.
+
 ### Fixed
 
 - **The hosted showcase loads remote images.** `Application::with_platform`

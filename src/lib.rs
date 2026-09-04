@@ -39,12 +39,14 @@
 //! # Minimum Rust version
 //!
 //! This crate declares `rust-version = "1.85"`, which is a statement about its
-//! own source — async closures, and gpui's edition 2024 — rather than a
-//! guarantee about a whole build. gpuikit is edition 2021, so cargo's v2
-//! feature resolver does not hold dependencies back to that floor, and several
-//! already declare more (cosmic-text and smol_str 1.89, oo7 1.92 on Linux); on
-//! a toolchain near 1.85 you will most likely meet one of theirs first. A
-//! recent stable is the practical answer.
+//! own source — async closures, and edition 2024 — rather than a guarantee
+//! about a whole build. Edition 2024 selects cargo's v3 resolver, which unlike
+//! v2 does take that floor into account: when it picks a *new* version of a
+//! dependency it prefers one whose own `rust-version` fits. That is a
+//! preference, not a wall, and it says nothing about the versions `Cargo.lock`
+//! already names — several of those declare more (cosmic-text and smol_str
+//! 1.89, oo7 1.92 on Linux), so on a toolchain near 1.85 you will most likely
+//! meet one of theirs first. A recent stable is the practical answer.
 //!
 //! The `stitch` feature raises gpuikit's own floor to **1.95**. It is the only
 //! one that does.

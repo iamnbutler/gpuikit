@@ -70,7 +70,7 @@ pub fn inline_code(
     font_family: &SharedString,
     bg: Option<gpui::Hsla>,
     cx: &App,
-) -> impl IntoElement {
+) -> impl IntoElement + use<> {
     let theme = cx.theme();
 
     div()

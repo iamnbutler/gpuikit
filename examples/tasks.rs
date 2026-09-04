@@ -549,7 +549,7 @@ impl Render for TasksApp {
 fn filter_button(
     label: &'static str,
     theme: &std::sync::Arc<gpuikit::theme::Theme>,
-) -> impl IntoElement {
+) -> impl IntoElement + use<> {
     div()
         .id(label)
         .px(px(8.))
@@ -569,7 +569,7 @@ fn task_row(
     checkbox: Entity<RowCheckbox>,
     index: usize,
     theme: &std::sync::Arc<gpuikit::theme::Theme>,
-) -> impl IntoElement {
+) -> impl IntoElement + use<> {
     let label_variant = match task.label {
         TaskLabel::Bug => BadgeVariant::Destructive,
         TaskLabel::Feature => BadgeVariant::Default,

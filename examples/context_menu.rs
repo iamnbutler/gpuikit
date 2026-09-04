@@ -79,7 +79,7 @@ impl Demo {
         cx.notify();
     }
 
-    fn render_row(&self, index: usize, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_row(&self, index: usize, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         let row = &self.rows[index];
         let selected = self.selected == index;

@@ -583,7 +583,7 @@ fn menu_popup(
     min_width: Pixels,
     max_height: Pixels,
     cx: &App,
-) -> impl IntoElement {
+) -> impl IntoElement + use<> {
     let theme = cx.theme();
 
     div()
@@ -670,7 +670,7 @@ fn clears_the_highlight(
     }
 }
 
-fn menu_row(row: Row, state: Entity<MenuState>, cx: &App) -> impl IntoElement {
+fn menu_row(row: Row, state: Entity<MenuState>, cx: &App) -> impl IntoElement + use<> {
     let theme = cx.theme();
 
     match row {

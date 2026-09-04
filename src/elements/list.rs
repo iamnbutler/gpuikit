@@ -137,7 +137,7 @@ impl List {
     }
 
     /// Render the list into an element.
-    pub fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    pub fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
         let item_height = self.item_height;
         let font_size = self.font_size;
         let entries = self.entries.clone();

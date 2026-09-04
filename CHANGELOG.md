@@ -55,6 +55,13 @@ All notable changes to this project will be documented in this file.
   `from_themeable` lossless. Themes built through `Theme::new` — which is all
   of the bundled ones — are unaffected. A struct-literal `Theme { … }` has to
   name the six new fields, the same way `controls` required.
+- **gpui is 1.18.** The requirement moves from `1.14.2` to `1.18`, and the
+  lockfile the hosted showcase builds from with it — it had drifted to 1.17.2
+  and no further, because `cargo` never bumps a locked minor on its own. 1.18
+  carries the input improvements a `<input>`-vs-gpui comparison on the hosted
+  showcase turned up. The crate and its 588 tests compile against it unchanged,
+  and so does the wasm build the browser runs, so the API churn #202 flags did
+  not bite this step — the caret question that issue raises is still open.
 
 ### Fixed
 

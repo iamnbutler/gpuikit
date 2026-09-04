@@ -80,8 +80,8 @@ required-features = ["examples"]
 
 [dependencies]
 # GPUI framework (from gpui-unofficial on crates.io)
-gpui = { package = "gpui-unofficial", version = "1.14.2" }
-gpui_platform = { package = "gpui-platform-gpui-unofficial", version = "1.14.2", features = ["font-kit"] }
+gpui = { package = "gpui-unofficial", version = "1.18" }
+gpui_platform = { package = "gpui-platform-gpui-unofficial", version = "1.18", features = ["font-kit"] }
 rust-embed = "8.2.0"
 anyhow = "1.0.79"
 serde = { version = "1.0", features = ["derive"] }
@@ -136,7 +136,7 @@ pretty_assertions = "1.4"
 # compile for wasm32. Tests never run on wasm, so the feature is asked for only
 # where they do; the showcase, built as an example for the web, gets plain gpui.
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
-gpui = { package = "gpui-unofficial", version = "1.14.2", features = ["test-support"] }
+gpui = { package = "gpui-unofficial", version = "1.18", features = ["test-support"] }
 
 # The hosted showcase mirrors its active page to the URL hash, so a component
 # can be linked to, and listens for the hash changing under it (back button,

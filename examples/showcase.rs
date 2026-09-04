@@ -4,13 +4,13 @@ use gpui::{
     AnyElement, App, AppContext, Bounds, ClipboardItem, Context, Entity, FocusHandle, FontWeight,
     Hsla, InteractiveElement, IntoElement, Menu, ParentElement, Render, Rgba, SharedString,
     StatefulInteractiveElement, Styled, TitlebarOptions, Window, WindowBounds, WindowOptions, div,
-    px, size,
+    hsla, px, size,
 };
 use gpuikit::a11y::FocusNavigation;
 use gpuikit::date::{Date, Weekday};
 use gpuikit::input::InputState;
 use gpuikit::markdown::{Markdown, MarkdownElement, preprocessing_available};
-use gpuikit::theme::{ActiveTheme, GlobalTheme, Theme, Themeable};
+use gpuikit::theme::{ActiveTheme, GlobalTheme, Theme, ThemeExtension, ThemeVariant, Themeable};
 use gpuikit::{
     DefaultIcons,
     elements::{
@@ -255,6 +255,7 @@ const NAV_SECTIONS: &[NavSection] = &[
         DefaultIcons::ruler_square,
         &[
             ("theme", "Theme"),
+            ("theme-extension", "Theme Extension"),
             ("typography", "Typography"),
             ("control-sizes", "Control Sizes"),
         ],
@@ -900,6 +901,172 @@ const TABLE_COLUMN_REPOSITORY: usize = 0;
 const TABLE_COLUMN_LANGUAGE: usize = 1;
 const TABLE_COLUMN_STARS: usize = 2;
 
+/// Two fills a diff view needs and gpuikit has no opinion about — declared
+/// here, in the example, which is the whole demonstration: the crate this
+/// type is defined in is not the crate that defines `Theme`.
+///
+/// `derive` is written in terms of the theme's own tokens, so every theme
+/// answers for it, including the six bundled ones that predate it.
+#[derive(Clone, PartialEq, Debug)]
+struct DiffColors {
+    added: Hsla,
+    removed: Hsla,
+}
+
+impl ThemeExtension for DiffColors {
+    fn derive(theme: &Theme) -> Self {
+        DiffColors {
+            added: theme.success().opacity(0.18),
+            removed: theme.danger().opacity(0.18),
+        }
+    }
+}
+
+/// The source listing under the page's extension section. Fixed, unlike the
+/// theme listing above it, because nothing on the page changes it.
+const EXTENSION_CODE: &str = r#"```rust
+use gpuikit::theme::{Theme, ThemeExtension, Themeable};
+
+#[derive(Clone)]
+struct DiffColors {
+    added: Hsla,
+    removed: Hsla,
+}
+
+impl ThemeExtension for DiffColors {
+    // What this looks like when a theme has not said otherwise. Written in
+    // the theme's own tokens, so it follows every theme rather than only
+    // the one it was written against.
+    fn derive(theme: &Theme) -> Self {
+        DiffColors {
+            added: theme.success().opacity(0.18),
+            removed: theme.danger().opacity(0.18),
+        }
+    }
+}
+
+// Any theme now answers for it, with no Option at the call site:
+let diff = cx.theme().extension::<DiffColors>();
+
+// And a theme author who disagrees says so:
+let theme = Theme::gruvbox_dark().with_extension(DiffColors {
+    added: hsla(0.33, 0.60, 0.20, 1.0),
+    removed: hsla(0.00, 0.60, 0.20, 1.0),
+});
+```
+"#;
+
+/// Where the Theme Extension page's controls start. Named because both the
+/// sliders and the code block under them are built from these, and a default
+/// changed in one place only would make the page's first frame disagree with
+/// its own source listing.
+const THEME_EXT_BASE_HUE: f32 = 220.0;
+const THEME_EXT_ACCENT_HUE: f32 = 292.0;
+const THEME_EXT_VARIANT: ThemeVariant = ThemeVariant::Dark;
+const THEME_EXT_OVERRIDES: bool = false;
+
+/// The theme the Theme Extension page builds, as a pure function of that
+/// page's four controls. Hues arrive in degrees, which is how the sliders are
+/// labelled; `hsla` wants turns.
+///
+/// This is the whole authoring story in one function: five colours go to
+/// `Theme::new`, and the roughly thirty-five other tokens derive from them
+/// unless a field is set. Nothing here is privileged — a consumer crate can
+/// write exactly this.
+fn demo_theme(base_hue: f32, accent_hue: f32, variant: ThemeVariant, overrides: bool) -> Theme {
+    let base = base_hue / 360.0;
+    let accent_h = accent_hue / 360.0;
+
+    let (fg, bg, surface, border, accent) = match variant {
+        ThemeVariant::Dark => (
+            hsla(base, 0.10, 0.86, 1.0),
+            hsla(base, 0.18, 0.10, 1.0),
+            hsla(base, 0.16, 0.16, 1.0),
+            hsla(base, 0.14, 0.28, 1.0),
+            hsla(accent_h, 0.70, 0.62, 1.0),
+        ),
+        ThemeVariant::Light => (
+            hsla(base, 0.30, 0.18, 1.0),
+            hsla(base, 0.28, 0.97, 1.0),
+            hsla(base, 0.34, 0.92, 1.0),
+            hsla(base, 0.20, 0.78, 1.0),
+            hsla(accent_h, 0.62, 0.42, 1.0),
+        ),
+    };
+
+    let mut theme = Theme::new("Aurora", variant, fg, bg, surface, border, accent);
+
+    // An override is one field, and only the tokens named here stop deriving.
+    if overrides {
+        theme.success_color = Some(hsla(0.42, 0.55, 0.45, 1.0));
+        theme.danger_color = Some(hsla(0.02, 0.72, 0.55, 1.0));
+        theme.button_bg_color = Some(accent.opacity(0.18));
+    }
+
+    theme
+}
+
+/// The Rust that produces the theme the page is currently showing, as a
+/// markdown fence. Regenerated whenever a control moves, so what the page
+/// draws and what the code block says cannot drift apart — and so the block
+/// can be copied into a real application unchanged.
+fn demo_theme_code(
+    base_hue: f32,
+    accent_hue: f32,
+    variant: ThemeVariant,
+    overrides: bool,
+) -> String {
+    let theme = demo_theme(base_hue, accent_hue, variant, overrides);
+    let variant_name = match variant {
+        ThemeVariant::Dark => "Dark",
+        ThemeVariant::Light => "Light",
+    };
+
+    let turns = |color: Hsla| format!("hsla({:.3}, {:.2}, {:.2}, 1.0)", color.h, color.s, color.l);
+
+    let override_block = if overrides {
+        format!(
+            "\n// Only these three stop deriving. Everything else still follows\n\
+             // the five above.\n\
+             theme.success_color = Some({});\n\
+             theme.danger_color = Some({});\n\
+             theme.button_bg_color = Some({});\n",
+            turns(theme.success()),
+            turns(theme.danger()),
+            turns(theme.button_bg()),
+        )
+    } else {
+        String::new()
+    };
+
+    format!(
+        "```rust\n\
+         use gpui::hsla;\n\
+         use gpuikit::theme::{{GlobalTheme, Theme, ThemeVariant}};\n\
+         use std::sync::Arc;\n\
+         \n\
+         let mut theme = Theme::new(\n\
+         \x20   \"Aurora\",\n\
+         \x20   ThemeVariant::{variant_name},\n\
+         \x20   {}, // fg\n\
+         \x20   {}, // bg\n\
+         \x20   {}, // surface\n\
+         \x20   {}, // border\n\
+         \x20   {}, // accent\n\
+         );\n\
+         {override_block}\n\
+         // Installing it is one global. Every gpuikit element reads it\n\
+         // through `cx.theme()` on the next frame.\n\
+         cx.set_global(GlobalTheme(Arc::new(theme)));\n\
+         ```\n",
+        turns(theme.fg()),
+        turns(theme.bg()),
+        turns(theme.surface()),
+        turns(theme.border()),
+        turns(theme.accent()),
+    )
+}
+
 struct Showcase {
     focus_handle: FocusHandle,
     active_page: Rc<RefCell<SharedString>>,
@@ -1041,6 +1208,14 @@ struct Showcase {
     home_launch_calendar: Entity<Calendar>,
     /// The day the launch calendar last reported.
     home_launch_window: Option<Date>,
+    /// The Theme Extension page's four controls, and the code block under
+    /// them that is regenerated from their values.
+    theme_ext_base_hue: Entity<Slider>,
+    theme_ext_accent_hue: Entity<Slider>,
+    theme_ext_variant: Entity<ToggleGroup<ThemeVariant>>,
+    theme_ext_overrides: Entity<Switch>,
+    theme_ext_code: Entity<Markdown>,
+    theme_ext_extension_code: Entity<Markdown>,
 }
 
 impl Showcase {
@@ -1598,6 +1773,67 @@ impl Showcase {
         cx.observe(&home_comms, |_this, _tabs, cx| cx.notify())
             .detach();
 
+        // The Theme Extension page. Its swatches and its code block are both
+        // derived from these four, so the page has to hear about each one.
+        let theme_ext_base_hue = cx.new(|_cx| {
+            slider("theme-ext-base-hue", THEME_EXT_BASE_HUE, 0.0..=360.0)
+                .label("Base hue")
+                .step(1.0)
+        });
+        let theme_ext_accent_hue = cx.new(|_cx| {
+            slider("theme-ext-accent-hue", THEME_EXT_ACCENT_HUE, 0.0..=360.0)
+                .label("Accent hue")
+                .step(1.0)
+        });
+        let theme_ext_variant = cx.new(|_cx| {
+            toggle_group(
+                "theme-ext-variant",
+                vec![
+                    toggle_option(ThemeVariant::Dark, "Dark"),
+                    toggle_option(ThemeVariant::Light, "Light"),
+                ],
+            )
+            .selected_value(THEME_EXT_VARIANT)
+        });
+        let theme_ext_overrides = cx.new(|_cx| {
+            switch("theme-ext-overrides", THEME_EXT_OVERRIDES)
+                .label("Override success, danger and button_bg")
+        });
+        let theme_ext_code = cx.new(|cx| {
+            Markdown::new(
+                demo_theme_code(
+                    THEME_EXT_BASE_HUE,
+                    THEME_EXT_ACCENT_HUE,
+                    THEME_EXT_VARIANT,
+                    THEME_EXT_OVERRIDES,
+                ),
+                cx,
+            )
+        });
+
+        let theme_ext_extension_code = cx.new(|cx| Markdown::new(EXTENSION_CODE, cx));
+
+        cx.observe(&theme_ext_base_hue, |this, _slider, cx| {
+            this.refresh_theme_ext_code(cx);
+            cx.notify();
+        })
+        .detach();
+        cx.observe(&theme_ext_accent_hue, |this, _slider, cx| {
+            this.refresh_theme_ext_code(cx);
+            cx.notify();
+        })
+        .detach();
+        cx.observe(&theme_ext_variant, |this, _group, cx| {
+            this.refresh_theme_ext_code(cx);
+            cx.notify();
+        })
+        .detach();
+        cx.observe(&theme_ext_overrides, |this, _switch, cx| {
+            this.refresh_theme_ext_code(cx);
+            cx.notify();
+        })
+        .detach();
+
         // The URL decides on the web; native opens on Home.
         let active_page = Rc::new(RefCell::new(
             page_from_location().unwrap_or_else(|| SharedString::from("home")),
@@ -1796,6 +2032,12 @@ impl Showcase {
             home_cargo,
             home_launch_calendar,
             home_launch_window: Some(first_window),
+            theme_ext_base_hue,
+            theme_ext_accent_hue,
+            theme_ext_variant,
+            theme_ext_overrides,
+            theme_ext_code,
+            theme_ext_extension_code,
         }
     }
 
@@ -2317,6 +2559,272 @@ impl Showcase {
                         .child(v_stack().flex_1().min_w(px(300.)).child(calendar_card)),
                 ),
         )
+    }
+
+    // ----- Theme Extension -----
+
+    /// The four controls, read back as the arguments `demo_theme` takes.
+    fn theme_ext_settings(&self, cx: &App) -> (f32, f32, ThemeVariant, bool) {
+        (
+            self.theme_ext_base_hue.read(cx).value(),
+            self.theme_ext_accent_hue.read(cx).value(),
+            self.theme_ext_variant
+                .read(cx)
+                .get_selected()
+                .first()
+                .copied()
+                .unwrap_or(ThemeVariant::Dark),
+            self.theme_ext_overrides.read(cx).is_on(),
+        )
+    }
+
+    /// Rewrite the code block under the page. Called from the observers on
+    /// the four controls rather than from `render`: `set_source` notifies,
+    /// and notifying inside a render is how a frame loop starts.
+    fn refresh_theme_ext_code(&mut self, cx: &mut Context<Self>) {
+        let (base, accent, variant, overrides) = self.theme_ext_settings(cx);
+        let source = demo_theme_code(base, accent, variant, overrides);
+        self.theme_ext_code
+            .update(cx, |code, cx| code.set_source(source, cx));
+    }
+
+    /// How to write a theme of your own, with the theme being written on the
+    /// page and the code that produces it side by side.
+    ///
+    /// The page teaches the mechanism that actually ships: five primitives
+    /// into `Theme::new`, everything else derived by `Themeable`'s defaults,
+    /// and a public field per token for the ones you want to say yourself.
+    /// It is deliberately not a second colour reference — that is the Theme
+    /// page, which shows the tokens the *active* theme resolves to.
+    fn render_theme_extension_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
+        let theme = cx.theme().clone();
+        let (base_hue, accent_hue, variant, overrides) = self.theme_ext_settings(cx);
+        let demo = demo_theme(base_hue, accent_hue, variant, overrides);
+
+        let heading = |text: &'static str| {
+            div()
+                .text_sm()
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_color(theme.fg_muted())
+                .child(text)
+        };
+
+        // Two columns of swatches, so a long token list stays on one screen.
+        let swatch_columns = |rows: Vec<(&'static str, Hsla)>| {
+            let split = rows.len().div_ceil(2);
+            let (left, right) = rows.split_at(split);
+            h_stack()
+                .gap_8()
+                .items_start()
+                .child(
+                    v_stack().flex_1().min_w_0().children(
+                        left.iter()
+                            .map(|(name, color)| color_row(name, *color, &theme)),
+                    ),
+                )
+                .child(
+                    v_stack().flex_1().min_w_0().children(
+                        right
+                            .iter()
+                            .map(|(name, color)| color_row(name, *color, &theme)),
+                    ),
+                )
+        };
+
+        // 1 — the five arguments to `Theme::new`.
+        let primitives = card()
+            .title("1 · The five primitives")
+            .description(
+                "These are the whole of Theme::new's colour arguments. Move a slider and \
+                 watch what follows from them below.",
+            )
+            .body(
+                v_stack()
+                    .gap_4()
+                    .child(self.theme_ext_variant.clone())
+                    .child(self.theme_ext_base_hue.clone())
+                    .child(self.theme_ext_accent_hue.clone())
+                    .child(separator())
+                    .child(swatch_columns(vec![
+                        ("fg", demo.fg()),
+                        ("bg", demo.bg()),
+                        ("surface", demo.surface()),
+                        ("border", demo.border()),
+                        ("accent", demo.accent()),
+                    ])),
+            );
+
+        // 2 — what a theme author never writes.
+        let derived = card()
+            .title("2 · What derives for free")
+            .description(
+                "Not one of these was named above. Themeable gives every token a default \
+                 in terms of the five, so a theme is five colours long until you disagree \
+                 with one.",
+            )
+            .body(swatch_columns(vec![
+                ("fg_muted", demo.fg_muted()),
+                ("fg_disabled", demo.fg_disabled()),
+                ("surface_secondary", demo.surface_secondary()),
+                ("surface_tertiary", demo.surface_tertiary()),
+                ("border_secondary", demo.border_secondary()),
+                ("border_subtle", demo.border_subtle()),
+                ("outline", demo.outline()),
+                ("accent_bg", demo.accent_bg()),
+                ("accent_bg_hover", demo.accent_bg_hover()),
+                ("selection", demo.selection()),
+                ("input_bg", demo.input_bg()),
+                ("input_border", demo.input_border()),
+            ]));
+
+        // 3 — and how to disagree with one.
+        let overridden = card()
+            .title("3 · Overriding a token")
+            .description(
+                "Every token has a public Option<Hsla> field on Theme. Set one and it stops \
+                 deriving; leave it None and it keeps following the primitives.",
+            )
+            .body(
+                v_stack()
+                    .gap_3()
+                    .child(self.theme_ext_overrides.clone())
+                    .child(separator())
+                    .child(swatch_columns(vec![
+                        ("success", demo.success()),
+                        ("danger", demo.danger()),
+                        ("button_bg", demo.button_bg()),
+                        ("warning", demo.warning()),
+                    ]))
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(theme.fg_muted())
+                            .child(if overrides {
+                                "success, danger and button_bg are set explicitly. warning is \
+                                 still derived, which is why it did not move."
+                            } else {
+                                "All four derive. Turn the switch on to set the first three."
+                            }),
+                    ),
+            );
+
+        // 4 — installing it, which is the part that is genuinely one line.
+        let install = card()
+            .title("4 · Install it")
+            .description(
+                "A theme is global state. Applying replaces it for the whole window, so the \
+                 showcase itself changes — that is the demonstration.",
+            )
+            .body(
+                h_stack()
+                    .flex_wrap()
+                    .gap_2()
+                    .items_center()
+                    .child(button("theme-ext-apply", "Apply this theme").on_click({
+                        let settings = (base_hue, accent_hue, variant, overrides);
+                        move |_, window, cx| {
+                            let (base, accent, variant, overrides) = settings;
+                            let theme = demo_theme(base, accent, variant, overrides);
+                            cx.set_global(GlobalTheme(Arc::new(theme)));
+                            window.refresh();
+                        }
+                    }))
+                    .child(
+                        button("theme-ext-restore", "Restore Gruvbox Dark").on_click(
+                            |_, window, cx| {
+                                cx.set_global(GlobalTheme(Arc::new(Theme::gruvbox_dark())));
+                                window.refresh();
+                            },
+                        ),
+                    ),
+            )
+            .footer(div().text_xs().text_color(theme.fg_muted()).child(
+                "The theme picker in the sidebar keeps its own selection, so it will \
+                         still name the last bundled theme after you apply this one.",
+            ));
+
+        // 5 — the whole thing as source, regenerated per change.
+        let code = card()
+            .title("5 · The code")
+            .description("This is the page's current state, and it compiles as written.")
+            .body(MarkdownElement::new(self.theme_ext_code.clone()));
+
+        // 6 — tokens this crate does not define, which is the other half of
+        // extension and the half a downstream component library needs.
+        let diff = demo.extension::<DiffColors>();
+        let gruvbox_diff = Theme::gruvbox_dark().extension::<DiffColors>();
+
+        let extension = card()
+            .title("6 · Tokens gpuikit does not define")
+            .description(
+                "A crate built on gpuikit needs colours this one has never heard of. A \
+                 ThemeExtension is a struct of them plus a rule for deriving them from any \
+                 theme, so every theme answers for it — including the bundled ones, which \
+                 predate it.",
+            )
+            .body(
+                v_stack()
+                    .gap_3()
+                    .child(swatch_columns(vec![
+                        ("DiffColors::added", diff.added),
+                        ("DiffColors::removed", diff.removed),
+                    ]))
+                    .child(div().text_xs().text_color(theme.fg_muted()).child(
+                        "Those follow the sliders above, because derive() is written in the \
+                         theme's own tokens. Under Gruvbox Dark, untouched, the same \
+                         extension resolves to:",
+                    ))
+                    .child(swatch_columns(vec![
+                        ("added", gruvbox_diff.added),
+                        ("removed", gruvbox_diff.removed),
+                    ]))
+                    .child(separator())
+                    .child(MarkdownElement::new(self.theme_ext_extension_code.clone())),
+            );
+
+        // And the answer to the other question: a theme type of your own.
+        let bring_your_own = card()
+            .title("7 · A theme type of your own")
+            .description(
+                "Implement Themeable on your own type and resolve it with \
+                 Theme::from_themeable, which reads every token once into a concrete Theme. \
+                 The snapshot is lossless — Theme carries an override field for every token \
+                 the trait defines — and it keeps the per-frame reads a field access rather \
+                 than a vtable dispatch, which is why the global stays concrete.",
+            )
+            .body(div().text_xs().text_color(theme.fg_muted()).child(
+                "Behaviour does not survive the snapshot: a Themeable whose danger() changes \
+                 with the time of day is one fixed colour afterwards, and wants \
+                 re-snapshotting when it moves.",
+            ));
+
+        v_stack()
+            .gap_6()
+            .child(
+                v_stack()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(theme.fg_muted())
+                            .child("Theme Extension"),
+                    )
+                    .child(p(
+                        "A gpuikit theme is a value, not a file format and not a plugin. \
+                              You build a Theme, you install it as a global, and every element \
+                              picks it up on the next frame.",
+                    )),
+            )
+            .child(heading("Authoring"))
+            .child(primitives)
+            .child(derived)
+            .child(overridden)
+            .child(install)
+            .child(code)
+            .child(heading("Extending the vocabulary"))
+            .child(extension)
+            .child(bring_your_own)
     }
 
     fn render_button_page(
@@ -5311,6 +5819,7 @@ impl Render for Showcase {
             "markdown" => self.render_markdown_page(cx).into_any_element(),
             "editor" => self.render_editor_page(cx).into_any_element(),
             "theme" => self.render_theme_page(cx).into_any_element(),
+            "theme-extension" => self.render_theme_extension_page(cx).into_any_element(),
             _ => div().child("Unknown page").into_any_element(),
         };
 

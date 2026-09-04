@@ -35,6 +35,15 @@ All notable changes to this project will be documented in this file.
   hundred times a frame, so resolving the vtable once here beats a dispatch on
   every read. Behaviour does not survive the snapshot; a `Themeable` that
   varies wants re-snapshotting when it moves.
+- **A Theme Extension page in the showcase**, which teaches both halves. The
+  five primitives sit behind live sliders; a dozen tokens derive from them,
+  none of them named; a switch shows what overriding one does; a button
+  installs the result, which restyles the showcase itself; and the Rust for
+  the current state is regenerated into a code block as the controls move, so
+  the listing cannot drift from what the page draws. It closes on the two ways
+  to extend the vocabulary — a `ThemeExtension` defined by the page rather than
+  the crate, resolved against both the live theme and Gruvbox Dark, and
+  `Theme::from_themeable` for a theme type of your own.
 
 ### Changed
 

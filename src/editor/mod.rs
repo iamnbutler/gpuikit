@@ -19,6 +19,7 @@ pub mod element;
 mod tests;
 
 pub mod syntax_highlighter;
+pub mod view;
 
 // Internal modules
 mod meta_line;
@@ -32,6 +33,7 @@ pub use crate::keymap::extensions::{BindingBuilder, bind, create_bindings};
 pub use crate::keymap::{BindingSpec, Keymap, KeymapCollection};
 pub use meta_line::{Language, MetaLine, Selection};
 pub use syntax_highlighter::SyntaxHighlighter;
+pub use view::{EditorBindings, EditorView, bind_editor_keys};
 
 // Re-export gpui for convenience
 pub use gpui;

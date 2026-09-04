@@ -3,7 +3,7 @@ use gpui::{
     prelude::FluentBuilder, px, rgb,
 };
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Language {
     #[default]
     PlainText,

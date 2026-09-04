@@ -215,4 +215,9 @@ pub fn init(cx: &mut App) {
     elements::combobox::bind_combobox_keys(cx);
     elements::command::bind_command_keys(cx);
     elements::toast::init(cx);
+    // The editor binds its keys in its own `Editor` context, distinct from
+    // `Input`, so it neither ties with nor outranks anything above — order is
+    // not load-bearing here. Only present with the feature that compiles it.
+    #[cfg(feature = "editor")]
+    editor::bind_editor_keys(cx, None);
 }

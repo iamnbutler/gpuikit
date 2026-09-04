@@ -1216,6 +1216,10 @@ struct Showcase {
     theme_ext_overrides: Entity<Switch>,
     theme_ext_code: Entity<Markdown>,
     theme_ext_extension_code: Entity<Markdown>,
+    /// The Editor page's interactive view. Only built with the `editor`
+    /// feature; without it the page renders a placeholder.
+    #[cfg(feature = "editor")]
+    editor_view: Entity<gpuikit::editor::EditorView>,
 }
 
 impl Showcase {
@@ -1813,6 +1817,15 @@ impl Showcase {
 
         let theme_ext_extension_code = cx.new(|cx| Markdown::new(EXTENSION_CODE, cx));
 
+        // The Editor page's live buffer. An EditorView owns its own focus and
+        // editing state, so it is built once here rather than per frame.
+        #[cfg(feature = "editor")]
+        let editor_view = {
+            use gpuikit::editor::{EditorView, Language};
+            let lines: Vec<String> = EDITOR_SAMPLE.lines().map(str::to_string).collect();
+            cx.new(|cx| EditorView::new("showcase-editor", lines, Language::Rust, cx))
+        };
+
         cx.observe(&theme_ext_base_hue, |this, _slider, cx| {
             this.refresh_theme_ext_code(cx);
             cx.notify();
@@ -2038,6 +2051,8 @@ impl Showcase {
             theme_ext_overrides,
             theme_ext_code,
             theme_ext_extension_code,
+            #[cfg(feature = "editor")]
+            editor_view,
         }
     }
 
@@ -5351,22 +5366,14 @@ impl Showcase {
         // the showcase would make every other page pay for syntect, and
         // dropping the page is what let the editor go undemonstrated.
         #[cfg(feature = "editor")]
-        let demo = {
-            use gpuikit::editor::{Editor, EditorElement};
-
-            let lines: Vec<String> = EDITOR_SAMPLE.lines().map(str::to_string).collect();
-            let mut editor = Editor::new("showcase-editor", lines);
-            editor.set_language("rust".to_string());
-
-            div()
-                .h(px(220.))
-                .border_1()
-                .border_color(theme.border())
-                .rounded_md()
-                .overflow_hidden()
-                .child(EditorElement::new(editor))
-                .into_any_element()
-        };
+        let demo = div()
+            .h(px(260.))
+            .border_1()
+            .border_color(theme.border())
+            .rounded_md()
+            .overflow_hidden()
+            .child(self.editor_view.clone())
+            .into_any_element();
         #[cfg(not(feature = "editor"))]
         let demo = empty()
             .title("Built without the editor feature")
@@ -5384,8 +5391,10 @@ impl Showcase {
             )
             .child(div().text_sm().text_color(theme.fg_muted()).child(
                 "A gutter, line numbers, an active line and syntect highlighting. \
-                     Display only here: `EditorElement` has no keyboard handling of its own, \
-                     so an interactive page waits on an `EditorView`.",
+                     Click into it and type: `EditorView` adds focus and keyboard \
+                     handling over `EditorElement` — arrows and shift-selection, \
+                     backspace/delete/enter, and select-all/copy/cut/paste on the \
+                     platform's usual chords.",
             ))
             .child(demo)
     }

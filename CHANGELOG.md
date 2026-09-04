@@ -44,6 +44,16 @@ All notable changes to this project will be documented in this file.
   to extend the vocabulary — a `ThemeExtension` defined by the page rather than
   the crate, resolved against both the live theme and Gruvbox Dark, and
   `Theme::from_themeable` for a theme type of your own.
+- **`EditorView`: a focusable, typeable editor** (with the `editor` feature).
+  `EditorElement` draws an `Editor` but handles no input; `EditorView` is the
+  other half — a `Render` that owns the focus, inserts typed characters, and
+  turns a fixed set of editing `actions` (motion, shift-selection, backspace/
+  delete/enter, select-all, copy/cut/paste) into edits. It does *not* own the
+  key→action map, because gpui dispatches actions globally and the right chord
+  is the application's call; `EditorBindings` ships a platform-default set and
+  `bind_editor_keys` (which `gpuikit::init` calls) installs it, leaving a
+  consumer free to rebind, extend, or ignore it. The showcase's Editor page is
+  now live: click in and type. (`Language` gains `Copy`, `PartialEq`, `Eq`.)
 
 ### Changed
 

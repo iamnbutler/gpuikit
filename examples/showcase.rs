@@ -2098,7 +2098,7 @@ impl Showcase {
                 h_stack()
                     .gap_2()
                     .child(badge(build_stamp()).outline())
-                    .child(badge("gpui 1.14").secondary()),
+                    .child(badge(concat!("gpui ", env!("GPUI_VERSION"))).secondary()),
             )
             .child(h1("Components for gpui, composed."))
             .child(lead(

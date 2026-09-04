@@ -86,6 +86,11 @@ All notable changes to this project will be documented in this file.
   over the pure-Rust `fancy-regex`, and the web build asks for the feature —
   so the editor highlights in the browser as it does natively. (The unused
   `gpui_util` dependency the `editor` feature also pulled in is dropped.)
+- **The showcase's gpui version badge read a hand-written string.** The Home
+  page's header badge said `gpui 1.14` as a literal, so it stayed at 1.14 while
+  the dependency moved to 1.18 underneath it. A `build.rs` now reads the
+  resolved `gpui-unofficial` version out of `Cargo.lock` and the badge renders
+  that, baked in at compile time so it works in the wasm build too.
 
 ## [0.9.0] - 2026-09-04
 

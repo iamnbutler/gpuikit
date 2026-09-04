@@ -253,7 +253,11 @@ const NAV_SECTIONS: &[NavSection] = &[
     (
         "Foundations",
         DefaultIcons::ruler_square,
-        &[("control-sizes", "Control Sizes")],
+        &[
+            ("theme", "Theme"),
+            ("typography", "Typography"),
+            ("control-sizes", "Control Sizes"),
+        ],
     ),
     (
         "Input",
@@ -277,7 +281,6 @@ const NAV_SECTIONS: &[NavSection] = &[
         &[
             ("avatar", "Avatar"),
             ("badge", "Badge"),
-            ("typography", "Typography"),
             ("loading", "Loading"),
             ("alert", "Alert"),
             ("tooltip", "Tooltip"),
@@ -316,7 +319,6 @@ const NAV_SECTIONS: &[NavSection] = &[
         DefaultIcons::file_text,
         &[("markdown", "Markdown"), ("editor", "Editor")],
     ),
-    ("System", DefaultIcons::gear, &[("theme", "Theme")]),
 ];
 
 /// One nav section: its label, the glyph its rail row draws when the sidebar
@@ -627,24 +629,15 @@ const REPOSITORIES: &[Repo] = &[
 /// They load through the `HttpClient` that `main` installs, which is the
 /// browser's Fetch on the web and nothing natively — see `main`.
 const PORTRAITS: [&str; 9] = [
-    // Venrick Azcueta
     "https://images.unsplash.com/photo-1631680900243-3c207cf5a481?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
-    // Alex Suprun
     "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
-    // Giorgio Encinas
     "https://images.unsplash.com/photo-1655874819398-c6dfbec68ac7?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
-    // Alef Morais
     "https://images.unsplash.com/photo-1734830268394-6c4a1f165af1?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
-    // Khashayar Kouchpeydeh
     "https://images.unsplash.com/photo-1616840420121-7ad8ed885f11?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
-    // David Chang Kit
     "https://images.unsplash.com/photo-1719603785926-84d214438120?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
-    // Amir Seilsepour
     "https://images.unsplash.com/photo-1595152452543-e5fc28ebc2b8?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
-    // Albert Vinas
     "https://images.unsplash.com/photo-1757077538768-220e9591e060?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
-    // Abhishek Rai
-    "https://images.unsplash.com/photo-1784483323534-3460c079d0c1?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
+    "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
 ];
 
 /// Where a crew member is right now, for the Home page's manifest.
@@ -1872,25 +1865,13 @@ impl Showcase {
                  component in the sidebar to see every one of its variants on \
                  its own.",
             ))
+            // Wrapped in a row so the button hugs its label: a bare child of a
+            // `v_stack` stretches to the column's full width.
             .child(
-                h_stack()
-                    .flex_wrap()
-                    .gap_2()
-                    .items_center()
-                    .child(button("home-browse", "Browse the components").on_click({
-                        let cell = self.active_page.clone();
-                        move |_, window, _cx| {
-                            navigate_to(&cell, SharedString::from("button"), window)
-                        }
-                    }))
-                    .child(
-                        button("home-open-palette", "Search the components").on_click({
-                            let palette = self.command_palette.clone();
-                            move |_, window, cx| {
-                                palette.update(cx, |state, cx| state.open(window, cx));
-                            }
-                        }),
-                    ),
+                h_stack().child(button("home-browse", "Browse the components").on_click({
+                    let cell = self.active_page.clone();
+                    move |_, window, _cx| navigate_to(&cell, SharedString::from("button"), window)
+                })),
             );
 
         // The rows of the board wrap rather than overflow: the hosted showcase
@@ -1933,7 +1914,7 @@ impl Showcase {
                     h_stack()
                         .gap_2()
                         .items_center()
-                        .child(avatar(PORTRAITS[member.portrait]).size(px(24.)))
+                        .child(avatar(PORTRAITS[member.portrait]).size(px(18.)))
                         .child(member.name)
                         .into_any_element()
                 })
@@ -2206,25 +2187,14 @@ impl Showcase {
             );
 
         // --- Docking: Alert ---
-        let docking = h_stack()
-            .gap_3()
-            .items_center()
-            .child(
-                div().flex_1().min_w_0().child(
-                    alert("Cygnus NG-31 is holding on the R-bar. Approach needs a go from the commander and from Houston.")
-                        .id("home-docking-hold")
-                        .title("Hold at 200 m")
-                        .warning()
-                        .dismissible(true),
-                ),
-            )
-            .child(
-                button("home-docking-go", "Go for approach").on_click(|_, window, cx| {
-                    cx.toast("Cygnus NG-31 cleared to 30 m. Capture in 14 minutes.")
-                        .info()
-                        .show(window, cx);
-                }),
-            );
+        let docking = alert(
+            "Cygnus NG-31 is holding on the R-bar. Approach needs a go from the commander \
+             and from Houston.",
+        )
+        .id("home-docking-hold")
+        .title("Hold at 200 m")
+        .warning()
+        .dismissible(true);
 
         // --- Checklist: Checkbox, Progress ---
         let go_items = self

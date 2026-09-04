@@ -26,13 +26,13 @@ use crate::element_id::{for_entity, scoped};
 use crate::icons::Icons;
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    deferred, div, prelude::*, px, rems, AnyElement, App, ClickEvent, Context, ElementId, Entity,
-    Global, Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement, Render,
-    SharedString, StatefulInteractiveElement, Styled, Svg, Window,
+    AnyElement, App, ClickEvent, Context, ElementId, Entity, Global, Hsla, InteractiveElement,
+    IntoElement, MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement,
+    Styled, Svg, Window, deferred, div, prelude::*, px, rems,
 };
 use std::rc::Rc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 /// Default auto-dismiss duration for toasts

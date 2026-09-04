@@ -5,9 +5,9 @@ use crate::layout::h_stack;
 use crate::theme::{ActiveTheme, Themeable};
 use crate::traits::disableable::Disableable;
 use gpui::{
-    div, prelude::*, px, rems, AnyElement, App, Context, ElementId, EventEmitter,
-    InteractiveElement, IntoElement, MouseButton, ParentElement, Render, SharedString,
-    StatefulInteractiveElement, Styled, Window,
+    AnyElement, App, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
+    MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
+    div, prelude::*, px, rems,
 };
 use std::rc::Rc;
 

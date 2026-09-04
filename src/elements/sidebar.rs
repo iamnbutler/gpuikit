@@ -53,15 +53,15 @@
 //! of the ladder that document states.
 
 use gpui::{
-    anchored, deferred, div, point, prelude::*, px, AnyElement, App, ClickEvent, Div, ElementId,
-    FocusHandle, IntoElement, ParentElement, Pixels, Rems, RenderOnce, Role, SharedString,
-    Stateful, Styled, Svg, Window,
+    AnyElement, App, ClickEvent, Div, ElementId, FocusHandle, IntoElement, ParentElement, Pixels,
+    Rems, RenderOnce, Role, SharedString, Stateful, Styled, Svg, Window, anchored, deferred, div,
+    point, prelude::*, px,
 };
 
 use crate::a11y::{A11y, Announce};
 use crate::element_id::scoped;
 use crate::icons::Icons;
-use crate::theme::{focus_ring, ActiveTheme, ControlMetrics, ControlSize, Themeable};
+use crate::theme::{ActiveTheme, ControlMetrics, ControlSize, Themeable, focus_ring};
 use crate::traits::accessible::Accessible;
 use crate::traits::clickable::Clickable;
 use crate::traits::control_sized::ControlSized;
@@ -694,7 +694,7 @@ mod tests {
     use crate::elements::list::{List, ListEntry};
     use crate::elements::separator::separator;
     use crate::theme::ControlScale;
-    use gpui::{size, Context, Entity, Render, TestAppContext, VisualTestContext};
+    use gpui::{Context, Entity, Render, TestAppContext, VisualTestContext, size};
 
     // --- what it announces ---
 
@@ -737,9 +737,11 @@ mod tests {
     /// that section exists for.
     #[test]
     fn the_trigger_takes_focus_and_a_disabled_one_declines_it() {
-        assert!(sidebar_trigger("nav-toggle", SidebarState::Expanded)
-            .a11y()
-            .is_focusable());
+        assert!(
+            sidebar_trigger("nav-toggle", SidebarState::Expanded)
+                .a11y()
+                .is_focusable()
+        );
 
         let disabled = sidebar_trigger("nav-toggle", SidebarState::Expanded)
             .disabled(true)
@@ -752,10 +754,12 @@ mod tests {
     /// The panel is a landmark, so it is never asked the question.
     #[test]
     fn the_region_is_not_asked_about_keyboard_focus() {
-        assert!(!sidebar("app-nav")
-            .label("Navigation")
-            .a11y()
-            .is_missing_a_focus_decision());
+        assert!(
+            !sidebar("app-nav")
+                .label("Navigation")
+                .a11y()
+                .is_missing_a_focus_decision()
+        );
     }
 
     #[test]

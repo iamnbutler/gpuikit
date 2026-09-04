@@ -13,14 +13,14 @@
 //! Run with: cargo run --example context_menu
 
 use gpui::{
-    actions, div, prelude::*, px, size, App, Application, Bounds, Context, FocusHandle, Focusable,
-    IntoElement, KeyBinding, ParentElement, Render, SharedString, Styled, Window, WindowBounds,
-    WindowOptions,
+    App, Application, Bounds, Context, FocusHandle, Focusable, IntoElement, KeyBinding,
+    ParentElement, Render, SharedString, Styled, Window, WindowBounds, WindowOptions, actions, div,
+    prelude::*, px, size,
 };
+use gpuikit::DefaultIcons;
 use gpuikit::elements::context_menu::{context_menu, menu_item};
 use gpuikit::layout::v_stack;
 use gpuikit::theme::{ActiveTheme, Themeable};
-use gpuikit::DefaultIcons;
 
 actions!(context_menu_example, [Duplicate]);
 

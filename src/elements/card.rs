@@ -1,7 +1,7 @@
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, prelude::FluentBuilder, rems, AnyElement, App, IntoElement, ParentElement, RenderOnce,
-    SharedString, Styled, Window,
+    AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
+    prelude::FluentBuilder, rems,
 };
 
 pub fn card() -> Card {

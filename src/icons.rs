@@ -2,7 +2,7 @@
 //!
 //! Provides convenient access to the bundled Radix icon set.
 
-use gpui::{svg, Svg};
+use gpui::{Svg, svg};
 
 /// Default icon set bundled with gpuikit (Radix Icons)
 ///

@@ -37,9 +37,9 @@ use crate::icons::Icons;
 use crate::theme::{ActiveTheme, ControlSize, Themeable};
 use crate::traits::accessible::Accessible;
 use gpui::{
-    actions, div, prelude::*, px, App, Context, DismissEvent, ElementId, Entity, EventEmitter,
-    FocusHandle, Focusable, IntoElement, KeyBinding, KeyDownEvent, ParentElement, Rems, Render,
-    Role, ScrollHandle, SharedString, Styled, Window,
+    App, Context, DismissEvent, ElementId, Entity, EventEmitter, FocusHandle, Focusable,
+    IntoElement, KeyBinding, KeyDownEvent, ParentElement, Rems, Render, Role, ScrollHandle,
+    SharedString, Styled, Window, actions, div, prelude::*, px,
 };
 use std::rc::Rc;
 

@@ -29,9 +29,9 @@
 use std::rc::Rc;
 
 use gpui::{
-    anchored, deferred, div, prelude::*, px, Action, AnyElement, App, Context, ElementId, Entity,
-    FocusHandle, IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, ParentElement, Pixels,
-    Point, ScrollHandle, SharedString, Styled, Svg, Window,
+    Action, AnyElement, App, Context, ElementId, Entity, FocusHandle, IntoElement, KeyDownEvent,
+    MouseButton, MouseDownEvent, ParentElement, Pixels, Point, ScrollHandle, SharedString, Styled,
+    Svg, Window, anchored, deferred, div, prelude::*, px,
 };
 
 use crate::element_id::scoped;
@@ -209,11 +209,7 @@ impl MenuItems {
 
     /// Applies `f` only when `condition` holds.
     pub fn when(self, condition: bool, f: impl FnOnce(Self) -> Self) -> Self {
-        if condition {
-            f(self)
-        } else {
-            self
-        }
+        if condition { f(self) } else { self }
     }
 
     /// Whether no entries have been added.
@@ -783,7 +779,7 @@ fn menu_row(row: Row, state: Entity<MenuState>, cx: &App) -> impl IntoElement {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{point, Modifiers, MouseUpEvent, Render, TestAppContext, VisualTestContext};
+    use gpui::{Modifiers, MouseUpEvent, Render, TestAppContext, VisualTestContext, point};
     use std::cell::RefCell;
 
     fn labels(entries: &[MenuEntry]) -> Vec<&str> {

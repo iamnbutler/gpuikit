@@ -74,9 +74,9 @@ use crate::theme::{ActiveTheme, ControlSize, Themeable};
 use crate::traits::accessible::Accessible;
 use crate::traits::control_sized::ControlSized;
 use gpui::{
-    actions, deferred, div, prelude::*, px, App, Context, ElementId, Entity, EventEmitter,
-    Focusable, IntoElement, KeyBinding, ParentElement, Rems, Render, Role, SharedString, Styled,
-    Svg, Window,
+    App, Context, ElementId, Entity, EventEmitter, Focusable, IntoElement, KeyBinding,
+    ParentElement, Rems, Render, Role, SharedString, Styled, Svg, Window, actions, deferred, div,
+    prelude::*, px,
 };
 use std::rc::Rc;
 
@@ -639,7 +639,7 @@ impl Render for CommandState {
 mod tests {
     use super::*;
     use gpui::{
-        div, px, size, AppContext, Entity, IntoElement, Render, TestAppContext, VisualTestContext,
+        AppContext, Entity, IntoElement, Render, TestAppContext, VisualTestContext, div, px, size,
     };
     use std::cell::RefCell;
     use std::ops::Deref;

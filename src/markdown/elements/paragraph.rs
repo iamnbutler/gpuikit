@@ -2,8 +2,8 @@
 
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    combine_highlights, div, prelude::*, rems, App, ElementId, HighlightStyle, Hsla, ParentElement,
-    SharedString, Styled, StyledText,
+    App, ElementId, HighlightStyle, Hsla, ParentElement, SharedString, Styled, StyledText,
+    combine_highlights, div, prelude::*, rems,
 };
 
 use super::super::inline_style::{InlinePalette, RichText};

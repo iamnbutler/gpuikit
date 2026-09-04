@@ -1,4 +1,4 @@
-use gpui::{px, rgb, ElementId, Pixels, Rgba, SharedString, TextRun};
+use gpui::{ElementId, Pixels, Rgba, SharedString, TextRun, px, rgb};
 
 use super::buffer::{GapBuffer, TextBuffer};
 use super::syntax_highlighter::SyntaxHighlighter;

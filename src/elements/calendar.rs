@@ -66,16 +66,16 @@
 //! breaking change to make deliberately, not a field to bolt on.
 
 use crate::a11y::{A11y, Announce};
-use crate::date::{month_name, Date, Weekday};
+use crate::date::{Date, Weekday, month_name};
 use crate::element_id::scoped;
 use crate::icons::Icons;
-use crate::theme::{focus_ring, ActiveTheme, ControlSize, Themeable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable, focus_ring};
 use crate::traits::accessible::Accessible;
 use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use gpui::{
-    actions, div, prelude::*, App, Context, ElementId, EventEmitter, FocusHandle, Focusable,
-    IntoElement, KeyBinding, ParentElement, Rems, Render, Role, SharedString, Styled, Window,
+    App, Context, ElementId, EventEmitter, FocusHandle, Focusable, IntoElement, KeyBinding,
+    ParentElement, Rems, Render, Role, SharedString, Styled, Window, actions, div, prelude::*,
 };
 use std::rc::Rc;
 
@@ -684,7 +684,7 @@ impl Render for Calendar {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{px, size, Entity, TestAppContext, VisualTestContext};
+    use gpui::{Entity, TestAppContext, VisualTestContext, px, size};
     use std::cell::RefCell;
     use std::ops::Deref;
 

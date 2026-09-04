@@ -6,9 +6,9 @@ use crate::element_id::scoped;
 use crate::icons::Icons;
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, prelude::FluentBuilder, px, rems, App, ClickEvent, Context, ElementId, Entity, Hsla,
-    InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce, SharedString,
-    StatefulInteractiveElement, Styled, Svg, Window,
+    App, ClickEvent, Context, ElementId, Entity, Hsla, InteractiveElement, IntoElement,
+    MouseButton, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement, Styled, Svg,
+    Window, div, prelude::FluentBuilder, px, rems,
 };
 
 /// Creates a new alert with an optional message

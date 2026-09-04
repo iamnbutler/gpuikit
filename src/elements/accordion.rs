@@ -25,8 +25,8 @@
 use crate::icons::Icons;
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, prelude::*, px, rems, Context, ElementId, EventEmitter, IntoElement, ParentElement,
-    Render, SharedString, Styled, Window,
+    Context, ElementId, EventEmitter, IntoElement, ParentElement, Render, SharedString, Styled,
+    Window, div, prelude::*, px, rems,
 };
 use std::collections::HashSet;
 

@@ -10,8 +10,8 @@
 #![allow(missing_docs)]
 
 use gpui::{
-    actions, div, prelude::*, px, size, App, Application, Bounds, ClipboardItem, Context, Entity,
-    KeyBinding, Window, WindowBounds, WindowOptions,
+    App, Application, Bounds, ClipboardItem, Context, Entity, KeyBinding, Window, WindowBounds,
+    WindowOptions, actions, div, prelude::*, px, size,
 };
 use gpuikit::markdown::{Markdown, MarkdownElement, MarkdownStyle};
 use gpuikit::theme::{ActiveTheme, Themeable};

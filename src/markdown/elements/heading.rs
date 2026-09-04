@@ -1,12 +1,12 @@
 //! Heading element for markdown.
 
 use crate::theme::{ActiveTheme, Themeable};
-use gpui::{div, prelude::*, rems, App, ElementId, ParentElement, Styled};
+use gpui::{App, ElementId, ParentElement, Styled, div, prelude::*, rems};
 
 use super::super::inline_style::{InlinePalette, RichText};
 use super::super::selectable_text::RunRole;
 use super::super::style::TextStyle;
-use super::paragraph::{rich_text_run, RunContext};
+use super::paragraph::{RunContext, rich_text_run};
 
 /// Heading level (h1-h6).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

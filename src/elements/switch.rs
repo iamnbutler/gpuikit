@@ -10,8 +10,9 @@ use crate::traits::labelable::Labelable;
 use crate::traits::selectable::Selectable;
 use crate::utils::element_manager::ElementManagerExt;
 use gpui::{
-    div, prelude::*, App, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
+    App, Context, ElementId, EventEmitter, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window, div,
+    prelude::*,
 };
 
 /// Event emitted when the switch state changes

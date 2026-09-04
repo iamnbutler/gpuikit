@@ -4,8 +4,8 @@
 //! Useful for images, videos, and other media that need consistent proportions.
 
 use gpui::{
-    div, prelude::FluentBuilder, relative, AnyElement, App, IntoElement, ParentElement, Pixels,
-    RenderOnce, Styled, Window,
+    AnyElement, App, IntoElement, ParentElement, Pixels, RenderOnce, Styled, Window, div,
+    prelude::FluentBuilder, relative,
 };
 
 /// Common aspect ratio presets

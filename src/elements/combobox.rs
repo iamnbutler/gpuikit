@@ -100,8 +100,8 @@
 
 use crate::a11y::{A11y, Announce};
 use crate::element_id::scoped;
-use crate::elements::listbox::{matches_query, Listbox, ListboxFocus, LISTBOX_GAP};
-use crate::elements::text_field::{text_field, Adornment};
+use crate::elements::listbox::{LISTBOX_GAP, Listbox, ListboxFocus, matches_query};
+use crate::elements::text_field::{Adornment, text_field};
 use crate::icons::Icons;
 use crate::input::{InputState, InputStateEvent};
 use crate::theme::{ActiveTheme, ControlSize, Themeable};
@@ -109,9 +109,9 @@ use crate::traits::accessible::Accessible;
 use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use gpui::{
-    actions, anchored, deferred, div, point, prelude::*, px, App, Context, DismissEvent, ElementId,
-    Entity, EventEmitter, IntoElement, KeyBinding, ParentElement, Render, Role, SharedString,
-    Styled, Window,
+    App, Context, DismissEvent, ElementId, Entity, EventEmitter, IntoElement, KeyBinding,
+    ParentElement, Render, Role, SharedString, Styled, Window, actions, anchored, deferred, div,
+    point, prelude::*, px,
 };
 use std::rc::Rc;
 
@@ -776,7 +776,7 @@ impl<T: Clone + PartialEq + 'static> Render for ComboboxState<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{px, size, Entity, TestAppContext, VisualTestContext};
+    use gpui::{Entity, TestAppContext, VisualTestContext, px, size};
     use std::cell::RefCell;
     use std::ops::Deref;
 

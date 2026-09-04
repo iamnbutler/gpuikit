@@ -89,8 +89,8 @@ pub fn normalize_language(info: &str) -> Option<String> {
 
 #[cfg(feature = "editor")]
 pub use editor_bridge::{
-    code_highlight_themes, init_code_highlighting, set_code_highlight_theme, CodeHighlightTheme,
-    DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME,
+    CodeHighlightTheme, DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, code_highlight_themes,
+    init_code_highlighting, set_code_highlight_theme,
 };
 
 /// The highlights for one code block, or an empty vector if anything at all is

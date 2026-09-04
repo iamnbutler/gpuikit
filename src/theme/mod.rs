@@ -10,7 +10,7 @@ pub mod control;
 
 pub use control::{ControlMetrics, ControlScale, ControlSize, TrackMetrics};
 
-use gpui::{hsla, px, App, BoxShadow, Global, Hsla, Pixels, SharedString};
+use gpui::{App, BoxShadow, Global, Hsla, Pixels, SharedString, hsla, px};
 use std::sync::Arc;
 
 /// How thick the ring around a keyboard-focused control is.

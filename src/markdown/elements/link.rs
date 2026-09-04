@@ -2,8 +2,8 @@
 
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, prelude::*, App, CursorStyle, ElementId, InteractiveElement, ParentElement, SharedString,
-    StatefulInteractiveElement, Styled,
+    App, CursorStyle, ElementId, InteractiveElement, ParentElement, SharedString,
+    StatefulInteractiveElement, Styled, div, prelude::*,
 };
 
 /// Render a link element.

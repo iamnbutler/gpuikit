@@ -1,6 +1,6 @@
 use gpui::{App, Global, SharedString};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Powers gpuikit's syntactic sugar, allowing elements to not
 /// have to specify ids manually when created.

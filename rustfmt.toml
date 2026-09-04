@@ -1,0 +1,8 @@
+# Pinned, not inherited. rustfmt's *style* edition follows the crate's edition
+# unless it is set here, so bumping `edition` in Cargo.toml would silently
+# reformat every file in the crate — 2024 sorts `use` items case-sensitively,
+# which reorders almost every import block. That churn is a change worth making
+# on purpose, in its own commit, rather than a side effect of an unrelated one.
+# It is set to 2024 because that reformatting has happened; the next style
+# edition gets the same treatment.
+style_edition = "2024"

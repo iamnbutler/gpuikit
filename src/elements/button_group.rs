@@ -6,8 +6,8 @@ use crate::theme::{ActiveTheme, Themeable};
 use crate::traits::disableable::Disableable;
 use crate::traits::orientable::{Orientable, Orientation};
 use gpui::{
-    div, rems, AnyElement, App, ElementId, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, Styled, Window,
+    AnyElement, App, ElementId, InteractiveElement, IntoElement, ParentElement, RenderOnce, Styled,
+    Window, div, rems,
 };
 
 /// Create a new button group with the given ID.

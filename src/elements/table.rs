@@ -80,12 +80,12 @@
 use std::rc::Rc;
 
 use gpui::{
-    div, prelude::*, px, AnyElement, App, Div, ElementId, FontWeight, IntoElement, Length,
-    MouseButton, ParentElement, RenderOnce, SharedString, Styled, Window,
+    AnyElement, App, Div, ElementId, FontWeight, IntoElement, Length, MouseButton, ParentElement,
+    RenderOnce, SharedString, Styled, Window, div, prelude::*, px,
 };
 
 use crate::element_id;
-use crate::elements::checkbox::{checkbox_box, CheckState};
+use crate::elements::checkbox::{CheckState, checkbox_box};
 use crate::theme::{ActiveTheme, ControlSize, Themeable};
 use crate::traits::control_sized::ControlSized;
 

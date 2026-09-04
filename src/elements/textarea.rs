@@ -4,8 +4,8 @@
 //! styling with borders, padding, and theme colors.
 
 use gpui::{
-    div, prelude::*, App, ElementId, Entity, EntityId, FocusHandle, Focusable, IntoElement,
-    ParentElement, Pixels, Rems, RenderOnce, SharedString, Styled, Window,
+    App, ElementId, Entity, EntityId, FocusHandle, Focusable, IntoElement, ParentElement, Pixels,
+    Rems, RenderOnce, SharedString, Styled, Window, div, prelude::*,
 };
 
 use crate::element_id::for_entity;
@@ -360,7 +360,7 @@ mod tests {
     fn tab_stays_inside_a_focused_text_input(cx: &mut TestAppContext) {
         use crate::a11y::FocusNavigation;
         use crate::elements::button::button;
-        use gpui::{div, InteractiveElement, ParentElement};
+        use gpui::{InteractiveElement, ParentElement, div};
 
         cx.update(crate::init);
 

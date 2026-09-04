@@ -16,10 +16,10 @@
 use std::time::Duration;
 
 use gpui::{
-    actions, div, prelude::*, px, rems, size, App, Application, Bounds, Context, Entity,
-    KeyBinding, Window, WindowBounds, WindowOptions,
+    App, Application, Bounds, Context, Entity, KeyBinding, Window, WindowBounds, WindowOptions,
+    actions, div, prelude::*, px, rems, size,
 };
-use gpuikit::markdown::{preprocessing_available, Markdown, MarkdownElement, MarkdownStyle};
+use gpuikit::markdown::{Markdown, MarkdownElement, MarkdownStyle, preprocessing_available};
 use gpuikit::theme::{ActiveTheme, Themeable};
 
 actions!(markdown_streaming_example, [Restart]);

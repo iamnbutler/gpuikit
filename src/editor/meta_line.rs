@@ -1,6 +1,6 @@
 use gpui::{
-    div, prelude::FluentBuilder, px, rgb, IntoElement, ParentElement, Point, RenderOnce,
-    SharedString, Styled,
+    IntoElement, ParentElement, Point, RenderOnce, SharedString, Styled, div,
+    prelude::FluentBuilder, px, rgb,
 };
 
 #[derive(Default, Debug, Clone)]

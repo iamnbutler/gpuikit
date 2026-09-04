@@ -1,13 +1,13 @@
 use crate::a11y::{A11y, Announce};
-use crate::theme::{focus_ring, ActiveTheme, ControlSize, Themeable};
+use crate::theme::{ActiveTheme, ControlSize, Themeable, focus_ring};
 use crate::{
     layout::h_stack, traits, traits::accessible::Accessible, traits::control_sized::ControlSized,
     traits::disableable::Disableable,
 };
 use gpui::{
-    prelude::FluentBuilder, AnyView, App, ClickEvent, ElementId, FocusHandle, FontWeight,
-    InteractiveElement, IntoElement, MouseButton, ParentElement, RenderOnce, Role, SharedString,
-    StatefulInteractiveElement, Styled, Window,
+    AnyView, App, ClickEvent, ElementId, FocusHandle, FontWeight, InteractiveElement, IntoElement,
+    MouseButton, ParentElement, RenderOnce, Role, SharedString, StatefulInteractiveElement, Styled,
+    Window, prelude::FluentBuilder,
 };
 
 pub fn button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Button {
@@ -250,11 +250,11 @@ impl ControlSized for Button {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::a11y::test_support::announced;
     use crate::a11y::FocusNavigation;
+    use crate::a11y::test_support::announced;
     use gpui::{
-        accesskit, div, px, size, AnyElement, Context, ElementId, FocusHandle, KeyUpEvent,
-        Keystroke, PlatformInput, Render, TestAppContext, VisualTestContext,
+        AnyElement, Context, ElementId, FocusHandle, KeyUpEvent, Keystroke, PlatformInput, Render,
+        TestAppContext, VisualTestContext, accesskit, div, px, size,
     };
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -472,7 +472,10 @@ mod tests {
         cx.run_until_parked();
 
         let now = focused(cx);
-        assert!(now.is_some() && now != Some(root), "Tab did not reach the button. `announce` makes a focusable element a tab stop with `.tab_stop(true)`; a focusable element that is not a stop is walked straight past by `TabStopMap::next`");
+        assert!(
+            now.is_some() && now != Some(root),
+            "Tab did not reach the button. `announce` makes a focusable element a tab stop with `.tab_stop(true)`; a focusable element that is not a stop is walked straight past by `TabStopMap::next`"
+        );
     }
 
     /// The caller-handle path, which `track_focus` does *not* make a stop on

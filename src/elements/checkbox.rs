@@ -9,9 +9,9 @@ use crate::traits::disableable::Disableable;
 use crate::traits::labelable::Labelable;
 use crate::traits::selectable::Selectable;
 use gpui::{
-    div, prelude::*, px, App, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, Render, RenderOnce, SharedString, StatefulInteractiveElement,
-    Styled, Window,
+    App, Context, ElementId, EventEmitter, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, Render, RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window,
+    div, prelude::*, px,
 };
 
 /// Event emitted when the checkbox state changes

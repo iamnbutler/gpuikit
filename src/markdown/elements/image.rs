@@ -1,6 +1,6 @@
 //! Image element for markdown.
 
-use gpui::{img, prelude::*, px, App, SharedString, Styled};
+use gpui::{App, SharedString, Styled, img, prelude::*, px};
 
 /// Render an image element.
 ///

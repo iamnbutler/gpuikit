@@ -81,9 +81,9 @@ use crate::traits::accessible::Accessible;
 use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use gpui::{
-    div, prelude::FluentBuilder, rems, AnyElement, App, Bounds, ElementId, FocusHandle,
-    GlobalElementId, InspectorElementId, InteractiveElement, IntoElement, LayoutId, ParentElement,
-    Pixels, RenderOnce, Role, SharedString, Styled, Window,
+    AnyElement, App, Bounds, ElementId, FocusHandle, GlobalElementId, InspectorElementId,
+    InteractiveElement, IntoElement, LayoutId, ParentElement, Pixels, RenderOnce, Role,
+    SharedString, Styled, Window, div, prelude::FluentBuilder, rems,
 };
 
 /// What a group tells the controls inside it.
@@ -562,12 +562,12 @@ impl RenderOnce for Fieldset {
 mod tests {
     use super::*;
     use crate::a11y::test_support::announced;
-    use crate::elements::checkbox::{checkbox, Checkbox};
+    use crate::elements::checkbox::{Checkbox, checkbox};
     use crate::elements::field::field;
     use crate::traits::labelable::Labelable;
     use gpui::{
-        px, size, AnyElement, AppContext, Bounds, Context, Modifiers, Render, TestAppContext,
-        VisualTestContext,
+        AnyElement, AppContext, Bounds, Context, Modifiers, Render, TestAppContext,
+        VisualTestContext, px, size,
     };
 
     /// Draws whatever the test's closure builds, every frame.

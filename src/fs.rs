@@ -7,7 +7,7 @@
 //! instead of reaching for this module. `src/wasm_compat_guard.rs` tracks
 //! this exemption.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use gpui::Context;
 use gpui::TaskExt as _;
 use std::path::{Path, PathBuf};

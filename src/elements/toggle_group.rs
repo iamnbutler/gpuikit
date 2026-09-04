@@ -7,9 +7,9 @@ use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use crate::traits::orientable::{Orientable, Orientation};
 use gpui::{
-    div, prelude::*, Context, Div, ElementId, EventEmitter, FontWeight, Hsla, InteractiveElement,
-    IntoElement, MouseButton, ParentElement, Render, SharedString, Stateful,
-    StatefulInteractiveElement, Styled, Window,
+    Context, Div, ElementId, EventEmitter, FontWeight, Hsla, InteractiveElement, IntoElement,
+    MouseButton, ParentElement, Render, SharedString, Stateful, StatefulInteractiveElement, Styled,
+    Window, div, prelude::*,
 };
 
 /// Selection mode for the toggle group

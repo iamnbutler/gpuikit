@@ -11,14 +11,14 @@
 mod fixtures;
 
 use gpui::{
-    actions, div, linear_color_stop, linear_gradient, prelude::*, px, rgb, size, App, Application,
-    Background, Bounds, Context, DefiniteLength, Div, Entity, FocusHandle, Focusable, FontWeight,
-    Hsla, KeyBinding, SharedString, Stateful, Window, WindowBounds, WindowOptions,
+    App, Application, Background, Bounds, Context, DefiniteLength, Div, Entity, FocusHandle,
+    Focusable, FontWeight, Hsla, KeyBinding, SharedString, Stateful, Window, WindowBounds,
+    WindowOptions, actions, div, linear_color_stop, linear_gradient, prelude::*, px, rgb, size,
 };
 use gpuikit::elements::input::{input, text_area};
-use gpuikit::elements::select::{select, SelectChanged, SelectState};
+use gpuikit::elements::select::{SelectChanged, SelectState, select};
 use gpuikit::elements::slider::{Slider, SliderChanged};
-use gpuikit::input::{bind_input_keys, InputState};
+use gpuikit::input::{InputState, bind_input_keys};
 
 use fixtures::SampleText;
 

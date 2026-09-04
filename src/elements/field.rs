@@ -14,9 +14,9 @@ use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use crate::traits::labelable::Labelable;
 use gpui::{
-    div, prelude::FluentBuilder, rems, AnyElement, App, ElementId, InteractiveElement, IntoElement,
-    ParentElement, Rems, RenderOnce, Role, SharedString, StatefulInteractiveElement, Styled,
-    Window,
+    AnyElement, App, ElementId, InteractiveElement, IntoElement, ParentElement, Rems, RenderOnce,
+    Role, SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder,
+    rems,
 };
 
 /// Width of the label column in the beside layout.

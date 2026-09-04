@@ -19,8 +19,8 @@
 
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, prelude::FluentBuilder, rems, App, AsyncApp, EntityId, Hsla, IntoElement, ParentElement,
-    Rems, RenderOnce, SharedString, Styled, Task, Window,
+    App, AsyncApp, EntityId, Hsla, IntoElement, ParentElement, Rems, RenderOnce, SharedString,
+    Styled, Task, Window, div, prelude::FluentBuilder, rems,
 };
 use std::cell::RefCell;
 use std::time::Duration;
@@ -676,7 +676,7 @@ impl LoadingClock {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{px, Context, Render, TestAppContext};
+    use gpui::{Context, Render, TestAppContext, px};
 
     /// The clock outlives an individual `App`, so a test states its own
     /// starting point rather than inheriting one.

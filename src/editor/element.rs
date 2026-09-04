@@ -2,7 +2,7 @@
 
 use super::buffer::TextBuffer;
 use super::editor::Editor;
-use gpui::{canvas, Stateful, *};
+use gpui::{Stateful, canvas, *};
 use std::cell::RefCell;
 use std::rc::Rc;
 

@@ -14,10 +14,21 @@ use crate::theme::ControlSize;
 /// ([`Themeable::control`](crate::theme::Themeable::control)), so a control
 /// never names a height of its own.
 ///
-/// ```ignore
+/// ```
+/// # use gpui::{Context, IntoElement, Render, Window, prelude::*};
+/// use gpuikit::elements::badge::badge;
+/// use gpuikit::elements::button::button;
+/// use gpuikit::layout::h_stack;
+/// use gpuikit::traits::control_sized::ControlSized;
+/// # struct D;
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 /// h_stack()
 ///     .child(button("save", "Save").large())
 ///     .child(badge("2").large())
+/// # }}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, _| D);
 /// ```
 pub trait ControlSized: Sized {
     /// Put this control on the given rung.

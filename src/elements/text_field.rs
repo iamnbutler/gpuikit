@@ -21,26 +21,48 @@
 //!
 //! # Example
 //!
-//! ```ignore
-//! use gpuikit::elements::text_field::{text_field, Adornment};
+//! ```
+//! # use gpui::{Context, Entity, IntoElement, Render, Window, prelude::*};
 //! use gpuikit::DefaultIcons;
-//!
+//! use gpuikit::elements::text_field::{Adornment, text_field};
+//! # use gpuikit::input::InputState;
+//! # struct D { state: Entity<InputState> }
+//! # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+//! # let state = self.state.clone();
+//! # let _ =
 //! text_field(&state, cx)
 //!     .placeholder("Search")
 //!     .prefix(Adornment::icon(DefaultIcons::magnifying_glass()))
+//! # ;
 //!
 //! text_field(&state, cx)
 //!     .prefix(Adornment::text("https://"))
 //!     .suffix(Adornment::text(".com"))
+//! # }}
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(gpuikit::init);
+//! # let _ = tcx.add_window_view(|_, cx| D { state: cx.new(InputState::new_singleline) });
 //! ```
 //!
 //! A button that acts on the field is composition, not a field feature:
 //!
-//! ```ignore
+//! ```
+//! # use gpui::{Context, Entity, IntoElement, Render, Window, prelude::*};
+//! use gpuikit::elements::button::button;
+//! use gpuikit::elements::text_field::text_field;
+//! use gpuikit::layout::h_stack;
+//! # use gpuikit::input::InputState;
+//! # struct D { state: Entity<InputState> }
+//! # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+//! # let state = self.state.clone();
 //! h_stack()
 //!     .gap_2()
 //!     .child(text_field(&state, cx))
 //!     .child(button("go", "Go"))
+//! # }}
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(gpuikit::init);
+//! # let _ = tcx.add_window_view(|_, cx| D { state: cx.new(InputState::new_singleline) });
 //! ```
 //!
 //! [`Textarea`]: crate::elements::textarea::Textarea

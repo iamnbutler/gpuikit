@@ -9,7 +9,7 @@ use gpui::{Svg, svg};
 /// All icons are 15x15 SVGs designed to work well at small sizes.
 ///
 /// # Example
-/// ```ignore
+/// ```
 /// use gpuikit::DefaultIcons;
 /// use gpuikit::elements::icon_button::icon_button;
 ///

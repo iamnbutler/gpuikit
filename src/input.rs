@@ -11,15 +11,17 @@
 //!
 //! # Example
 //!
-//! ```ignore
-//! use gpui::Context;
+//! ```
+//! # use gpui::AppContext as _;
 //! use gpuikit::input::{InputState, bind_input_keys};
-//!
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(|cx| {
 //! // Initialize keybindings (typically in app initialization)
 //! bind_input_keys(cx, None);
 //!
 //! // Create an input state
 //! let input = cx.new(|cx| InputState::new_singleline(cx));
+//! # });
 //! ```
 
 mod bidi;

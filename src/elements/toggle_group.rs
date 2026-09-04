@@ -71,7 +71,11 @@ impl<T: Clone> Disableable for ToggleOption<T> {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// # use gpui::{Context, IntoElement, Render, Window, prelude::*};
+/// use gpuikit::elements::toggle_group::{ToggleGroupMode, toggle_group, toggle_option};
+/// # struct D;
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 /// // Single-select mode (default)
 /// let single = toggle_group(
 ///     "alignment",
@@ -92,6 +96,11 @@ impl<T: Clone> Disableable for ToggleOption<T> {
 ///     ],
 /// ).mode(ToggleGroupMode::Multiple)
 ///  .selected(vec!["bold", "italic"]);
+/// # cx.new(|_cx| single)
+/// # }}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, _| D);
 /// ```
 pub struct ToggleGroup<T: Clone + PartialEq + 'static> {
     id: ElementId,

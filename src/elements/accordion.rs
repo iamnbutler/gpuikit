@@ -2,9 +2,11 @@
 //!
 //! # Example
 //!
-//! ```ignore
-//! use gpuikit::elements::accordion::{accordion, accordion_item, AccordionState};
-//!
+//! ```
+//! # use gpui::{Context, IntoElement, Render, Window, prelude::*};
+//! use gpuikit::elements::accordion::{AccordionState, accordion, accordion_item};
+//! # struct D;
+//! # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 //! // Create an accordion with multiple items
 //! let accordion_state = cx.new(|_cx| {
 //!     AccordionState::new(
@@ -16,10 +18,15 @@
 //! });
 //!
 //! // For single mode (only one item open at a time):
-//! accordion("my-accordion").single()
+//! let _ = accordion("my-accordion").single();
 //!
 //! // For multiple mode (default, multiple items can be open):
-//! accordion("my-accordion").multiple()
+//! let _ = accordion("my-accordion").multiple();
+//! # accordion_state
+//! # }}
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(gpuikit::init);
+//! # let _ = tcx.add_window_view(|_, _| D);
 //! ```
 
 use crate::icons::Icons;

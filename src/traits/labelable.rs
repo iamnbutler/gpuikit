@@ -14,11 +14,20 @@ pub trait Labelable: Sized {
     ///
     /// # Example
     ///
-    /// ```ignore
+    /// ```
+    /// # use gpui::{Context, IntoElement, Render, Window, prelude::*};
+    /// use gpuikit::elements::checkbox::checkbox;
     /// use gpuikit::traits::labelable::Labelable;
-    ///
-    /// checkbox("my-checkbox", false)
-    ///     .label("Accept terms and conditions")
+    /// # struct D;
+    /// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    /// cx.new(|_cx| {
+    ///     checkbox("my-checkbox", false)
+    ///         .label("Accept terms and conditions")
+    /// })
+    /// # }}
+    /// # let mut tcx = gpui::TestAppContext::single();
+    /// # tcx.update(gpuikit::init);
+    /// # let _ = tcx.add_window_view(|_, _| D);
     /// ```
     fn label(self, label: impl Into<SharedString>) -> Self;
 }

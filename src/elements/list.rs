@@ -5,8 +5,11 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```
+//! # use gpui::{Context, IntoElement, Render, Window, div, prelude::*};
 //! use gpuikit::elements::list::{List, ListEntry};
+//! # struct D;
+//! # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 //!
 //! let entries = vec![
 //!     ListEntry::header("Section A"),
@@ -18,6 +21,10 @@
 //!
 //! // In your Render impl:
 //! List::new("my-list", entries).render(window, cx)
+//! # }}
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(gpuikit::init);
+//! # let _ = tcx.add_window_view(|_, _| D);
 //! ```
 
 use crate::theme::{ActiveTheme, Themeable};

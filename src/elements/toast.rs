@@ -5,13 +5,12 @@
 //!
 //! # Example
 //!
-//! ```ignore
-//! use gpuikit::elements::toast::{ToastExt, ToastPosition};
+//! ```
+//! # use gpui::{Context, IntoElement, Render, Window, prelude::*};
+//! use gpuikit::elements::toast::{self, ToastExt};
 //! use std::time::Duration;
-//!
-//! // In init:
-//! toast::init(cx);
-//!
+//! # struct D;
+//! # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 //! // Usage anywhere:
 //! cx.toast("Changes saved").success().duration(Duration::from_secs(3)).show(window, cx);
 //!
@@ -20,6 +19,11 @@
 //!     .action("Undo", |_event, window, cx| { /* ... */ })
 //!     .duration(Duration::from_secs(5))
 //!     .show(window, cx);
+//! # gpui::Empty
+//! # }}
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(|cx| { gpuikit::init(cx); toast::init(cx); });
+//! # let _ = tcx.add_window_view(|_, _| D);
 //! ```
 
 use crate::element_id::{for_entity, scoped};
@@ -610,7 +614,8 @@ pub fn set_toast_position(cx: &mut App, position: ToastPosition) {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use gpui::Application;
 /// use gpuikit::elements::toast;
 ///
 /// fn main() {

@@ -99,6 +99,7 @@ const FORBIDDEN: &[ForbiddenApi] = &[
                 "test-only: source scan inside `#[cfg(test)] mod tests`",
             ),
             ("build_profile_guard.rs", "test-only guard module"),
+            ("doctest_fence_guard.rs", "test-only guard module"),
             ("release_input_validation.rs", "test-only guard module"),
             ("release_version_guard.rs", "test-only guard module"),
             ("undying_thread_guard.rs", "test-only guard module"),

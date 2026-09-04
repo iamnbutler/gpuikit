@@ -5,11 +5,13 @@
 //!
 //! # Example
 //!
-//! ```ignore
-//! use gpuikit::elements::dialog::{dialog, DialogState};
+//! ```
+//! # use gpui::{Context, IntoElement, Render, Window, div, prelude::*};
 //! use gpuikit::elements::button::button;
+//! use gpuikit::elements::dialog::{DialogState, dialog};
 //! use gpuikit::layout::h_stack;
-//!
+//! # struct D;
+//! # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 //! let dialog_state = cx.new(|_cx| DialogState::new(
 //!     dialog("confirm-dialog")
 //!         .title("Are you sure?")
@@ -28,6 +30,11 @@
 //!
 //! // Open the dialog
 //! dialog_state.update(cx, |state, cx| state.open(window, cx));
+//! # dialog_state
+//! # }}
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(gpuikit::init);
+//! # let _ = tcx.add_window_view(|_, _| D);
 //! ```
 
 use crate::a11y::{A11y, Announce};
@@ -163,11 +170,20 @@ impl Dialog {
     /// is already on screen, and two ways to say no in the same corner is one
     /// too many.
     ///
-    /// ```ignore
+    /// ```
+    /// # use gpui::{Context, IntoElement, Render, Window, prelude::*};
+    /// use gpuikit::elements::dialog::{DialogState, dialog};
+    /// # struct D;
+    /// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    /// # cx.new(|_cx| DialogState::new(
     /// dialog("delete-project")
     ///     .confirm("Delete this project?", "Its 42 tasks are deleted with it. This cannot be undone.")
     ///     .confirm_label("Delete")
     ///     .on_confirm(|_window, _cx| { /* … */ })
+    /// # ))}}
+    /// # let mut tcx = gpui::TestAppContext::single();
+    /// # tcx.update(gpuikit::init);
+    /// # let _ = tcx.add_window_view(|_, _| D);
     /// ```
     pub fn confirm(
         mut self,
@@ -305,8 +321,17 @@ impl ControlSized for Dialog {
 ///
 /// Create using [`Dialog`] and wrap in an Entity:
 ///
-/// ```ignore
+/// ```
+/// # use gpui::{Context, IntoElement, Render, Window, prelude::*};
+/// use gpuikit::elements::dialog::{DialogState, dialog};
+/// # struct D;
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 /// let state = cx.new(|_cx| DialogState::new(dialog("my-dialog").title("Hello")));
+/// # state
+/// # }}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, _| D);
 /// ```
 pub struct DialogState {
     id: ElementId,
@@ -744,7 +769,8 @@ impl Render for DialogState {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use gpui::Application;
 /// use gpuikit::elements::dialog::bind_dialog_keys;
 ///
 /// fn main() {

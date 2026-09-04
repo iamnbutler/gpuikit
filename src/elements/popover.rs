@@ -2,9 +2,13 @@
 //!
 //! # Example
 //!
-//! ```ignore
-//! use gpuikit::elements::popover::{popover, PopoverState};
-//!
+//! ```
+//! # use gpui::{Context, IntoElement, Render, Window, prelude::*};
+//! use gpuikit::elements::button::button;
+//! use gpuikit::elements::popover::{PopoverState, popover};
+//! use gpuikit::layout::v_stack;
+//! # struct D;
+//! # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
 //! let popover_state = cx.new(|_cx| {
 //!     PopoverState::new(
 //!         popover("my-popover")
@@ -19,6 +23,11 @@
 //!             })
 //!     )
 //! });
+//! # popover_state
+//! # }}
+//! # let mut tcx = gpui::TestAppContext::single();
+//! # tcx.update(gpuikit::init);
+//! # let _ = tcx.add_window_view(|_, _| D);
 //! ```
 
 use crate::element_id::for_entity;
@@ -126,10 +135,20 @@ pub struct Popover {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
+/// # use gpui::{Context, IntoElement, Render, Window, div, prelude::*};
+/// use gpuikit::elements::button::button;
+/// use gpuikit::elements::popover::{PopoverState, popover};
+/// # struct D;
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+/// # cx.new(|_cx| PopoverState::new(
 /// popover("my-popover")
 ///     .trigger(|_window, _cx| button("open", "Open").into_any_element())
 ///     .content(|_window, _cx| div().child("Content").into_any_element())
+/// # ))}}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, _| D);
 /// ```
 pub fn popover(id: impl Into<ElementId>) -> Popover {
     Popover::new(id)
@@ -178,8 +197,17 @@ impl Popover {
 ///
 /// Create using [`Popover`] and wrap in an Entity:
 ///
-/// ```ignore
-/// let state = cx.new(|_cx| PopoverState::new(popover(...)));
+/// ```
+/// # use gpui::{Context, IntoElement, Render, Window, prelude::*};
+/// use gpuikit::elements::popover::{PopoverState, popover};
+/// # struct D;
+/// # impl Render for D { fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+/// let state = cx.new(|_cx| PopoverState::new(popover("my-popover")));
+/// # state
+/// # }}
+/// # let mut tcx = gpui::TestAppContext::single();
+/// # tcx.update(gpuikit::init);
+/// # let _ = tcx.add_window_view(|_, _| D);
 /// ```
 pub struct PopoverState {
     id: ElementId,

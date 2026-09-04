@@ -15,16 +15,15 @@ All notable changes to this project will be documented in this file.
   items go) are derived from that state on each frame. It is the first entry
   in the nav and the page a native run opens on; the URL hash still wins on
   the web.
-- **The showcase's portraits are compiled in.** gpui's default `HttpClient`
-  is a null client, so an `img` pointed at a URL never loads — natively or on
-  the web — unless the application installs one. The Avatar page had been a
-  blank circle for that reason. Nine 96px Unsplash crops now live in
-  `examples/showcase-media/`, with their attribution, and are decoded once
-  into `Arc<Image>`s the pages share. They are not in `assets/`, which
-  rust-embed compiles into every consumer.
-
 ### Fixed
 
+- **The hosted showcase loads remote images.** `Application::with_platform`
+  installs a null `HttpClient`, under which an `img` pointed at a URL loads
+  nothing; the Avatar page had been a blank circle on the web for that
+  reason. The showcase's web build now goes through
+  `gpui_platform::application()`, which installs the browser's Fetch as the
+  client. Natively that constructor installs none in this gpui, so a window
+  still draws the blank circle.
 - **`Alert` and `Toast` wrap long descriptions.** Both laid their text out in
   a `flex_1` column with no `min_w_0`, so the text's first line set the
   column's minimum width and a long description made the box wider than its

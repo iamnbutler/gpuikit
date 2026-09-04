@@ -1,10 +1,10 @@
 #![allow(missing_docs)]
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    AnyElement, App, AppContext, Application, Bounds, ClipboardItem, Context, Entity, FocusHandle,
-    FontWeight, Hsla, Image, ImageFormat, InteractiveElement, IntoElement, Menu, ParentElement,
-    Render, Rgba, SharedString, StatefulInteractiveElement, Styled, TitlebarOptions, Window,
-    WindowBounds, WindowOptions, div, px, size,
+    AnyElement, App, AppContext, Bounds, ClipboardItem, Context, Entity, FocusHandle, FontWeight,
+    Hsla, InteractiveElement, IntoElement, Menu, ParentElement, Render, Rgba, SharedString,
+    StatefulInteractiveElement, Styled, TitlebarOptions, Window, WindowBounds, WindowOptions, div,
+    px, size,
 };
 use gpuikit::a11y::FocusNavigation;
 use gpuikit::date::{Date, Weekday};
@@ -621,22 +621,30 @@ const REPOSITORIES: &[Repo] = &[
     },
 ];
 
-/// The faces on the Home and Avatar pages, compiled in. gpui's default
-/// `HttpClient` is a null client, so an `img` pointed at a URL never loads —
-/// natively or on the web — unless the application installs one; the Avatar
-/// page was a blank circle for that reason. `examples/showcase-media/README.md`
-/// says where these come from. Indexed by `CrewMember::portrait` and
-/// `Dispatch::portrait`, and decoded once, in `Showcase::new`.
-const PORTRAITS: [&[u8]; 9] = [
-    include_bytes!("showcase-media/portraits/I7dGp6--Gro.jpg"),
-    include_bytes!("showcase-media/portraits/ZHvM3XIOHoE.jpg"),
-    include_bytes!("showcase-media/portraits/n34dhlh0spw.jpg"),
-    include_bytes!("showcase-media/portraits/LPvi7DMp-HU.jpg"),
-    include_bytes!("showcase-media/portraits/zrZUCPgKMHc.jpg"),
-    include_bytes!("showcase-media/portraits/6ml7EMjw1EQ.jpg"),
-    include_bytes!("showcase-media/portraits/5vg_SarQimA.jpg"),
-    include_bytes!("showcase-media/portraits/zX700UTltlg.jpg"),
-    include_bytes!("showcase-media/portraits/XzgD6iRneEk.jpg"),
+/// The faces on the Home page: 96px crops from Unsplash, under the Unsplash
+/// License. Indexed by `CrewMember::portrait` and `Dispatch::portrait`.
+///
+/// They load through the `HttpClient` that `main` installs, which is the
+/// browser's Fetch on the web and nothing natively — see `main`.
+const PORTRAITS: [&str; 9] = [
+    // Venrick Azcueta
+    "https://images.unsplash.com/photo-1631680900243-3c207cf5a481?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
+    // Alex Suprun
+    "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
+    // Giorgio Encinas
+    "https://images.unsplash.com/photo-1655874819398-c6dfbec68ac7?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
+    // Alef Morais
+    "https://images.unsplash.com/photo-1734830268394-6c4a1f165af1?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
+    // Khashayar Kouchpeydeh
+    "https://images.unsplash.com/photo-1616840420121-7ad8ed885f11?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
+    // David Chang Kit
+    "https://images.unsplash.com/photo-1719603785926-84d214438120?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
+    // Amir Seilsepour
+    "https://images.unsplash.com/photo-1595152452543-e5fc28ebc2b8?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
+    // Albert Vinas
+    "https://images.unsplash.com/photo-1757077538768-220e9591e060?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
+    // Abhishek Rai
+    "https://images.unsplash.com/photo-1784483323534-3460c079d0c1?w=96&h=96&fit=crop&crop=faces&fm=jpg&q=70",
 ];
 
 /// Where a crew member is right now, for the Home page's manifest.
@@ -676,7 +684,7 @@ struct CrewMember {
 const CREW: &[CrewMember] = &[
     CrewMember {
         id: 1,
-        name: "Ines Marlow",
+        name: "Irena Marlow",
         role: "Station commander",
         shift: "Alpha",
         portrait: 0,
@@ -760,7 +768,7 @@ const DISPATCHES: &[Dispatch] = &[
     },
     Dispatch {
         channel: "downlink",
-        from: "Ines Marlow",
+        from: "Irena Marlow",
         portrait: 0,
         subject: "Crew status nominal. Requesting one more day on the CO₂ curve.",
         when: "03:30 UTC",
@@ -1023,10 +1031,6 @@ struct Showcase {
     table_sort: SortDescriptor,
     table_selected: HashSet<u32>,
     table_status: SharedString,
-    /// `PORTRAITS`, decoded. Built once: `Image::from_bytes` keys the image
-    /// cache on a hash of the bytes, but hashing five kilobytes per face per
-    /// frame is not free either.
-    portraits: Rc<Vec<Arc<Image>>>,
     /// The Home page's controls. Each has its own entity, like every other
     /// page's: nothing is shared with the component pages, so a slider dragged
     /// on Home does not move one on Slider.
@@ -1483,13 +1487,6 @@ impl Showcase {
         // go — are derived in `render` from these entities, so the page has to
         // hear about every change, the same way it hears about the table
         // filter above.
-        let portraits = Rc::new(
-            PORTRAITS
-                .iter()
-                .map(|bytes| Arc::new(Image::from_bytes(ImageFormat::Jpeg, bytes.to_vec())))
-                .collect::<Vec<_>>(),
-        );
-
         let home_crew_filter = cx.new(InputState::new_singleline);
         cx.observe(&home_crew_filter, |_this, _filter, cx| cx.notify())
             .detach();
@@ -1794,7 +1791,6 @@ impl Showcase {
             table_sort: SortDescriptor::new(TABLE_COLUMN_STARS, SortDirection::Descending),
             table_selected: HashSet::new(),
             table_status: "No repository opened yet.".into(),
-            portraits,
             home_crew_filter,
             home_crew_opened: "Click a row to open a crew record.".into(),
             home_burn_target,
@@ -1931,14 +1927,13 @@ impl Showcase {
             .filter(|member| member.status == CrewStatus::OnStation)
             .count();
 
-        let portraits = self.portraits.clone();
         let crew_table = table("home-crew")
             .column(
-                Column::new("Crew", move |member: &CrewMember, _window, _cx| {
+                Column::new("Crew", |member: &CrewMember, _window, _cx| {
                     h_stack()
                         .gap_2()
                         .items_center()
-                        .child(avatar(portraits[member.portrait].clone()).size(px(24.)))
+                        .child(avatar(PORTRAITS[member.portrait]).size(px(24.)))
                         .child(member.name)
                         .into_any_element()
                 })
@@ -2177,7 +2172,7 @@ impl Showcase {
                     h_stack()
                         .gap_2()
                         .items_center()
-                        .child(avatar(self.portraits[dispatch.portrait].clone()).size(px(20.)))
+                        .child(avatar(PORTRAITS[dispatch.portrait]).size(px(20.)))
                         .child(
                             div()
                                 .flex_1()
@@ -3252,11 +3247,8 @@ impl Showcase {
                     .child("Avatar"),
             )
             .child(
-                h_stack().gap_2().items_center().children(
-                    [px(48.), px(32.), px(24.), px(16.)]
-                        .into_iter()
-                        .zip(self.portraits.iter())
-                        .map(|(size, portrait)| avatar(portrait.clone()).size(size)),
+                h_stack().gap_2().child(
+                    avatar("https://avatars.githubusercontent.com/u/1714999?v=4").size(px(32.)),
                 ),
             )
     }
@@ -5445,9 +5437,15 @@ fn boot(cx: &mut App) {
 }
 
 fn main() {
-    let app = Application::with_platform(gpui_platform::current_platform(false))
-        .with_assets(gpuikit::assets());
-
+    // `Application::with_platform` installs a null `HttpClient`, under which
+    // an `img` pointed at a URL loads nothing and logs "No HttpClient
+    // available". `gpui_platform::application()` is the constructor that
+    // installs a real one: on the web, the browser's Fetch. Natively it
+    // installs none in this gpui — a native client is a separate crate,
+    // `reqwest-client-gpui-unofficial`, and tokio with it — so the portraits
+    // on the Home and Avatar pages load in a browser and stay blank in a
+    // window.
+    //
     // The browser owns the event loop: `Platform::run` schedules launch and
     // returns at once, so plain `run` would drop the app right after boot —
     // the canvas appears and vanishes. `run_embedded` hands back the owner;
@@ -5457,9 +5455,12 @@ fn main() {
     #[cfg(target_family = "wasm")]
     {
         gpui_platform::web_init();
+        let app = gpui_platform::application().with_assets(gpuikit::assets());
         std::mem::forget(app.run_embedded(boot));
     }
 
     #[cfg(not(target_family = "wasm"))]
-    app.run(boot);
+    gpui::Application::with_platform(gpui_platform::current_platform(false))
+        .with_assets(gpuikit::assets())
+        .run(boot);
 }

@@ -420,7 +420,7 @@ impl Calendar {
         delta: i32,
         icon: gpui::Svg,
         cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    ) -> impl IntoElement + use<> {
         let theme = cx.theme();
         let metrics = theme.control(self.size);
         let fg = theme.fg_muted();

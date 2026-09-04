@@ -1379,7 +1379,7 @@ impl Showcase {
         &mut self,
         _window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    ) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -1422,7 +1422,7 @@ impl Showcase {
             )
     }
 
-    fn render_button_group_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_button_group_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -1464,7 +1464,7 @@ impl Showcase {
         &mut self,
         _window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    ) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -1561,7 +1561,7 @@ impl Showcase {
             )
     }
 
-    fn render_checkbox_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_checkbox_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -1580,7 +1580,7 @@ impl Showcase {
             )
     }
 
-    fn render_switch_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_switch_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -1600,7 +1600,7 @@ impl Showcase {
             )
     }
 
-    fn render_toggle_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_toggle_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -1625,7 +1625,7 @@ impl Showcase {
             )
     }
 
-    fn render_radio_group_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_radio_group_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -1639,7 +1639,7 @@ impl Showcase {
             .child(self.radio_notifications.clone())
     }
 
-    fn render_toggle_group_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_toggle_group_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -1682,7 +1682,7 @@ impl Showcase {
             )
     }
 
-    fn render_slider_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_slider_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -1709,7 +1709,7 @@ impl Showcase {
             )
     }
 
-    fn render_tabs_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_tabs_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -1725,7 +1725,7 @@ impl Showcase {
 
     /// The calendar page: a live grid, a disabled-day predicate, a week that
     /// starts on Monday, and the day the grid last reported beside it.
-    fn render_calendar_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_calendar_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
 
         v_stack()
@@ -1784,7 +1784,7 @@ impl Showcase {
     /// blur modes that are not the default. It draws real comboboxes rather
     /// than pointing `ELEMENT_COVERAGE` at the select page, which would answer
     /// the build gate without meeting it.
-    fn render_combobox_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_combobox_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         let heading = |text: &'static str| div().text_sm().text_color(theme.fg_muted()).child(text);
 
@@ -1838,7 +1838,7 @@ impl Showcase {
 
     /// The command palette page. The palette itself is an overlay, so the page
     /// is a button that opens it and a note about the keyboard.
-    fn render_command_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_command_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         let palette = self.command_palette.clone();
 
@@ -1867,7 +1867,7 @@ impl Showcase {
             )
     }
 
-    fn render_select_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_select_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         let country_select = self.country_select.clone();
 
@@ -1987,7 +1987,7 @@ impl Showcase {
             )
     }
 
-    fn render_field_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_field_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -2060,7 +2060,7 @@ impl Showcase {
     /// The second fieldset is the whole argument: it says `disabled(true)`
     /// once, and neither field nor either checkbox inside it says anything
     /// about `disabled` at all.
-    fn render_form_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_form_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -2116,7 +2116,7 @@ impl Showcase {
             )
     }
 
-    fn render_text_field_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_text_field_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
 
         fn row(
@@ -2211,7 +2211,7 @@ impl Showcase {
             )
     }
 
-    fn render_textarea_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_textarea_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         card()
             .title("Textarea")
             .description("Multi-line text input for longer content")
@@ -2261,7 +2261,7 @@ impl Showcase {
             )
     }
 
-    fn render_avatar_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_avatar_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -2279,7 +2279,7 @@ impl Showcase {
             )
     }
 
-    fn render_badge_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_badge_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -2301,7 +2301,7 @@ impl Showcase {
             )
     }
 
-    fn render_kbd_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_kbd_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -2338,7 +2338,7 @@ impl Showcase {
             )
     }
 
-    fn render_label_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_label_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -2364,7 +2364,7 @@ impl Showcase {
     /// refresh rate. Pause stops that clock without leaving the page, so the
     /// cost of the indicators can be told apart from the cost of everything
     /// else here.
-    fn render_loading_indicator_page(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_loading_indicator_page(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         let fg_muted = theme.fg_muted();
         let playing = self.loading_playing;
@@ -2408,7 +2408,7 @@ impl Showcase {
             ))
     }
 
-    fn render_progress_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_progress_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -2429,7 +2429,7 @@ impl Showcase {
             )
     }
 
-    fn render_alert_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_alert_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -2458,7 +2458,7 @@ impl Showcase {
             )
     }
 
-    fn render_tooltip_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_tooltip_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -2486,7 +2486,7 @@ impl Showcase {
             )
     }
 
-    fn render_card_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_card_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -2510,7 +2510,7 @@ impl Showcase {
             )
     }
 
-    fn render_aspect_ratio_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_aspect_ratio_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -2597,7 +2597,7 @@ impl Showcase {
             )
     }
 
-    fn render_breadcrumb_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_breadcrumb_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -2634,7 +2634,7 @@ impl Showcase {
             )
     }
 
-    fn render_separator_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_separator_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -2654,7 +2654,7 @@ impl Showcase {
             )
     }
 
-    fn render_splitter_page(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_splitter_page(&self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         let border = theme.border();
         let fg_muted = theme.fg_muted();
@@ -2811,7 +2811,11 @@ impl Showcase {
             )
     }
 
-    fn render_sidebar_page(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_sidebar_page(
+        &self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement + use<> {
         // Colors resolved up front: `List::render` takes `cx` mutably.
         let theme = cx.theme();
         let border = theme.border();
@@ -3003,7 +3007,7 @@ impl Showcase {
             })
     }
 
-    fn render_collapsible_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_collapsible_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_2()
@@ -3022,7 +3026,7 @@ impl Showcase {
             )
     }
 
-    fn render_accordion_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_accordion_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -3036,7 +3040,7 @@ impl Showcase {
             .child(self.accordion.clone())
     }
 
-    fn render_scroll_area_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_scroll_area_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -3121,7 +3125,7 @@ impl Showcase {
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    ) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -3183,7 +3187,7 @@ impl Showcase {
             )
     }
 
-    fn render_popover_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_popover_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -3201,7 +3205,7 @@ impl Showcase {
         &mut self,
         _window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    ) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -3234,7 +3238,7 @@ impl Showcase {
             )
     }
 
-    fn render_context_menu_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_context_menu_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         let this = cx.entity();
         let pinned = self.context_menu_pinned;
@@ -3330,7 +3334,7 @@ impl Showcase {
         &mut self,
         _window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    ) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -3366,7 +3370,7 @@ impl Showcase {
             )
     }
 
-    fn render_typography_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_typography_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -3413,7 +3417,7 @@ impl Showcase {
             )
     }
 
-    fn render_empty_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_empty_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
         v_stack()
             .gap_4()
@@ -3537,7 +3541,7 @@ impl Showcase {
         rows
     }
 
-    fn render_table_page(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_table_page(&mut self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme().clone();
         // The handlers below run with `&mut App`, not with this view's
         // `Context`, so they reach the page through its own entity.
@@ -3732,7 +3736,7 @@ impl Showcase {
             )
     }
 
-    fn render_markdown_page(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_markdown_page(&mut self, cx: &mut Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme().clone();
 
         // `init_code_highlighting` is itself feature-gated, so the default
@@ -3888,7 +3892,7 @@ impl Showcase {
             )
     }
 
-    fn render_editor_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_editor_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
 
         // The page exists in both builds: requiring `--features editor` for
@@ -3938,7 +3942,7 @@ impl Showcase {
     ///
     /// Each row sits on a tinted stripe exactly the rung's height, so a control
     /// that is off its rung is visible immediately rather than only in a test.
-    fn render_control_sizes_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_control_sizes_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme();
 
         v_stack()
@@ -4052,7 +4056,7 @@ impl Showcase {
             )
     }
 
-    fn render_theme_page(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_theme_page(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let theme = cx.theme().clone();
 
         let sections: Vec<(&str, Vec<(&str, Hsla)>)> = vec![

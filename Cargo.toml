@@ -1,7 +1,7 @@
 [package]
 name = "gpuikit"
 version = "0.8.0"
-edition = "2021"
+edition = "2024"
 authors = ["Nate Butler <iamnbutler@gmail.com>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/iamnbutler/gpuikit"
@@ -16,9 +16,11 @@ categories = ["gui", "graphics"]
 # rust-embed, so anything in it is compiled into every consumer's binary.
 exclude = [".github/"]
 # This crate's own floor, not a promise about the whole dependency tree: it uses
-# async closures (stable in 1.85), and gpui is edition 2024, which needs the same
-# 1.85. The declared 1.75 was never true. Dependencies declare their own, higher
-# numbers and cargo does not hold them back — see README's "Minimum Rust version".
+# async closures (stable in 1.85), and edition 2024, which needs the same 1.85.
+# The declared 1.75 was never true. Dependencies already in `Cargo.lock` declare
+# their own, higher numbers; edition 2024's v3 resolver prefers to respect this
+# floor when it picks a new one, but only prefers — see the crate docs'
+# "Minimum Rust version".
 rust-version = "1.85"
 
 [lib]

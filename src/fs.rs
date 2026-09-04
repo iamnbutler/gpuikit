@@ -106,7 +106,7 @@ impl File {
     }
 
     /// Saves the file asynchronously
-    pub fn save_async(&mut self) -> impl std::future::Future<Output = Result<()>> {
+    pub fn save_async(&mut self) -> impl std::future::Future<Output = Result<()>> + use<> {
         let path = self.path.clone();
         let contents = self.contents.clone();
 
@@ -127,7 +127,7 @@ impl File {
     }
 
     /// Reloads the file from disk asynchronously
-    pub fn reload_async(&self) -> impl std::future::Future<Output = Result<String>> {
+    pub fn reload_async(&self) -> impl std::future::Future<Output = Result<String>> + use<> {
         let path = self.path.clone();
         let exists = self.exists_on_disk;
 

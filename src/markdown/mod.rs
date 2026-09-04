@@ -581,7 +581,7 @@ impl MarkdownRenderer {
         events: &[MarkdownEvent],
         document_id: ElementId,
         cx: &App,
-    ) -> impl IntoElement {
+    ) -> impl IntoElement + use<> {
         for event in events {
             self.handle_event(&event.event, cx);
         }
@@ -1069,7 +1069,7 @@ impl MarkdownRenderer {
         rows: Vec<Vec<RichText>>,
         alignments: Vec<Alignment>,
         cx: &App,
-    ) -> impl IntoElement {
+    ) -> impl IntoElement + use<> {
         let theme = cx.theme();
         let border_color = theme.border();
 

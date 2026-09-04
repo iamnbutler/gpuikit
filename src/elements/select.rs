@@ -463,7 +463,11 @@ impl<T: Clone + PartialEq + 'static> SelectState<T> {
             .map(|(_, label)| label.clone())
     }
 
-    pub fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    pub fn render(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement + use<T> {
         let is_open = self.listbox.is_some();
         // Before `theme` borrows `cx`, and before the label below shadows the
         // control's own name.

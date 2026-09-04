@@ -452,7 +452,6 @@ impl Calendar {
             .justify_center()
             .size(side)
             .rounded(metrics.radius)
-            .text_color(fg)
             .cursor_pointer()
             .hover(move |style| style.bg(hover_bg))
             .on_click(cx.listener(move |this, _, _window, cx| {
@@ -463,7 +462,16 @@ impl Calendar {
                 this.focused_day = this.focused_day.add_months(delta);
                 cx.notify();
             }))
-            .child(icon.size(metrics.text_size))
+            // The colour goes on the `Svg`, not on this div. `svg()` paints
+            // through `if let Some(color) = style.text.color`, and that style
+            // is the element's *own* — `Interactivity::compute_style` starts
+            // from `Style::default()` and refines it with the element's base
+            // style, so nothing cascades in from an ancestor the way it does
+            // for text. A `text_color` on the parent therefore reaches the
+            // glyph not at all: it drew nothing, and these two chevrons had
+            // never once been visible. Every other icon in the crate already
+            // colours the `Svg` itself; `icon_button` does it for its own.
+            .child(icon.size(metrics.text_size).text_color(fg))
     }
 }
 

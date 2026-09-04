@@ -367,7 +367,10 @@ impl InputBindings {
     /// Use this as a starting point when you want to override only specific bindings:
     ///
     /// ```ignore
-    /// let bindings = InputBindings::empty();
+    /// use gpui::KeyBinding;
+    /// use gpuikit::input::bindings::{InputBindings, SelectAll, INPUT_CONTEXT};
+    ///
+    /// let mut bindings = InputBindings::empty();
     /// bindings.select_all = Some(KeyBinding::new("ctrl-shift-a", SelectAll, Some(INPUT_CONTEXT)));
     /// ```
     pub fn empty() -> Self {

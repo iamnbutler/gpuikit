@@ -11,6 +11,7 @@ use gpui::{Svg, svg};
 /// # Example
 /// ```ignore
 /// use gpuikit::DefaultIcons;
+/// use gpuikit::elements::icon_button::icon_button;
 ///
 /// let icon = DefaultIcons::star();
 /// let button = icon_button("favorite", icon);

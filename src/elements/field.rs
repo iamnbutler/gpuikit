@@ -45,12 +45,17 @@ pub enum LabelPosition {
 /// # Example
 ///
 /// ```ignore
+/// use gpuikit::traits::labelable::Labelable;
+///
 /// field("username")
 ///     .label("Username")
 ///     .description("Enter your username")
 ///     .required(true)
-///     .child(input("username"))
+///     .child(input(&self.username, cx))
 /// ```
+///
+/// The child is any element. `input` takes the `Entity<InputState>` holding
+/// the text — the field wraps a control, it does not own one.
 #[derive(IntoElement)]
 pub struct Field {
     id: ElementId,

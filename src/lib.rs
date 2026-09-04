@@ -10,7 +10,7 @@
 //! use gpuikit::init;
 //!
 //! fn main() {
-//!     Application::new()
+//!     Application::with_platform(gpui_platform::current_platform(false))
 //!         .with_assets(gpuikit::assets())
 //!         .run(|cx| {
 //!             init(cx);
@@ -18,6 +18,10 @@
 //!         });
 //! }
 //! ```
+//!
+//! The platform comes from `gpui_platform`, which your app depends on
+//! alongside `gpui` — gpuikit does not re-export either. `false` asks for a
+//! real windowing platform rather than a headless one.
 //!
 //! # Feature Flags
 //!
@@ -137,11 +141,11 @@ mod wasm_compat_guard;
 #[folder = "assets"]
 pub struct Assets;
 
-/// Returns the gpuikit asset source for use with `Application::new().with_assets()`.
+/// Returns the gpuikit asset source, for `Application::with_assets`.
 ///
 /// # Example
 /// ```ignore
-/// Application::new()
+/// Application::with_platform(gpui_platform::current_platform(false))
 ///     .with_assets(gpuikit::assets())
 ///     .run(|cx| {
 ///         gpuikit::init(cx);

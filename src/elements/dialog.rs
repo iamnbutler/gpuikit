@@ -748,7 +748,7 @@ impl Render for DialogState {
 /// use gpuikit::elements::dialog::bind_dialog_keys;
 ///
 /// fn main() {
-///     Application::new().run(|cx| {
+///     Application::with_platform(gpui_platform::current_platform(false)).run(|cx| {
 ///         bind_dialog_keys(cx);
 ///         // ... rest of app initialization
 ///     });

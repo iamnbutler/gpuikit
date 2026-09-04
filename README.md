@@ -21,14 +21,18 @@ distribution of gpui — your app should depend on the same one:
 ```toml
 [dependencies]
 gpui = { package = "gpui-unofficial", version = "1.14" }
+gpui_platform = { package = "gpui-platform-gpui-unofficial", version = "1.14", features = ["font-kit"] }
 gpuikit = "0.8"
 ```
+
+`gpui_platform` is what builds the windowing platform an `Application` runs on;
+gpuikit re-exports neither it nor `gpui`, so your app names all three.
 
 ```rust
 use gpui::Application;
 
 fn main() {
-    Application::new()
+    Application::with_platform(gpui_platform::current_platform(false))
         .with_assets(gpuikit::assets())
         .run(|cx| {
             gpuikit::init(cx);

@@ -16,7 +16,7 @@
 //! before this module existed.
 //!
 //! ```ignore
-//! Application::new().run(|cx| {
+//! Application::with_platform(gpui_platform::current_platform(false)).run(|cx| {
 //!     gpuikit::init(cx);
 //!     gpuikit::markdown::init_code_highlighting(cx);
 //! });

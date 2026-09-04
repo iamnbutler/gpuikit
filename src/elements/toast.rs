@@ -17,7 +17,7 @@
 //!
 //! // With action:
 //! cx.toast("File deleted")
-//!     .action("Undo", |window, cx| { /* ... */ })
+//!     .action("Undo", |_event, window, cx| { /* ... */ })
 //!     .duration(Duration::from_secs(5))
 //!     .show(window, cx);
 //! ```
@@ -614,7 +614,7 @@ pub fn set_toast_position(cx: &mut App, position: ToastPosition) {
 /// use gpuikit::elements::toast;
 ///
 /// fn main() {
-///     Application::new().run(|cx| {
+///     Application::with_platform(gpui_platform::current_platform(false)).run(|cx| {
 ///         gpuikit::init(cx);
 ///         toast::init(cx);
 ///         // ... rest of app initialization

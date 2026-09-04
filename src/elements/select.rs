@@ -27,7 +27,7 @@
 //! use gpuikit::traits::disableable::Disableable;
 //!
 //! // Create a select with enum options
-//! #[derive(Clone, PartialEq)]
+//! #[derive(Clone, Debug, PartialEq)]
 //! enum Country { US, UK, CA }
 //!
 //! let select_state = cx.new(|_cx| {

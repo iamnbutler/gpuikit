@@ -501,10 +501,12 @@ impl ToastManager {
                     ),
                 )
             })
-            // Content
+            // Content. `min_w_0`, or a long description sets the toast's
+            // width and runs past the 360px column instead of wrapping.
             .child(
                 div()
                     .flex_1()
+                    .min_w_0()
                     .flex()
                     .flex_col()
                     .gap(rems(0.25))

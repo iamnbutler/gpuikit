@@ -1,10 +1,10 @@
 #![allow(missing_docs)]
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    App, AppContext, Application, Bounds, ClipboardItem, Context, Entity, FocusHandle, FontWeight,
-    Hsla, InteractiveElement, IntoElement, Menu, ParentElement, Render, Rgba, SharedString,
-    StatefulInteractiveElement, Styled, TitlebarOptions, Window, WindowBounds, WindowOptions, div,
-    px, size,
+    AnyElement, App, AppContext, Application, Bounds, ClipboardItem, Context, Entity, FocusHandle,
+    FontWeight, Hsla, Image, ImageFormat, InteractiveElement, IntoElement, Menu, ParentElement,
+    Render, Rgba, SharedString, StatefulInteractiveElement, Styled, TitlebarOptions, Window,
+    WindowBounds, WindowOptions, div, px, size,
 };
 use gpuikit::a11y::FocusNavigation;
 use gpuikit::date::{Date, Weekday};
@@ -249,6 +249,7 @@ const ELEMENT_COVERAGE: &[(&str, &str)] = &[
 /// are built once, in `Showcase::new`, because `render` runs on every frame and
 /// the sidebar does not change between them.
 const NAV_SECTIONS: &[NavSection] = &[
+    ("Overview", DefaultIcons::rocket, &[("home", "Home")]),
     (
         "Foundations",
         DefaultIcons::ruler_square,
@@ -620,6 +621,277 @@ const REPOSITORIES: &[Repo] = &[
     },
 ];
 
+/// The faces on the Home and Avatar pages, compiled in. gpui's default
+/// `HttpClient` is a null client, so an `img` pointed at a URL never loads —
+/// natively or on the web — unless the application installs one; the Avatar
+/// page was a blank circle for that reason. `examples/showcase-media/README.md`
+/// says where these come from. Indexed by `CrewMember::portrait` and
+/// `Dispatch::portrait`, and decoded once, in `Showcase::new`.
+const PORTRAITS: [&[u8]; 9] = [
+    include_bytes!("showcase-media/portraits/I7dGp6--Gro.jpg"),
+    include_bytes!("showcase-media/portraits/ZHvM3XIOHoE.jpg"),
+    include_bytes!("showcase-media/portraits/n34dhlh0spw.jpg"),
+    include_bytes!("showcase-media/portraits/LPvi7DMp-HU.jpg"),
+    include_bytes!("showcase-media/portraits/zrZUCPgKMHc.jpg"),
+    include_bytes!("showcase-media/portraits/6ml7EMjw1EQ.jpg"),
+    include_bytes!("showcase-media/portraits/5vg_SarQimA.jpg"),
+    include_bytes!("showcase-media/portraits/zX700UTltlg.jpg"),
+    include_bytes!("showcase-media/portraits/XzgD6iRneEk.jpg"),
+];
+
+/// Where a crew member is right now, for the Home page's manifest.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum CrewStatus {
+    OnStation,
+    InTransit,
+    Earthside,
+}
+
+impl CrewStatus {
+    fn label(self) -> &'static str {
+        match self {
+            CrewStatus::OnStation => "On station",
+            CrewStatus::InTransit => "In transit",
+            CrewStatus::Earthside => "Earthside",
+        }
+    }
+}
+
+/// One row of the Home page's crew manifest.
+#[derive(Clone, Copy, PartialEq, Debug)]
+struct CrewMember {
+    id: u32,
+    name: &'static str,
+    role: &'static str,
+    /// The sleep shift they keep. A station that sees sixteen sunrises a day
+    /// runs on a clock of its own, in three shifts.
+    shift: &'static str,
+    /// An index into `PORTRAITS`.
+    portrait: usize,
+    status: CrewStatus,
+}
+
+/// The rotation currently aboard Selene Station, the staging point for the
+/// Home page's lunar freight line.
+const CREW: &[CrewMember] = &[
+    CrewMember {
+        id: 1,
+        name: "Ines Marlow",
+        role: "Station commander",
+        shift: "Alpha",
+        portrait: 0,
+        status: CrewStatus::OnStation,
+    },
+    CrewMember {
+        id: 2,
+        name: "Tomas Reyes",
+        role: "Flight engineer",
+        shift: "Alpha",
+        portrait: 1,
+        status: CrewStatus::OnStation,
+    },
+    CrewMember {
+        id: 3,
+        name: "Mei-Lin Zhao",
+        role: "Regolith operations",
+        shift: "Bravo",
+        portrait: 2,
+        status: CrewStatus::OnStation,
+    },
+    CrewMember {
+        id: 4,
+        name: "Rafael Duarte",
+        role: "Medical officer",
+        shift: "Bravo",
+        portrait: 3,
+        status: CrewStatus::InTransit,
+    },
+    CrewMember {
+        id: 5,
+        name: "Anya Volkova",
+        role: "Systems software",
+        shift: "Charlie",
+        portrait: 4,
+        status: CrewStatus::Earthside,
+    },
+    CrewMember {
+        id: 6,
+        name: "Luis Herrera",
+        role: "Cargo master",
+        shift: "Charlie",
+        portrait: 5,
+        status: CrewStatus::InTransit,
+    },
+];
+
+/// A message on the Home page's comms board, filed under one of its tabs.
+#[derive(Clone, Copy)]
+struct Dispatch {
+    /// The id of the `home_comms` tab it shows under.
+    channel: &'static str,
+    from: &'static str,
+    /// An index into `PORTRAITS`.
+    portrait: usize,
+    subject: &'static str,
+    when: &'static str,
+}
+
+const DISPATCHES: &[Dispatch] = &[
+    Dispatch {
+        channel: "uplink",
+        from: "Houston FCR-1",
+        portrait: 6,
+        subject: "Go for TLI on window 09/09, pending weather at T-0",
+        when: "04:12 UTC",
+    },
+    Dispatch {
+        channel: "uplink",
+        from: "Tycho Regolith Works",
+        portrait: 7,
+        subject: "Pad 3 sintered; 14 t of feedstock ready for the down-mass leg",
+        when: "03:50 UTC",
+    },
+    Dispatch {
+        channel: "uplink",
+        from: "Anya Volkova",
+        portrait: 4,
+        subject: "Guidance patch 4.2.1 staged on the tug; needs a sim run first",
+        when: "02:07 UTC",
+    },
+    Dispatch {
+        channel: "downlink",
+        from: "Ines Marlow",
+        portrait: 0,
+        subject: "Crew status nominal. Requesting one more day on the CO₂ curve.",
+        when: "03:30 UTC",
+    },
+    Dispatch {
+        channel: "downlink",
+        from: "Mei-Lin Zhao",
+        portrait: 2,
+        subject: "Sample bay C sealed; manifest attached",
+        when: "01:45 UTC",
+    },
+    Dispatch {
+        channel: "scheduled",
+        from: "Gateway ops",
+        portrait: 8,
+        subject: "NRHO rendezvous brief, 09/11 14:00 UTC",
+        when: "in 7 d",
+    },
+    Dispatch {
+        channel: "scheduled",
+        from: "Medical",
+        portrait: 3,
+        subject: "Bravo-shift eye exams, 09/06 09:00 UTC",
+        when: "in 2 d",
+    },
+];
+
+/// Where the Home page's burn planner sends the tug.
+#[derive(Clone, PartialEq, Debug)]
+enum BurnTarget {
+    Gateway,
+    TychoPad,
+    L2Halo,
+    Return,
+}
+
+impl BurnTarget {
+    fn label(&self) -> &'static str {
+        match self {
+            BurnTarget::Gateway => "Lunar Gateway (NRHO)",
+            BurnTarget::TychoPad => "Tycho Regolith Works, pad 3",
+            BurnTarget::L2Halo => "Earth–Moon L2 halo",
+            BurnTarget::Return => "Return to Selene Station",
+        }
+    }
+}
+
+/// Which way the tug points for the burn.
+#[derive(Clone, PartialEq, Debug)]
+enum BurnDirection {
+    Prograde,
+    Retrograde,
+    Normal,
+    Radial,
+}
+
+impl BurnDirection {
+    fn label(&self) -> &'static str {
+        match self {
+            BurnDirection::Prograde => "prograde",
+            BurnDirection::Retrograde => "retrograde",
+            BurnDirection::Normal => "normal",
+            BurnDirection::Radial => "radial",
+        }
+    }
+}
+
+/// The tug the burn planner plans for: a methalox stage of about the size
+/// that flies today. Vacuum specific impulse in seconds, dry mass in tonnes,
+/// thrust in newtons.
+const TUG_ISP_S: f32 = 348.0;
+const TUG_DRY_MASS_T: f32 = 8.0;
+const TUG_THRUST_N: f32 = 2_200_000.0;
+/// Standard gravity, m/s², which is what turns an Isp into an exhaust velocity.
+const G0: f32 = 9.806_65;
+
+/// The rocket equation, solved for propellant: what it costs to give the dry
+/// tug plus `payload_t` a change in velocity of `delta_v_m_s`. In tonnes.
+fn propellant_for(delta_v_m_s: f32, payload_t: f32) -> f32 {
+    (TUG_DRY_MASS_T + payload_t) * ((delta_v_m_s / (TUG_ISP_S * G0)).exp() - 1.0)
+}
+
+/// How long the engine runs to spend that much, at its fixed mass flow.
+fn burn_seconds(propellant_t: f32) -> f32 {
+    let mass_flow_kg_s = TUG_THRUST_N / (TUG_ISP_S * G0);
+    propellant_t * 1000.0 / mass_flow_kg_s
+}
+
+/// Days of the launch calendar's month with a trans-lunar injection window.
+/// Every other day is disabled: the plane of the station's orbit only lines
+/// up with the Moon's about every third day.
+const LAUNCH_WINDOW_DAYS: &[u32] = &[6, 9, 12, 21, 24, 27];
+
+/// The life-support gauges: label, the reading as the crew would say it, and
+/// the fraction of the gauge that is filled.
+const LIFE_SUPPORT: &[(&str, &str, f32)] = &[
+    ("O₂ partial pressure", "21.1 kPa", 0.88),
+    ("CO₂ scrubber saturation", "bank A · 71 %", 0.71),
+    ("Water reclamation", "93 % recovered", 0.93),
+    ("Battery state of charge", "38 % · in eclipse", 0.38),
+];
+
+/// The pre-launch checklist: element id, the item, whether it starts checked,
+/// and whether it is locked. Range safety owns the last one; the page cannot
+/// change it.
+const CHECKLIST: [(&str, &str, bool, bool); 5] = [
+    (
+        "home-check-propellant",
+        "Propellant load complete",
+        true,
+        false,
+    ),
+    ("home-check-range", "Range clear", true, false),
+    ("home-check-weather", "Weather go at T-0", false, false),
+    ("home-check-crew", "Crew strapped in", false, false),
+    (
+        "home-check-fts",
+        "Flight termination system armed",
+        true,
+        true,
+    ),
+];
+
+/// The Home page's status strip: what the tile says, and the number under it.
+const TELEMETRY: &[(&str, &str)] = &[
+    ("Altitude", "412 km"),
+    ("Ground speed", "7.66 km/s"),
+    ("Orbital period", "92.9 min"),
+    ("Light delay to Moon", "1.28 s"),
+];
+
 /// The columns the Table page sorts by, by index. Restated here because the
 /// comparator is the page's job — the element is told *how* the rows are
 /// sorted, never *how to* sort them.
@@ -751,6 +1023,27 @@ struct Showcase {
     table_sort: SortDescriptor,
     table_selected: HashSet<u32>,
     table_status: SharedString,
+    /// `PORTRAITS`, decoded. Built once: `Image::from_bytes` keys the image
+    /// cache on a hash of the bytes, but hashing five kilobytes per face per
+    /// frame is not free either.
+    portraits: Rc<Vec<Arc<Image>>>,
+    /// The Home page's controls. Each has its own entity, like every other
+    /// page's: nothing is shared with the component pages, so a slider dragged
+    /// on Home does not move one on Slider.
+    home_crew_filter: Entity<InputState>,
+    /// The last manifest row activated, as the card's footer prints it.
+    home_crew_opened: SharedString,
+    home_burn_target: Entity<SelectState<BurnTarget>>,
+    home_burn_direction: Entity<ToggleGroup<BurnDirection>>,
+    home_burn_delta_v: Entity<Slider>,
+    home_burn_payload: Entity<Slider>,
+    home_life_support: [Entity<Switch>; 3],
+    home_comms: Entity<Tabs>,
+    home_checklist: [Entity<Checkbox>; 5],
+    home_cargo: Entity<AccordionState>,
+    home_launch_calendar: Entity<Calendar>,
+    /// The day the launch calendar last reported.
+    home_launch_window: Option<Date>,
 }
 
 impl Showcase {
@@ -1186,9 +1479,138 @@ impl Showcase {
         cx.observe(&table_filter, |_this, _filter, cx| cx.notify())
             .detach();
 
-        // The URL decides on the web; native opens on Button.
+        // The Home page. Its readouts — propellant, subsystems online, items
+        // go — are derived in `render` from these entities, so the page has to
+        // hear about every change, the same way it hears about the table
+        // filter above.
+        let portraits = Rc::new(
+            PORTRAITS
+                .iter()
+                .map(|bytes| Arc::new(Image::from_bytes(ImageFormat::Jpeg, bytes.to_vec())))
+                .collect::<Vec<_>>(),
+        );
+
+        let home_crew_filter = cx.new(InputState::new_singleline);
+        cx.observe(&home_crew_filter, |_this, _filter, cx| cx.notify())
+            .detach();
+
+        let home_burn_target = cx.new(|_cx| {
+            SelectState::new(
+                select(
+                    "home-burn-target",
+                    "Target",
+                    vec![
+                        (BurnTarget::Gateway, BurnTarget::Gateway.label()),
+                        (BurnTarget::TychoPad, BurnTarget::TychoPad.label()),
+                        (BurnTarget::L2Halo, BurnTarget::L2Halo.label()),
+                        (BurnTarget::Return, BurnTarget::Return.label()),
+                    ],
+                )
+                .selected(BurnTarget::Gateway)
+                .full_width(true),
+            )
+        });
+        let home_burn_direction = cx.new(|_cx| {
+            toggle_group(
+                "home-burn-direction",
+                vec![
+                    toggle_option(BurnDirection::Prograde, "Prograde"),
+                    toggle_option(BurnDirection::Retrograde, "Retrograde"),
+                    toggle_option(BurnDirection::Normal, "Normal"),
+                    toggle_option(BurnDirection::Radial, "Radial"),
+                ],
+            )
+            .selected_value(BurnDirection::Prograde)
+        });
+        // 3.1 km/s is what trans-lunar injection costs from low Earth orbit.
+        let home_burn_delta_v = cx.new(|_cx| {
+            slider("home-burn-delta-v", 3100.0, 0.0..=3400.0)
+                .label("Δv, m/s")
+                .step(10.0)
+        });
+        let home_burn_payload = cx.new(|_cx| {
+            slider("home-burn-payload", 12.0, 0.0..=40.0)
+                .label("Payload, t")
+                .step(0.5)
+        });
+        let home_life_support = [
+            ("home-ls-sabatier", "Sabatier reactor", true),
+            ("home-ls-scrubber-b", "Scrubber bank B", false),
+            ("home-ls-night", "Night lighting", true),
+        ]
+        .map(|(id, label, on)| cx.new(|_cx| switch(id, on).label(label)));
+        let home_comms = cx.new(|_cx| {
+            tabs("home-comms")
+                .tab(tab("uplink", "Uplink"))
+                .tab(tab("downlink", "Downlink"))
+                .tab(tab("scheduled", "Scheduled"))
+        });
+        let home_checklist = CHECKLIST.map(|(id, label, checked, locked)| {
+            cx.new(|_cx| checkbox(id, checked).label(label).disabled(locked))
+        });
+        let home_cargo = cx.new(|_cx| {
+            AccordionState::new(
+                gpuikit::elements::accordion::accordion("home-cargo")
+                    .item(
+                        accordion_item("bay-a", "Bay A · 6.2 t · pressurised")
+                            .content("Food for 90 days, two CO₂ scrubber cartridges, medical resupply, and the crew's personal allowance at 2 kg each."),
+                    )
+                    .item(
+                        accordion_item("bay-b", "Bay B · 4.8 t · unpressurised")
+                            .content("A replacement solar array wing for Gateway and the drill string for Tycho pad 3, strapped on a common pallet."),
+                    )
+                    .item(
+                        accordion_item("bay-c", "Bay C · 1.0 t · sealed, return")
+                            .content("Regolith cores and sintered brick samples coming down. Sealed on station; opens in the receiving lab, not here.")
+                            .disabled(true),
+                    )
+                    .default_expanded("bay-a"),
+            )
+        });
+
+        // A fixed month, like the Calendar page: a page that read the clock
+        // would look different every day it was screenshotted.
+        let launch_today = Date::new(2026, 9, 4).expect("2026-09-04 is a day");
+        let first_window = Date::new(2026, 9, 9).expect("2026-09-09 is a day");
+        let home_launch_calendar = cx.new(|cx| {
+            Calendar::new("home-launch-calendar", launch_today, cx)
+                .today(launch_today)
+                .selected(Some(first_window))
+                .first_day_of_week(Weekday::Monday)
+                .disabled_days(|date| !LAUNCH_WINDOW_DAYS.contains(&date.day()))
+        });
+        cx.subscribe(
+            &home_launch_calendar,
+            |this, _, event: &CalendarEvent, cx| {
+                if let CalendarEvent::Selected(date) = event {
+                    this.home_launch_window = Some(*date);
+                    cx.notify();
+                }
+            },
+        )
+        .detach();
+
+        for slider in [&home_burn_delta_v, &home_burn_payload] {
+            cx.observe(slider, |_this, _slider, cx| cx.notify())
+                .detach();
+        }
+        for switch in &home_life_support {
+            cx.observe(switch, |_this, _switch, cx| cx.notify())
+                .detach();
+        }
+        for item in &home_checklist {
+            cx.observe(item, |_this, _item, cx| cx.notify()).detach();
+        }
+        cx.observe(&home_burn_target, |_this, _select, cx| cx.notify())
+            .detach();
+        cx.observe(&home_burn_direction, |_this, _group, cx| cx.notify())
+            .detach();
+        cx.observe(&home_comms, |_this, _tabs, cx| cx.notify())
+            .detach();
+
+        // The URL decides on the web; native opens on Home.
         let active_page = Rc::new(RefCell::new(
-            page_from_location().unwrap_or_else(|| SharedString::from("button")),
+            page_from_location().unwrap_or_else(|| SharedString::from("home")),
         ));
         let nav = nav_entries(&active_page);
 
@@ -1372,7 +1794,564 @@ impl Showcase {
             table_sort: SortDescriptor::new(TABLE_COLUMN_STARS, SortDirection::Descending),
             table_selected: HashSet::new(),
             table_status: "No repository opened yet.".into(),
+            portraits,
+            home_crew_filter,
+            home_crew_opened: "Click a row to open a crew record.".into(),
+            home_burn_target,
+            home_burn_direction,
+            home_burn_delta_v,
+            home_burn_payload,
+            home_life_support,
+            home_comms,
+            home_checklist,
+            home_cargo,
+            home_launch_calendar,
+            home_launch_window: Some(first_window),
         }
+    }
+
+    // ----- Home -----
+
+    /// The crew rows the manifest shows, after the filter field above it.
+    fn visible_crew(&self, cx: &App) -> Vec<CrewMember> {
+        let needle = self.home_crew_filter.read(cx).content().to_lowercase();
+        CREW.iter()
+            .copied()
+            .filter(|member| {
+                needle.is_empty()
+                    || member.name.to_lowercase().contains(&needle)
+                    || member.role.to_lowercase().contains(&needle)
+            })
+            .collect()
+    }
+
+    /// A small labelled number for the status strip.
+    fn telemetry_tile(theme: &Theme, label: &'static str, value: &'static str) -> impl IntoElement {
+        v_stack()
+            .gap_1()
+            .px_3()
+            .py_2()
+            .rounded_md()
+            .bg(theme.surface())
+            .border_1()
+            .border_color(theme.border())
+            .child(div().text_xs().text_color(theme.fg_muted()).child(label))
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(value),
+            )
+    }
+
+    /// The Home page is a mission-control board for a small lunar freight
+    /// line, built out of nothing but the kit. Every panel is a `Card`; what
+    /// is inside is a `Table`, a `Slider`, a `Switch`, a `Calendar` and so on,
+    /// composed the way an application would compose them, rather than lined
+    /// up one variant at a time the way the component pages do. Its point is
+    /// to show what the parts look like together.
+    fn render_home_page(
+        &mut self,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement + use<> {
+        let theme = cx.theme().clone();
+        let view = cx.entity();
+
+        // --- Header ---
+        // --- Header ---
+        let hero = v_stack()
+            .max_w(px(640.))
+            .gap_3()
+            .child(
+                h_stack()
+                    .gap_2()
+                    .child(badge(build_stamp()).outline())
+                    .child(badge("gpui 1.14").secondary()),
+            )
+            .child(h1("Components for gpui, composed."))
+            .child(lead(
+                "Everything on this board is built from the kit: cards, a table, \
+                 sliders, switches, tabs, a calendar and a toast. Pick a \
+                 component in the sidebar to see every one of its variants on \
+                 its own.",
+            ))
+            .child(
+                h_stack()
+                    .flex_wrap()
+                    .gap_2()
+                    .items_center()
+                    .child(button("home-browse", "Browse the components").on_click({
+                        let cell = self.active_page.clone();
+                        move |_, window, _cx| {
+                            navigate_to(&cell, SharedString::from("button"), window)
+                        }
+                    }))
+                    .child(
+                        button("home-open-palette", "Search the components").on_click({
+                            let palette = self.command_palette.clone();
+                            move |_, window, cx| {
+                                palette.update(cx, |state, cx| state.open(window, cx));
+                            }
+                        }),
+                    ),
+            );
+
+        // The rows of the board wrap rather than overflow: the hosted showcase
+        // is opened at every width a browser has, so below about 800 px of
+        // content a side column drops under the main one, and the strip's
+        // tiles go two to a line.
+        let telemetry = v_stack()
+            .gap_2()
+            .child(
+                h_stack()
+                    .gap_2()
+                    .items_center()
+                    .child(loading_indicator().dots().xsmall().color(theme.success()))
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(theme.fg_muted())
+                            .child("Selene Station · live telemetry"),
+                    ),
+            )
+            .child(h_stack().flex_wrap().gap_2().children(TELEMETRY.iter().map(
+                |(label, value)| {
+                    div()
+                        .flex_1()
+                        .min_w(px(150.))
+                        .child(Self::telemetry_tile(&theme, label, value))
+                },
+            )));
+
+        // --- Crew manifest: TextField, Table, Avatar, Badge ---
+        let crew = self.visible_crew(cx);
+        let aboard = CREW
+            .iter()
+            .filter(|member| member.status == CrewStatus::OnStation)
+            .count();
+
+        let portraits = self.portraits.clone();
+        let crew_table = table("home-crew")
+            .column(
+                Column::new("Crew", move |member: &CrewMember, _window, _cx| {
+                    h_stack()
+                        .gap_2()
+                        .items_center()
+                        .child(avatar(portraits[member.portrait].clone()).size(px(24.)))
+                        .child(member.name)
+                        .into_any_element()
+                })
+                .min_width(px(170.)),
+            )
+            .column(
+                Column::new("Role", |member: &CrewMember, _window, _cx| {
+                    div().child(member.role).into_any_element()
+                })
+                .min_width(px(130.)),
+            )
+            .column(
+                Column::new("Status", |member: &CrewMember, _window, _cx| {
+                    match member.status {
+                        CrewStatus::OnStation => badge(member.status.label()),
+                        CrewStatus::InTransit => badge(member.status.label()).secondary(),
+                        CrewStatus::Earthside => badge(member.status.label()).outline(),
+                    }
+                    .into_any_element()
+                })
+                .fixed(px(100.))
+                .align(CellAlign::Center),
+            )
+            .rows(crew.iter().map(|member| {
+                let member = *member;
+                let view = view.clone();
+                Row::new(member).on_click(move |_window, cx| {
+                    view.update(cx, |this, cx| {
+                        this.home_crew_opened =
+                            format!("{} · {} · {} shift", member.name, member.role, member.shift)
+                                .into();
+                        cx.notify();
+                    });
+                })
+            }))
+            .empty("Nobody on the manifest matches that.");
+
+        let crew_card = card()
+            .title("Crew manifest")
+            .description(format!(
+                "Rotation 14. {aboard} of {} aboard; the rest are in transit or on the ground.",
+                CREW.len()
+            ))
+            .body(
+                v_stack()
+                    .gap_3()
+                    .child(
+                        div().w(px(240.)).child(
+                            text_field(&self.home_crew_filter, cx)
+                                .placeholder("Filter by name or role")
+                                .prefix(Adornment::icon(DefaultIcons::magnifying_glass())),
+                        ),
+                    )
+                    .child(crew_table),
+            )
+            .footer(
+                div()
+                    .text_xs()
+                    .text_color(theme.fg_muted())
+                    .child(self.home_crew_opened.clone()),
+            );
+
+        // --- Burn planner: Select, ToggleGroup, Slider, Button, Toast ---
+        let delta_v = self.home_burn_delta_v.read(cx).value();
+        let payload = self.home_burn_payload.read(cx).value();
+        let propellant = propellant_for(delta_v, payload);
+        let seconds = burn_seconds(propellant);
+        let target = self
+            .home_burn_target
+            .read(cx)
+            .selected
+            .clone()
+            .unwrap_or(BurnTarget::Gateway);
+        let direction = self
+            .home_burn_direction
+            .read(cx)
+            .get_selected()
+            .first()
+            .cloned()
+            .unwrap_or(BurnDirection::Prograde);
+        // The tug tanks 60 t. Past that, the readout says so and the commit is
+        // disabled — the same readout, in the danger colour.
+        let over_budget = propellant > 60.0;
+
+        let readout = |label: &'static str, value: String, warn: bool| {
+            v_stack()
+                .flex_1()
+                .gap_1()
+                .child(div().text_xs().text_color(theme.fg_muted()).child(label))
+                .child(
+                    div()
+                        .text_sm()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .when(warn, |el| el.text_color(theme.danger()))
+                        .child(value),
+                )
+        };
+
+        let burn_summary = format!(
+            "{delta_v:.0} m/s {} to {}",
+            direction.label(),
+            target.label()
+        );
+
+        let burn_card = card()
+            .title("Burn planner")
+            .description("Isp 348 s, 8 t dry. Propellant is the rocket equation, run live.")
+            .body(
+                v_stack()
+                    .gap_4()
+                    .child(self.home_burn_target.clone())
+                    .child(self.home_burn_direction.clone())
+                    .child(self.home_burn_delta_v.clone())
+                    .child(self.home_burn_payload.clone())
+                    .child(separator())
+                    .child(
+                        h_stack()
+                            .gap_4()
+                            .child(readout(
+                                "Propellant",
+                                format!("{propellant:.1} t"),
+                                over_budget,
+                            ))
+                            .child(readout("Burn", format!("{seconds:.0} s"), false))
+                            .child(readout(
+                                "Wet mass",
+                                format!("{:.1} t", TUG_DRY_MASS_T + payload + propellant),
+                                false,
+                            )),
+                    ),
+            )
+            .footer(
+                h_stack()
+                    .gap_2()
+                    .items_center()
+                    .child(
+                        button("home-burn-commit", "Commit burn")
+                            .disabled(over_budget)
+                            .on_click({
+                                let summary = burn_summary.clone();
+                                move |_, window, cx| {
+                                    cx.toast(summary.clone())
+                                        .title("Burn committed")
+                                        .success()
+                                        .show(window, cx);
+                                }
+                            }),
+                    )
+                    .child(button("home-burn-scrub", "Scrub").destructive().on_click(
+                        |_, window, cx| {
+                            cx.toast("Burn scrubbed. The tug holds its orbit.")
+                                .warning()
+                                .show(window, cx);
+                        },
+                    ))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .text_xs()
+                            .text_color(if over_budget {
+                                theme.danger()
+                            } else {
+                                theme.fg_muted()
+                            })
+                            .child(if over_budget {
+                                "Over the 60 t tank. Shed payload or shorten the burn.".to_string()
+                            } else {
+                                burn_summary
+                            }),
+                    ),
+            );
+
+        // --- Life support: Progress, Switch ---
+        let subsystems_online = self
+            .home_life_support
+            .iter()
+            .filter(|switch| switch.read(cx).is_on())
+            .count();
+
+        let gauges = LIFE_SUPPORT.iter().map(|(label, reading, fill)| {
+            let variant = if *fill >= 0.85 {
+                ProgressVariant::Success
+            } else if *fill < 0.4 {
+                ProgressVariant::Danger
+            } else {
+                ProgressVariant::Default
+            };
+            v_stack()
+                .gap_1()
+                .child(
+                    h_stack()
+                        .justify_between()
+                        .child(div().text_sm().child(*label))
+                        .child(div().text_xs().text_color(theme.fg_muted()).child(*reading)),
+                )
+                .child(progress(*fill).variant(variant))
+        });
+
+        let life_support_card = card()
+            .title("Life support")
+            .description("Gauges read the environment; the switches run it.")
+            .body(
+                v_stack()
+                    .gap_3()
+                    .children(gauges)
+                    .child(separator())
+                    .children(self.home_life_support.iter().cloned()),
+            )
+            .footer(div().text_xs().text_color(theme.fg_muted()).child(format!(
+                "{subsystems_online} of {} subsystems online",
+                self.home_life_support.len()
+            )));
+
+        // --- Comms: Tabs, Avatar ---
+        let channel = self
+            .home_comms
+            .read(cx)
+            .get_selected()
+            .cloned()
+            .unwrap_or_else(|| SharedString::from("uplink"));
+
+        let dispatches: Vec<_> = DISPATCHES
+            .iter()
+            .filter(|dispatch| dispatch.channel == channel.as_ref())
+            .collect();
+
+        let comms_rows = dispatches.iter().enumerate().map(|(i, dispatch)| {
+            v_stack()
+                .when(i > 0, |el| {
+                    el.border_t_1().border_color(theme.border_subtle())
+                })
+                .py_2()
+                .gap_1()
+                .child(
+                    h_stack()
+                        .gap_2()
+                        .items_center()
+                        .child(avatar(self.portraits[dispatch.portrait].clone()).size(px(20.)))
+                        .child(
+                            div()
+                                .flex_1()
+                                .text_sm()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .child(dispatch.from),
+                        )
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(theme.fg_muted())
+                                .child(dispatch.when),
+                        ),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(theme.fg_muted())
+                        .child(dispatch.subject),
+                )
+        });
+
+        let comms_card = card()
+            .title("Comms")
+            .description("Round trip to the Moon is 2.6 s; nobody talks over anyone.")
+            .body(
+                v_stack()
+                    .gap_2()
+                    .child(self.home_comms.clone())
+                    .child(v_stack().children(comms_rows)),
+            );
+
+        // --- Docking: Alert ---
+        let docking = h_stack()
+            .gap_3()
+            .items_center()
+            .child(
+                div().flex_1().min_w_0().child(
+                    alert("Cygnus NG-31 is holding on the R-bar. Approach needs a go from the commander and from Houston.")
+                        .id("home-docking-hold")
+                        .title("Hold at 200 m")
+                        .warning()
+                        .dismissible(true),
+                ),
+            )
+            .child(
+                button("home-docking-go", "Go for approach").on_click(|_, window, cx| {
+                    cx.toast("Cygnus NG-31 cleared to 30 m. Capture in 14 minutes.")
+                        .info()
+                        .show(window, cx);
+                }),
+            );
+
+        // --- Checklist: Checkbox, Progress ---
+        let go_items = self
+            .home_checklist
+            .iter()
+            .filter(|item| item.read(cx).is_checked())
+            .count();
+        let checklist_len = self.home_checklist.len();
+
+        let checklist_card = card()
+            .title("Pre-launch checklist")
+            .description("Range safety owns the last line; it cannot be unchecked from here.")
+            .body(
+                v_stack()
+                    .gap_2()
+                    .children(self.home_checklist.iter().cloned()),
+            )
+            .footer(
+                v_stack()
+                    .gap_2()
+                    .child(
+                        h_stack()
+                            .justify_between()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(theme.fg_muted())
+                                    .child(format!("{go_items} of {checklist_len} go")),
+                            )
+                            .child(if go_items == checklist_len {
+                                badge("Go for launch")
+                            } else {
+                                badge("No go").outline()
+                            }),
+                    )
+                    .child(progress(go_items as f32 / checklist_len as f32).variant(
+                        if go_items == checklist_len {
+                            ProgressVariant::Success
+                        } else {
+                            ProgressVariant::Default
+                        },
+                    )),
+            );
+
+        // --- Launch windows: Calendar ---
+        let window_line = match self.home_launch_window {
+            Some(date) => format!(
+                "Window: {} {}, {}. Days the plane does not line up are disabled.",
+                date.month_name(),
+                date.day(),
+                date.year()
+            ),
+            None => "Pick a window. Days the plane does not line up are disabled.".to_string(),
+        };
+
+        let calendar_card = card()
+            .title("Launch windows")
+            .description("Trans-lunar injection, September 2026.")
+            // Centred in a row, not stretched: the calendar's frame takes
+            // whatever width it is given, and its grid does not, so a
+            // stretched frame is mostly empty.
+            .body(
+                h_stack()
+                    .justify_center()
+                    .child(self.home_launch_calendar.clone()),
+            )
+            .footer(
+                div()
+                    .text_xs()
+                    .text_color(theme.fg_muted())
+                    .child(window_line),
+            );
+
+        // --- Cargo: Accordion ---
+        let cargo_card = card()
+            .title("Cargo manifest")
+            .description("What goes up on this window, by bay.")
+            .body(self.home_cargo.clone());
+
+        // --- The board ---
+        // Cards are paired by height, so a row's columns end together: the
+        // manifest beside the gauges, the planner beside the comms board, and
+        // the three short cards on one line.
+        let main_column = |child: AnyElement| v_stack().flex_1().min_w(px(440.)).child(child);
+        let side_column = |child: AnyElement| {
+            v_stack()
+                .flex_1()
+                .min_w(px(320.))
+                .max_w(px(420.))
+                .child(child)
+        };
+
+        v_stack().gap_8().child(hero).child(telemetry).child(
+            v_stack()
+                .gap_4()
+                .child(
+                    h_stack()
+                        .flex_wrap()
+                        .gap_4()
+                        .items_start()
+                        .child(main_column(crew_card.into_any_element()))
+                        .child(side_column(life_support_card.into_any_element())),
+                )
+                .child(
+                    h_stack()
+                        .flex_wrap()
+                        .gap_4()
+                        .items_start()
+                        .child(main_column(burn_card.into_any_element()))
+                        .child(side_column(comms_card.into_any_element())),
+                )
+                .child(docking)
+                .child(
+                    h_stack()
+                        .flex_wrap()
+                        .gap_4()
+                        .items_start()
+                        .child(v_stack().flex_1().min_w(px(280.)).child(checklist_card))
+                        .child(v_stack().flex_1().min_w(px(280.)).child(cargo_card))
+                        .child(v_stack().flex_1().min_w(px(300.)).child(calendar_card)),
+                ),
+        )
     }
 
     fn render_button_page(
@@ -2273,8 +3252,11 @@ impl Showcase {
                     .child("Avatar"),
             )
             .child(
-                h_stack().gap_2().child(
-                    avatar("https://avatars.githubusercontent.com/u/1714999?v=4").size(px(32.)),
+                h_stack().gap_2().items_center().children(
+                    [px(48.), px(32.), px(24.), px(16.)]
+                        .into_iter()
+                        .zip(self.portraits.iter())
+                        .map(|(size, portrait)| avatar(portrait.clone()).size(size)),
                 ),
             )
     }
@@ -4298,6 +5280,7 @@ impl Render for Showcase {
             );
 
         let content = match current_page.as_ref() {
+            "home" => self.render_home_page(window, cx).into_any_element(),
             "button" => v_stack()
                 .gap_8()
                 .child(self.render_button_page(window, cx))

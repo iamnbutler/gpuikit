@@ -8,19 +8,19 @@
 //! cx.notify(current_view))`, so a repeating animation re-arms a notify of the
 //! *enclosing view* forever: one spinner pins its whole window — sidebar,
 //! scroll area and all — at the display refresh rate, whether or not the
-//! spinner's glyph actually changed.
+//! spinner's frame actually changed.
 //!
 //! Indicators therefore share one `LoadingClock`. It wakes at the union of
 //! the frame boundaries its subscribers asked for — 2–10 times a second rather
 //! than 60–120 — and notifies exactly the views that are displaying an
 //! indicator, which is the same invalidation gpui was doing, just at the rate
-//! the glyphs change. When the last indicator goes away the clock stops
+//! the frames change. When the last indicator goes away the clock stops
 //! entirely and costs nothing until one is rendered again.
 
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
     div, prelude::FluentBuilder, rems, App, AsyncApp, EntityId, Hsla, IntoElement, ParentElement,
-    RenderOnce, SharedString, Styled, Task, Window,
+    Rems, RenderOnce, SharedString, Styled, Task, Window,
 };
 use std::cell::RefCell;
 use std::time::Duration;
@@ -41,7 +41,94 @@ pub fn loading_indicator() -> LoadingIndicator {
     LoadingIndicator::new()
 }
 
-/// The glyph sequence a [`LoadingIndicator`] cycles through.
+/// One frame of an indicator: either characters, or lit dots on a grid.
+///
+/// Four of the seven variants used to be characters too — `❊✳※`, `◢◣◤◥` and
+/// the braille blocks. That made them a bet on the consumer's font, and the
+/// bet loses on gpui's own web platform, which bundles IBM Plex Sans and Lilex
+/// and calls `new_without_system_fonts`: neither font has U+2733, U+25E2 or
+/// anything in the braille block, there is no fallback to fall back to, and
+/// all four rendered as empty boxes. Drawing them removes the bet. A spinner
+/// in a GPU toolkit has no business depending on text at all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Frame {
+    /// Characters. Kept for the variants whose whole identity *is* the
+    /// characters, and which only ever use ASCII: a dot is a dot everywhere.
+    Text(&'static str),
+    /// Lit dots on a `cols` x `rows` grid, one bit per cell, row-major from
+    /// the top left.
+    Dots { cols: u16, rows: u16, mask: u16 },
+}
+
+/// A braille byte as a row-major mask on the 2x4 grid its dots are drawn on.
+///
+/// The braille frames below stay written as the bytes they came from — `0xFE`
+/// is `⣾` — because that is what keeps the eight-frame spinner recognisable as
+/// the one every terminal draws. Braille numbers its dots down the left
+/// column, then down the right, then the low pair, so the byte is not itself a
+/// row-major bitmap and this is the translation.
+const fn braille(byte: u8) -> u16 {
+    /// `(bit in the braille byte, cell index on the 2-wide, 4-tall grid)`.
+    const CELLS: [(u8, u16); 8] = [
+        (0, 0), // dot 1: left column, row 0
+        (1, 2), // dot 2: left, row 1
+        (2, 4), // dot 3: left, row 2
+        (3, 1), // dot 4: right, row 0
+        (4, 3), // dot 5: right, row 1
+        (5, 5), // dot 6: right, row 2
+        (6, 6), // dot 7: left, row 3
+        (7, 7), // dot 8: right, row 3
+    ];
+
+    let mut mask = 0u16;
+    let mut i = 0;
+    while i < CELLS.len() {
+        let (bit, cell) = CELLS[i];
+        if byte & (1 << bit) != 0 {
+            mask |= 1 << cell;
+        }
+        i += 1;
+    }
+    mask
+}
+
+/// A 2x4 dot frame from a braille byte.
+const fn braille_frame(byte: u8) -> Frame {
+    Frame::Dots {
+        cols: 2,
+        rows: 4,
+        mask: braille(byte),
+    }
+}
+
+/// The eight-frame braille spinner: one dot dark, walking the ring.
+const BRAILLE_SPINNER: [Frame; 8] = [
+    braille_frame(0xFE),
+    braille_frame(0xFD),
+    braille_frame(0xFB),
+    braille_frame(0xBF),
+    braille_frame(0x7F),
+    braille_frame(0xDF),
+    braille_frame(0xEF),
+    braille_frame(0xF7),
+];
+
+/// Every non-empty braille pattern, in order — a binary counter on eight dots.
+///
+/// 255 frames, not 256: mask 0 draws nothing, and a spinner that vanishes for
+/// one frame per cycle reads as a dropped frame rather than as a count. The
+/// glyph version of this claimed 256 in its own doc comment and listed 192.
+const BRAILLE_COUNTER: [Frame; 255] = {
+    let mut frames = [braille_frame(1); 255];
+    let mut i = 0;
+    while i < frames.len() {
+        frames[i] = braille_frame((i + 1) as u8);
+        i += 1;
+    }
+    frames
+};
+
+/// The frame sequence a [`LoadingIndicator`] cycles through.
 #[derive(Debug, Clone, Copy, Default)]
 pub enum LoadingIndicatorVariant {
     /// `.`, `..`, `...`
@@ -51,39 +138,89 @@ pub enum LoadingIndicatorVariant {
     Ellipsis,
     /// A spinning ASCII bar.
     Dash,
-    /// Pulsing asterisks.
+    /// A drawn star, twinkling: the centre, a plus, a cross, a plus.
     Star,
-    /// A triangle rotating through the four corners.
+    /// A drawn triangle rotating through the four corners — three lit dots of
+    /// a 2x2, with the dark one walking clockwise.
     Triangle,
-    /// The eight-frame braille spinner.
+    /// The eight-frame braille spinner, drawn as dots rather than typed.
     Braille,
-    /// A 256-frame braille counter.
+    /// A 255-frame braille counter, drawn as dots rather than typed.
     BrailleExtended,
 }
 
 impl LoadingIndicatorVariant {
-    fn frames(&self) -> &'static [&'static str] {
+    fn frames(&self) -> &'static [Frame] {
         match self {
-            LoadingIndicatorVariant::Dots => &[".  ", ".. ", "..."],
-            LoadingIndicatorVariant::Ellipsis => &["   ", ".  ", ".. ", "...", ".. ", ".  "],
-            LoadingIndicatorVariant::Dash => &["-", "\\", "|", "/"],
-            LoadingIndicatorVariant::Star => &["❊", "❊", "✳︎", "※"],
-            LoadingIndicatorVariant::Triangle => &["◢", "◣", "◤", "◥"],
-            LoadingIndicatorVariant::Braille => &["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"],
-            LoadingIndicatorVariant::BrailleExtended => &[
-                "⡀", "⡁", "⡂", "⡃", "⡄", "⡅", "⡆", "⡇", "⡈", "⡉", "⡊", "⡋", "⡌", "⡍", "⡎", "⡏",
-                "⡐", "⡑", "⡒", "⡓", "⡔", "⡕", "⡖", "⡗", "⡘", "⡙", "⡚", "⡛", "⡜", "⡝", "⡞", "⡟",
-                "⡠", "⡡", "⡢", "⡣", "⡤", "⡥", "⡦", "⡧", "⡨", "⡩", "⡪", "⡫", "⡬", "⡭", "⡮", "⡯",
-                "⡰", "⡱", "⡲", "⡳", "⡴", "⡵", "⡶", "⡷", "⡸", "⡹", "⡺", "⡻", "⡼", "⡽", "⡾", "⡿",
-                "⢀", "⢁", "⢂", "⢃", "⢄", "⢅", "⢆", "⢇", "⢈", "⢉", "⢊", "⢋", "⢌", "⢍", "⢎", "⢏",
-                "⢐", "⢑", "⢒", "⢓", "⢔", "⢕", "⢖", "⢗", "⢘", "⢙", "⢚", "⢛", "⢜", "⢝", "⢞", "⢟",
-                "⢠", "⢡", "⢢", "⢣", "⢤", "⢥", "⢦", "⢧", "⢨", "⢩", "⢪", "⢫", "⢬", "⢭", "⢮", "⢯",
-                "⢰", "⢱", "⢲", "⢳", "⢴", "⢵", "⢶", "⢷", "⢸", "⢹", "⢺", "⢻", "⢼", "⢽", "⢾", "⢿",
-                "⣀", "⣁", "⣂", "⣃", "⣄", "⣅", "⣆", "⣇", "⣈", "⣉", "⣊", "⣋", "⣌", "⣍", "⣎", "⣏",
-                "⣐", "⣑", "⣒", "⣓", "⣔", "⣕", "⣖", "⣗", "⣘", "⣙", "⣚", "⣛", "⣜", "⣝", "⣞", "⣟",
-                "⣠", "⣡", "⣢", "⣣", "⣤", "⣥", "⣦", "⣧", "⣨", "⣩", "⣪", "⣫", "⣬", "⣭", "⣮", "⣯",
-                "⣰", "⣱", "⣲", "⣳", "⣴", "⣵", "⣶", "⣷", "⣸", "⣹", "⣺", "⣻", "⣼", "⣽", "⣾", "⣿",
+            LoadingIndicatorVariant::Dots => {
+                &[Frame::Text(".  "), Frame::Text(".. "), Frame::Text("...")]
+            }
+            LoadingIndicatorVariant::Ellipsis => &[
+                Frame::Text("   "),
+                Frame::Text(".  "),
+                Frame::Text(".. "),
+                Frame::Text("..."),
+                Frame::Text(".. "),
+                Frame::Text(".  "),
             ],
+            LoadingIndicatorVariant::Dash => &[
+                Frame::Text("-"),
+                Frame::Text("\\"),
+                Frame::Text("|"),
+                Frame::Text("/"),
+            ],
+            // A 3x3: the centre alone, a plus, a cross, a plus. Read as bits
+            // from the top left, so `0b010_111_010` is the middle row full and
+            // the middle column full — a plus.
+            LoadingIndicatorVariant::Star => &[
+                Frame::Dots {
+                    cols: 3,
+                    rows: 3,
+                    mask: 0b000_010_000,
+                },
+                Frame::Dots {
+                    cols: 3,
+                    rows: 3,
+                    mask: 0b010_111_010,
+                },
+                Frame::Dots {
+                    cols: 3,
+                    rows: 3,
+                    mask: 0b101_010_101,
+                },
+                Frame::Dots {
+                    cols: 3,
+                    rows: 3,
+                    mask: 0b010_111_010,
+                },
+            ],
+            // Three lit dots of a 2x2 make a right triangle; which corner is
+            // dark is which way it points. The dark corner walks clockwise
+            // from the top left, so the triangle rotates.
+            LoadingIndicatorVariant::Triangle => &[
+                Frame::Dots {
+                    cols: 2,
+                    rows: 2,
+                    mask: 0b11_10,
+                },
+                Frame::Dots {
+                    cols: 2,
+                    rows: 2,
+                    mask: 0b11_01,
+                },
+                Frame::Dots {
+                    cols: 2,
+                    rows: 2,
+                    mask: 0b01_11,
+                },
+                Frame::Dots {
+                    cols: 2,
+                    rows: 2,
+                    mask: 0b10_11,
+                },
+            ],
+            LoadingIndicatorVariant::Braille => &BRAILLE_SPINNER,
+            LoadingIndicatorVariant::BrailleExtended => &BRAILLE_COUNTER,
         }
     }
 
@@ -95,22 +232,41 @@ impl LoadingIndicatorVariant {
             LoadingIndicatorVariant::Star => Duration::from_millis(1000),
             LoadingIndicatorVariant::Triangle => Duration::from_millis(1200),
             LoadingIndicatorVariant::Braille => Duration::from_millis(1000),
-            LoadingIndicatorVariant::BrailleExtended => Duration::from_millis(30000),
+            // 100ms a frame. Not the round 30s the glyph version named:
+            // `every_variant_divides_its_cycle_evenly` requires the cycle to
+            // be an exact multiple of the frame count, and 255 does not divide
+            // 30s in whole nanoseconds. 25.5s does, and reads as a counter.
+            LoadingIndicatorVariant::BrailleExtended => Duration::from_millis(25_500),
         }
     }
 
-    /// How long one glyph is on screen — the interval at which a view showing
+    /// How long one frame is on screen — the interval at which a view showing
     /// this variant needs to be redrawn, and nothing faster.
     fn frame_period(&self) -> Duration {
         self.duration() / self.frames().len() as u32
     }
 
-    fn char_width(&self) -> usize {
-        self.frames()
-            .iter()
-            .map(|f| f.chars().count())
-            .max()
-            .unwrap_or(1)
+    /// The width the indicator reserves, in multiples of its own height, so a
+    /// spinner does not shift the text beside it as its frames change width.
+    fn width_ratio(&self) -> f32 {
+        match self.frames().first() {
+            // 0.6em per character is the ratio the glyph version used.
+            Some(Frame::Text(_)) => {
+                let chars = self
+                    .frames()
+                    .iter()
+                    .map(|frame| match frame {
+                        Frame::Text(text) => text.chars().count(),
+                        Frame::Dots { .. } => 1,
+                    })
+                    .max()
+                    .unwrap_or(1);
+                chars as f32 * 0.6
+            }
+            // A grid is as wide as its columns are tall.
+            Some(Frame::Dots { cols, rows, .. }) => *cols as f32 / *rows as f32,
+            None => 1.0,
+        }
     }
 }
 
@@ -128,11 +284,16 @@ pub enum LoadingIndicatorSize {
     Large,
 }
 
-/// A text spinner.
+/// A spinner.
 ///
 /// Frames come from the shared `LoadingClock` rather than from a per-element
-/// animation, so an indicator costs its window one redraw per glyph rather than
-/// one per display refresh. See the [module docs](self).
+/// animation, so an indicator costs its window one redraw per frame rather
+/// than one per display refresh. See the [module docs](self).
+///
+/// Three variants are text and four are drawn. The drawn ones are drawn
+/// because they used to be text: their glyphs are absent from the fonts gpui's
+/// web platform bundles, and an indicator that renders as an empty box on a
+/// supported target is not an indicator. See [`Frame`].
 #[derive(IntoElement)]
 pub struct LoadingIndicator {
     variant: LoadingIndicatorVariant,
@@ -152,7 +313,7 @@ impl LoadingIndicator {
         }
     }
 
-    /// Set the glyph sequence.
+    /// Set the frame sequence.
     pub fn variant(mut self, variant: LoadingIndicatorVariant) -> Self {
         self.variant = variant;
         self
@@ -230,7 +391,8 @@ impl LoadingIndicator {
         self
     }
 
-    /// Override the glyph colour. Defaults to the theme's accent.
+    /// Override the colour of the text or the dots. Defaults to the theme's
+    /// accent.
     pub fn color(mut self, color: Hsla) -> Self {
         self.color = Some(color);
         self
@@ -253,13 +415,67 @@ impl Default for LoadingIndicator {
     }
 }
 
+impl LoadingIndicatorSize {
+    /// The indicator's height, and the font size a `Text` frame draws at.
+    ///
+    /// Named in rems rather than left to `text_xs()` and friends because a
+    /// `Dots` frame has to be *measured*, not just styled: the grid is sized
+    /// from this so a drawn frame occupies the same box a typed one would and
+    /// the two families line up beside the same paragraph.
+    fn height(self) -> Rems {
+        match self {
+            // The values `text_xs`, `text_sm`, `text_base` and `text_xl` set.
+            LoadingIndicatorSize::XSmall => rems(0.75),
+            LoadingIndicatorSize::Small => rems(0.875),
+            LoadingIndicatorSize::Medium => rems(1.0),
+            LoadingIndicatorSize::Large => rems(1.25),
+        }
+    }
+}
+
+/// One frame of lit dots, drawn.
+///
+/// The grid fills a `height`-tall box; a cell is that height over the row
+/// count, and the dot is most of a cell, which leaves the gap between dots
+/// without anyone naming a gap. Unlit cells are drawn as empty boxes rather
+/// than skipped, so every frame of a variant is the same size and the grid
+/// does not jitter as dots come and go.
+fn dot_grid(cols: u16, rows: u16, mask: u16, height: Rems, color: Hsla) -> impl IntoElement {
+    let cell = height / rows as f32;
+    let dot = cell * 0.72;
+
+    div()
+        .flex()
+        .flex_col()
+        .flex_none()
+        .h(height)
+        .children((0..rows).map(|row| {
+            div()
+                .flex()
+                .flex_row()
+                .h(cell)
+                .children((0..cols).map(move |col| {
+                    let lit = mask & (1 << (row * cols + col)) != 0;
+                    div()
+                        .w(cell)
+                        .h(cell)
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .when(lit, |this| {
+                            this.child(div().w(dot).h(dot).rounded_full().bg(color))
+                        })
+                }))
+        }))
+}
+
 impl RenderOnce for LoadingIndicator {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
         let color = self.color.unwrap_or_else(|| theme.accent());
 
         let frames = self.variant.frames();
-        let glyph = if self.playing && !cx.reduce_motion() {
+        let frame = if self.playing && !cx.reduce_motion() {
             let period = self.variant.frame_period();
             // Legal here: `draw_roots` enters `DrawPhase::Prepaint` before the
             // root view renders, and every view's element wraps its render in
@@ -272,29 +488,25 @@ impl RenderOnce for LoadingIndicator {
             frames[0]
         };
 
-        let size = self.size;
-        let width_rems = self.variant.char_width() as f32 * 0.6;
+        let height = self.size.height();
 
         div()
             .text_color(color)
             .flex_none()
-            .min_w(rems(width_rems))
-            .text_center()
-            .when(matches!(size, LoadingIndicatorSize::XSmall), |this| {
-                this.text_xs()
+            .flex()
+            .items_center()
+            .justify_center()
+            .min_w(height * self.variant.width_ratio())
+            .text_size(height)
+            .line_height(height)
+            .map(|this| match frame {
+                // `SharedString::new_static` on a `&'static str` that fits
+                // inline: no allocation, per indicator per frame.
+                Frame::Text(text) => this.child(SharedString::new_static(text)),
+                Frame::Dots { cols, rows, mask } => {
+                    this.child(dot_grid(cols, rows, mask, height, color))
+                }
             })
-            .when(matches!(size, LoadingIndicatorSize::Small), |this| {
-                this.text_sm()
-            })
-            .when(matches!(size, LoadingIndicatorSize::Medium), |this| {
-                this.text_base()
-            })
-            .when(matches!(size, LoadingIndicatorSize::Large), |this| {
-                this.text_xl()
-            })
-            // `SharedString::new_static` on a `&'static str` that fits inline:
-            // no allocation, per indicator per frame.
-            .child(SharedString::new_static(glyph))
     }
 }
 
@@ -406,7 +618,7 @@ impl LoadingClock {
             .map(|nanos| Duration::from_nanos(nanos as u64))
     }
 
-    /// Advance the timeline by `interval` and return the views whose glyphs
+    /// Advance the timeline by `interval` and return the views whose frames
     /// changed, dropping subscribers that have stopped re-registering.
     fn tick(&mut self, interval: Duration) -> Vec<EntityId> {
         self.elapsed += interval;
@@ -545,6 +757,112 @@ mod tests {
 
         assert!(with_clock(|clock| clock.subscribers.is_empty()));
         assert!(!with_clock(|clock| clock.running));
+    }
+
+    fn all_variants() -> [LoadingIndicatorVariant; 7] {
+        [
+            LoadingIndicatorVariant::Dots,
+            LoadingIndicatorVariant::Ellipsis,
+            LoadingIndicatorVariant::Dash,
+            LoadingIndicatorVariant::Star,
+            LoadingIndicatorVariant::Triangle,
+            LoadingIndicatorVariant::Braille,
+            LoadingIndicatorVariant::BrailleExtended,
+        ]
+    }
+
+    /// The defect that made four variants drawn ones: they were built from
+    /// `❊✳※`, `◢◣◤◥` and the braille block, none of which is in either font
+    /// gpui's web platform bundles, and that platform loads no system fonts.
+    /// All four rendered as empty boxes in the browser.
+    ///
+    /// ASCII is the line because it is the only repertoire the crate can
+    /// promise across a consumer's font choices. A variant that wants a shape
+    /// draws it.
+    #[test]
+    fn no_variant_bets_on_a_font_having_a_glyph() {
+        for variant in all_variants() {
+            for frame in variant.frames() {
+                if let Frame::Text(text) = frame {
+                    assert!(
+                        text.is_ascii(),
+                        "{variant:?} draws {text:?} as text, which is a bet on the \
+                         consumer's font; draw it as `Frame::Dots` instead"
+                    );
+                }
+            }
+        }
+    }
+
+    /// A blank frame reads as a dropped frame, not as part of the animation.
+    #[test]
+    fn no_frame_is_empty() {
+        for variant in all_variants() {
+            for frame in variant.frames() {
+                match frame {
+                    Frame::Text(text) => {
+                        assert!(!text.is_empty(), "{variant:?} has an empty text frame")
+                    }
+                    Frame::Dots { cols, rows, mask } => {
+                        assert_ne!(*mask, 0, "{variant:?} has a frame with no lit dots");
+                        let cells = cols * rows;
+                        assert!(
+                            *mask < (1 << cells),
+                            "{variant:?} lights a cell outside its {cols}x{rows} grid"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Braille numbers its dots down the left column, then down the right,
+    /// then the low pair — so the byte is not a row-major bitmap, and the
+    /// spinner comes out mirrored if the translation is wrong.
+    #[test]
+    fn braille_bytes_map_to_the_cells_braille_names() {
+        // Dot 1 is the top left; dot 8 is the bottom right; all eight is all
+        // eight. Cell indices are row-major on the 2-wide, 4-tall grid.
+        assert_eq!(braille(0b0000_0001), 1 << 0, "dot 1 is the top left");
+        assert_eq!(braille(0b0000_1000), 1 << 1, "dot 4 is the top right");
+        assert_eq!(braille(0b0100_0000), 1 << 6, "dot 7 is the bottom left");
+        assert_eq!(braille(0b1000_0000), 1 << 7, "dot 8 is the bottom right");
+        assert_eq!(braille(0xFF), 0b1111_1111, "every dot is every cell");
+        assert_eq!(braille(0x00), 0, "no dots, no cells");
+    }
+
+    /// Each frame of the eight-frame spinner is the full cell minus one, and
+    /// over the cycle every cell takes its turn — which is what makes it read
+    /// as one dark dot going round rather than as flicker.
+    #[test]
+    fn the_braille_spinner_walks_one_dark_dot_around_the_ring() {
+        let mut dark = Vec::new();
+        for frame in BRAILLE_SPINNER {
+            let Frame::Dots { mask, .. } = frame else {
+                panic!("the braille spinner is drawn, not typed");
+            };
+            assert_eq!(
+                mask.count_ones(),
+                7,
+                "a spinner frame lights {} dots, not seven",
+                mask.count_ones()
+            );
+            dark.push((!mask) & 0xFF);
+        }
+
+        dark.sort_unstable();
+        dark.dedup();
+        assert_eq!(dark.len(), 8, "two frames leave the same dot dark");
+    }
+
+    /// A counter counts: 255 frames, each the next pattern, none of them
+    /// blank.
+    #[test]
+    fn the_braille_counter_counts() {
+        assert_eq!(BRAILLE_COUNTER.len(), 255);
+        for (index, frame) in BRAILLE_COUNTER.iter().enumerate() {
+            assert_eq!(*frame, braille_frame((index + 1) as u8));
+        }
     }
 
     #[test]

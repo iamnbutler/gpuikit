@@ -181,17 +181,31 @@ pub trait Themeable {
         hsla(base.h, base.s, (base.l - 0.08).max(0.0), base.a)
     }
 
-    /// Text on a destructive button.
+    /// Text on a destructive button: black or white, whichever the fill
+    /// actually reads better against.
     ///
-    /// Black or white off the fill's own lightness, not
-    /// [`fg`](Themeable::fg): a light theme's foreground is dark, and dark
-    /// text on a saturated red is the one combination this has to avoid.
+    /// Not [`fg`](Themeable::fg) — a light theme's foreground is dark, and
+    /// dark text on a saturated red is the one combination this has to avoid
+    /// — and not the fill's HSL lightness either, which is what this used to
+    /// pick by. HSL lightness is not perceived brightness: a saturated red
+    /// sits high on the L axis and low on the luminance one, so the rule
+    /// `l > 0.6 → black` chose *white* for Gruvbox Dark's `#fb4934`, which is
+    /// 3.4:1 — under WCAG AA — where black on the same fill is 6.1:1. It was
+    /// the only theme in the crate the old rule got wrong, and it was the one
+    /// whose destructive button looked washed out.
+    ///
+    /// Comparing contrast ratios picks the same answer as before for every
+    /// other built-in theme, and it keeps picking the readable one for a
+    /// consumer's `danger` colour whatever hue it is.
     fn destructive_fg(&self) -> Hsla {
+        let black = hsla(0.0, 0.0, 0.0, 1.0);
+        let white = hsla(0.0, 0.0, 1.0, 1.0);
         let bg = self.destructive_bg();
-        if bg.l > 0.6 {
-            hsla(0.0, 0.0, 0.0, 1.0)
+
+        if contrast_ratio(bg, white) >= contrast_ratio(bg, black) {
+            white
         } else {
-            hsla(0.0, 0.0, 1.0, 1.0)
+            black
         }
     }
 
@@ -284,6 +298,39 @@ pub trait Themeable {
     fn control(&self, size: ControlSize) -> ControlMetrics {
         self.control_scale().metrics(size)
     }
+}
+
+/// The WCAG 2.1 contrast ratio between two opaque colours, 1.0 to 21.0.
+///
+/// Alpha is ignored: both callers pass fills, and compositing a translucent
+/// one correctly needs the colour behind it, which a theme accessor does not
+/// have. A ratio computed against the fill as if it were opaque is the right
+/// answer for the fills the crate actually draws, and wrong in the same
+/// direction as simply reading the declared colour, which is what the code
+/// this replaced did.
+fn contrast_ratio(a: Hsla, b: Hsla) -> f32 {
+    let lighter = relative_luminance(a).max(relative_luminance(b));
+    let darker = relative_luminance(a).min(relative_luminance(b));
+    (lighter + 0.05) / (darker + 0.05)
+}
+
+/// WCAG relative luminance: sRGB channels linearised, then weighted by how
+/// much the eye gets from each.
+///
+/// This is the quantity HSL's `l` is often mistaken for and is not. `l` is the
+/// midpoint of the largest and smallest channel, so it says a fully saturated
+/// red and a fully saturated cyan are equally bright; luminance says the cyan
+/// is nearly four times brighter, which is what a reader sees.
+fn relative_luminance(color: Hsla) -> f32 {
+    let rgba = gpui::Rgba::from(color);
+    let channel = |c: f32| {
+        if c <= 0.03928 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * channel(rgba.r) + 0.7152 * channel(rgba.g) + 0.0722 * channel(rgba.b)
 }
 
 pub fn init(cx: &mut App) {
@@ -865,6 +912,76 @@ mod tests {
     }
 
     /// A theme's scale has to actually reach the elements. `Themeable::control`
+    /// Every built-in theme, by name, so a new one has to be added here and
+    /// is then held to the contrast assertion below.
+    fn built_in_themes() -> Vec<(&'static str, Theme)> {
+        vec![
+            ("default", Theme::default()),
+            ("gruvbox_dark", Theme::gruvbox_dark()),
+            ("gruvbox_light", Theme::gruvbox_light()),
+            ("catppuccin_latte", Theme::catppuccin_latte()),
+            ("catppuccin_frappe", Theme::catppuccin_frappe()),
+            ("catppuccin_macchiato", Theme::catppuccin_macchiato()),
+            ("catppuccin_mocha", Theme::catppuccin_mocha()),
+        ]
+    }
+
+    /// The defect this replaced: `destructive_fg` picked black or white off
+    /// the fill's HSL lightness, and Gruvbox Dark's `#fb4934` sits at `l =
+    /// 0.594` — just inside the "dark enough for white text" side of a 0.6
+    /// threshold — while its *luminance* puts black nearly twice as far
+    /// ahead. The button was legible, badly, and looked washed out.
+    ///
+    /// 4.5:1 is WCAG AA for body text. Every built-in theme clears it on the
+    /// better of the two, so this is a floor the crate already meets rather
+    /// than an aspiration.
+    #[test]
+    fn destructive_text_clears_wcag_aa_on_every_built_in_theme() {
+        for (name, theme) in built_in_themes() {
+            let ratio = contrast_ratio(theme.destructive_bg(), theme.destructive_fg());
+            assert!(
+                ratio >= 4.5,
+                "{name}: destructive text is {ratio:.2}:1 on its own fill, under WCAG AA"
+            );
+        }
+    }
+
+    /// The rule has to pick the *better* of black and white, not merely one
+    /// that happens to pass. A theme whose fill clears 4.5:1 both ways would
+    /// satisfy the assertion above with the worse choice.
+    #[test]
+    fn destructive_text_is_the_better_of_black_and_white() {
+        let black = hsla(0.0, 0.0, 0.0, 1.0);
+        let white = hsla(0.0, 0.0, 1.0, 1.0);
+
+        for (name, theme) in built_in_themes() {
+            let bg = theme.destructive_bg();
+            let chosen = contrast_ratio(bg, theme.destructive_fg());
+            let best = contrast_ratio(bg, black).max(contrast_ratio(bg, white));
+            assert!(
+                (chosen - best).abs() < 0.001,
+                "{name}: chose {chosen:.2}:1 when {best:.2}:1 was available"
+            );
+        }
+    }
+
+    /// Relative luminance is not HSL lightness, which is the whole reason
+    /// `destructive_fg` changed. Saturated red and saturated cyan share an
+    /// `l` of 0.5 and are nowhere near each other in luminance.
+    #[test]
+    fn luminance_and_hsl_lightness_are_different_quantities() {
+        let red = hsla(0.0, 1.0, 0.5, 1.0);
+        let cyan = hsla(180.0 / 360.0, 1.0, 0.5, 1.0);
+
+        assert_eq!(red.l, cyan.l, "the premise: equal HSL lightness");
+        assert!(
+            relative_luminance(cyan) > relative_luminance(red) * 3.0,
+            "cyan {:.3} is not far brighter than red {:.3}",
+            relative_luminance(cyan),
+            relative_luminance(red),
+        );
+    }
+
     /// has a default impl, so this is the wire between `Theme::controls` and
     /// what a control reads at render time.
     #[test]

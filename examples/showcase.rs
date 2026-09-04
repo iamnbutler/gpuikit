@@ -179,12 +179,21 @@ fn main() {
 
 /// Every module in `src/elements/`, and the nav page that shows it.
 ///
-/// Rendered by the Coverage page, so this is live code rather than a constant
-/// only a test reads — the list is in front of anyone who opens the showcase.
-/// Two tests in `src/elements.rs` cross-check it against the crate: every
-/// element module needs a row here, and every page named here has to be one
-/// the nav can actually reach. An element that genuinely should not have a
-/// page is spelled `("name", "none: <reason>")`.
+/// Read only by two tests in `src/elements.rs`, which cross-check it against
+/// the crate: every element module needs a row here, and every page named
+/// here has to be one the nav can actually reach. An element that genuinely
+/// should not have a page is spelled `("name", "none: <reason>")`.
+///
+/// It used to be rendered as a Coverage page in the nav as well. That page is
+/// gone: it is a maintenance ledger, and a visitor evaluating the toolkit has
+/// no use for a table of which module appears where. The table stays because
+/// the tests need it, not because anyone should look at it.
+#[expect(
+    dead_code,
+    reason = "read by src/elements.rs's showcase_coverage tests, which parse \
+              this file's source rather than link against it — so the value is \
+              never evaluated and the table is never dead"
+)]
 const ELEMENT_COVERAGE: &[(&str, &str)] = &[
     ("accordion", "collapsible"),
     ("alert", "alert"),
@@ -306,11 +315,7 @@ const NAV_SECTIONS: &[NavSection] = &[
         DefaultIcons::file_text,
         &[("markdown", "Markdown"), ("editor", "Editor")],
     ),
-    (
-        "System",
-        DefaultIcons::gear,
-        &[("theme", "Theme"), ("coverage", "Coverage")],
-    ),
+    ("System", DefaultIcons::gear, &[("theme", "Theme")]),
 ];
 
 /// One nav section: its label, the glyph its rail row draws when the sidebar
@@ -1860,7 +1865,6 @@ impl Showcase {
                     }
                 }),
             )
-            .child(palette)
     }
 
     fn render_select_page(&self, cx: &Context<Self>) -> impl IntoElement {
@@ -2399,7 +2403,7 @@ impl Showcase {
                     .child(loading_indicator().braille_extended().playing(playing)),
             )
             .child(div().text_sm().text_color(fg_muted).child(
-                "One shared clock wakes only when a glyph changes, and only the views \
+                "One shared clock wakes only when a frame changes, and only the views \
                          showing an indicator. Paused, it stops entirely.",
             ))
     }
@@ -2888,11 +2892,23 @@ impl Showcase {
             .child(separator())
             .child(button("sidebar-demo-action", "New project"));
 
-        let body = div().flex_1().p_4().text_sm().text_color(fg_muted).child(
-            "The panel beside this text is a Sidebar. Collapse it and it becomes a rail \
+        // `min_w_0`, for the same reason the content area needs it: this
+        // paragraph's minimum content width is wider than the frame leaves
+        // once the panel is docked, so without it the body refuses to shrink
+        // and pushes the panel out through `overflow_hidden`. Docked left that
+        // is invisible; docked right it is the panel itself that leaves, and
+        // "Wider" appears to do nothing.
+        let body = div()
+            .flex_1()
+            .min_w_0()
+            .p_4()
+            .text_sm()
+            .text_color(fg_muted)
+            .child(
+                "The panel beside this text is a Sidebar. Collapse it and it becomes a rail \
                  of icons rather than disappearing; make it overlay and it becomes a \
                  dismissible drawer with a scrim.",
-        );
+            );
 
         v_stack()
             .gap_2()
@@ -4036,63 +4052,6 @@ impl Showcase {
             )
     }
 
-    fn render_coverage_page(&self, cx: &Context<Self>) -> impl IntoElement {
-        let theme = cx.theme().clone();
-
-        let mut table = v_stack().gap_0().child(
-            h_stack()
-                .gap_4()
-                .py_1()
-                .border_b_1()
-                .border_color(theme.border())
-                .child(
-                    div()
-                        .w(px(220.))
-                        .text_sm()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child("src/elements/"),
-                )
-                .child(
-                    div()
-                        .text_sm()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child("Shown on"),
-                ),
-        );
-
-        for (module, page) in ELEMENT_COVERAGE {
-            table = table.child(
-                h_stack()
-                    .gap_4()
-                    .py_1()
-                    .child(div().w(px(220.)).text_sm().child(format!("{module}.rs")))
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(theme.fg_muted())
-                            .child(page.to_string()),
-                    ),
-            );
-        }
-
-        v_stack()
-            .gap_4()
-            .child(
-                div()
-                    .text_lg()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(theme.fg_muted())
-                    .child("Coverage"),
-            )
-            .child(div().text_sm().text_color(theme.fg_muted()).child(format!(
-                "{} element modules, each mapped to the page that shows it. Two tests in \
-                     src/elements.rs fail the build if a module gains no page, or if a page \
-                     named here is not reachable from the nav.",
-                ELEMENT_COVERAGE.len()
-            )))
-            .child(table)
-    }
-
     fn render_theme_page(&self, cx: &Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
 
@@ -4403,7 +4362,6 @@ impl Render for Showcase {
             "markdown" => self.render_markdown_page(cx).into_any_element(),
             "editor" => self.render_editor_page(cx).into_any_element(),
             "theme" => self.render_theme_page(cx).into_any_element(),
-            "coverage" => self.render_coverage_page(cx).into_any_element(),
             _ => div().child("Unknown page").into_any_element(),
         };
 
@@ -4427,13 +4385,31 @@ impl Render for Showcase {
                 div()
                     .id("content-area")
                     .flex_1()
+                    // A flex item's min-width is `auto`, which is its
+                    // *content's* minimum — a paragraph's longest
+                    // unbreakable run, and in practice its whole first line.
+                    // Without this the column is as wide as the widest prose
+                    // on the page, the window cannot shrink it, and every
+                    // page runs off the right edge under the root's
+                    // `overflow_hidden`. It is why the buttons below stretched
+                    // past the viewport and why the command palette's scrim
+                    // was the shape it was.
+                    .min_w_0()
                     .overflow_y_scroll()
                     .min_h_full()
                     .p_8()
                     .child(content),
             )
+            // Modals are mounted here, at the root, and not on the page
+            // that opens them. A `Dialog`'s and a `CommandState`'s scrim is
+            // `absolute` + `size_full`, which resolves against its parent —
+            // so a palette mounted inside a page draws its scrim over that
+            // page's box and centres its panel in it. The palette used to be
+            // `.child(palette)` at the bottom of `render_command_page`, which
+            // is what put a black rectangle under the button there.
             .child(self.dialog_example.clone())
             .child(self.destructive_dialog.clone())
+            .child(self.command_palette.clone())
             .child(cx.toast_manager().clone())
     }
 }

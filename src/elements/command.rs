@@ -475,6 +475,12 @@ impl ControlSized for CommandState {
 
 impl Render for CommandState {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Closed is nothing at all, not an empty wrapper — see the note
+        // at the end of this function for why the wrapper mattered.
+        if !self.open {
+            return div().into_any_element();
+        }
+
         let theme = cx.theme();
         let metrics = theme.control(self.size);
         let list_a11y = self.a11y();
@@ -609,14 +615,23 @@ impl Render for CommandState {
             )
             .child(panel);
 
-        // Rung 10 of `docs/overlays.md`'s ladder — the dialog layer. A palette
-        // is a modal over a scrim and belongs at the same height as one. There
-        // is no trigger to hang off, so it is `anchored()`-free like `dialog`
-        // and its distance from the top is padding on the scrim rather than an
+        // Rung 10 of the overlay ladder — the dialog layer. A palette is a
+        // modal over a scrim and belongs at the same height as one. There is
+        // no trigger to hang off, so it is `anchored()`-free like `dialog` and
+        // its distance from the top is padding on the scrim rather than an
         // offset.
-        div().when(self.open, |this| {
-            this.child(deferred(scrimmed).with_priority(10))
-        })
+        //
+        // Returned bare, exactly as `DialogState` returns its own. `deferred`
+        // hands its child's layout id straight up, so the scrim — which is
+        // `absolute` — becomes an out-of-flow child of whatever flex container
+        // encloses this view, and `size_full` resolves against that container.
+        // Wrapping it in a plain `div()` first, which is what this used to do,
+        // makes *that wrapper* the containing block: a flex item whose only
+        // child is absolute measures nothing, and the scrim then resolves
+        // `size_full` against a box with no size. That is what drew a black
+        // rectangle the shape of whatever surrounded the palette instead of a
+        // scrim over the window.
+        deferred(scrimmed).with_priority(10).into_any_element()
     }
 }
 

@@ -99,6 +99,7 @@
 //!   entirely. It is a second issue, and nothing here prevents it.
 
 use crate::a11y::{A11y, Announce};
+use crate::element_id::scoped;
 use crate::elements::listbox::{matches_query, Listbox, ListboxFocus, LISTBOX_GAP};
 use crate::elements::text_field::{text_field, Adornment};
 use crate::icons::Icons;
@@ -342,6 +343,14 @@ pub struct ComboboxState<T: Clone + PartialEq + 'static> {
     /// owns the value, and the two are deliberately not the same field.
     input: Entity<InputState>,
     listbox: Option<Entity<Listbox>>,
+    /// Whether the *press* on the chevron found the popup open.
+    ///
+    /// The popup dismisses itself on any press outside it, and that runs
+    /// before this element sees the click — so by click time the popup is
+    /// always closed and a toggle written against `listbox` reopens what the
+    /// press just shut. This records what the press found, which is the state
+    /// the user was toggling from.
+    chevron_found_open: bool,
     /// Indices into `options` that survived the filter, in the order the popup
     /// draws them.
     ///
@@ -403,6 +412,7 @@ impl<T: Clone + PartialEq + 'static> ComboboxState<T> {
             selected: combobox.selected,
             input,
             listbox: None,
+            chevron_found_open: false,
             visible,
             on_change: combobox.on_change,
             on_create: combobox.on_create,
@@ -674,15 +684,53 @@ impl<T: Clone + PartialEq + 'static> Render for ComboboxState<T> {
         let full_width = self.full_width;
         let gap = LISTBOX_GAP.to_pixels(window.rem_size());
 
+        // The chevron is a trigger, not decoration. It was an
+        // `Adornment::icon` — the one affordance on the control that looks
+        // pressable and was the only part of it that did nothing.
+        let chevron = div().id(scoped(&self.id, "chevron")).flex().items_center();
+
+        #[cfg(test)]
+        let chevron = chevron.debug_selector(|| "gpuikit-combobox-chevron".into());
+
+        let chevron = chevron
+            .when(!self.disabled, |this| {
+                this.cursor_pointer()
+                    // Stop the press reaching the field beneath: the field
+                    // would take focus and swallow the click, and the toggle
+                    // below would never see the second press that closes an
+                    // open popup.
+                    .on_mouse_down(
+                        gpui::MouseButton::Left,
+                        cx.listener(|this, _, _window, cx| {
+                            this.chevron_found_open = this.listbox.is_some();
+                            cx.stop_propagation();
+                        }),
+                    )
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        // Focus first either way: the popup keeps focus in the
+                        // field (`ListboxFocus::Caller`), so a popup opened
+                        // from the pointer has to leave the keyboard where a
+                        // popup opened from the keyboard would.
+                        window.focus(&gpui::Focusable::focus_handle(this.input.read(cx), cx), cx);
+                        if this.chevron_found_open {
+                            this.listbox = None;
+                            cx.notify();
+                        } else {
+                            this.open(window, cx);
+                        }
+                    }))
+            })
+            .child(
+                Icons::chevron_down()
+                    .size(metrics.text_size)
+                    .text_color(theme.fg_muted()),
+            );
+
         let field = text_field(&self.input, cx)
             .control_size(self.size)
             .disabled(self.disabled)
             .full_width(full_width)
-            .suffix(Adornment::icon(
-                Icons::chevron_down()
-                    .size(metrics.text_size)
-                    .text_color(theme.fg_muted()),
-            ));
+            .suffix(Adornment::element(chevron));
 
         let wrapper = div()
             .id(self.id.clone())
@@ -767,6 +815,66 @@ mod tests {
         let cx = VisualTestContext::from_window(*window.deref(), cx).into_mut();
         cx.run_until_parked();
         (state, cx)
+    }
+
+    /// The chevron was an `Adornment::icon` — decoration. It is the one part
+    /// of the control that looks pressable, and pressing it did nothing at
+    /// all; the popup could only be opened by typing or by Down.
+    #[gpui::test]
+    fn clicking_the_chevron_opens_the_popup(cx: &mut TestAppContext) {
+        let (state, cx) = open(cx, |builder| builder.selected(0));
+
+        state.read_with(cx, |this, _| assert!(!this.is_open()));
+
+        let bounds = cx
+            .debug_bounds("gpuikit-combobox-chevron")
+            .expect("the chevron should have been laid out");
+        cx.simulate_click(bounds.center(), gpui::Modifiers::default());
+
+        state.read_with(cx, |this, _| {
+            assert!(
+                this.is_open(),
+                "clicking the chevron did not open the popup"
+            );
+        });
+    }
+
+    /// It is a toggle, not a one-way opener: the pointer has to be able to put
+    /// back what it just opened, or the chevron is a control that only ever
+    /// does one thing.
+    #[gpui::test]
+    fn clicking_the_chevron_again_closes_the_popup(cx: &mut TestAppContext) {
+        let (state, cx) = open(cx, |builder| builder.selected(0));
+
+        let bounds = cx
+            .debug_bounds("gpuikit-combobox-chevron")
+            .expect("the chevron should have been laid out");
+        cx.simulate_click(bounds.center(), gpui::Modifiers::default());
+        state.read_with(cx, |this, _| assert!(this.is_open()));
+
+        cx.simulate_click(bounds.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+
+        state.read_with(cx, |this, _| {
+            assert!(
+                !this.is_open(),
+                "a second press on the chevron left the popup open"
+            );
+        });
+    }
+
+    /// A disabled combobox has no popup to open, and the chevron must not be a
+    /// way around that.
+    #[gpui::test]
+    fn clicking_the_chevron_of_a_disabled_combobox_does_nothing(cx: &mut TestAppContext) {
+        let (state, cx) = open(cx, |builder| builder.selected(0).disabled(true));
+
+        let bounds = cx
+            .debug_bounds("gpuikit-combobox-chevron")
+            .expect("the chevron should have been laid out");
+        cx.simulate_click(bounds.center(), gpui::Modifiers::default());
+
+        state.read_with(cx, |this, _| assert!(!this.is_open()));
     }
 
     fn type_into(state: &Entity<ComboboxState<usize>>, text: &str, cx: &mut VisualTestContext) {

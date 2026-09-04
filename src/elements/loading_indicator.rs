@@ -293,7 +293,7 @@ pub enum LoadingIndicatorSize {
 /// Three variants are text and four are drawn. The drawn ones are drawn
 /// because they used to be text: their glyphs are absent from the fonts gpui's
 /// web platform bundles, and an indicator that renders as an empty box on a
-/// supported target is not an indicator. See [`Frame`].
+/// supported target is not an indicator.
 #[derive(IntoElement)]
 pub struct LoadingIndicator {
     variant: LoadingIndicatorVariant,

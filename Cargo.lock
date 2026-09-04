@@ -2442,7 +2442,7 @@ dependencies = [
 
 [[package]]
 name = "gpuikit"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "gpui-platform-gpui-unofficial",

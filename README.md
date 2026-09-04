@@ -22,7 +22,7 @@ distribution of gpui — your app should depend on the same one:
 [dependencies]
 gpui = { package = "gpui-unofficial", version = "1.14" }
 gpui_platform = { package = "gpui-platform-gpui-unofficial", version = "1.14", features = ["font-kit"] }
-gpuikit = "0.8"
+gpuikit = "0.9"
 ```
 
 `gpui_platform` is what builds the windowing platform an `Application` runs on;

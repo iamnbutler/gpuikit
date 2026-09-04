@@ -4,6 +4,56 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-04
+
+A documentation release. Almost every code example this crate published was one
+nothing checked, and several had stopped being true — including the Quick Start
+on the front page of docs.rs. They compile now, 42 of the 47 run against a real
+gpui app, and a test in the crate refuses the fence that let them drift. The
+component work alongside it is the shared control size scale reaching `Tabs`,
+`ToggleGroup`, `RadioGroup` and `Slider`, and five defects the showcase turned
+up in the crate rather than in the page.
+
+### Changed
+
+- **The crate is edition 2024.** This is what makes a real doctest suite
+  affordable: from 2024 onward rustdoc merges a crate's doctests into a single
+  binary, so the 47 examples below compile and link once — 2.3s in CI — rather
+  than 47 times. `rust-version` is unchanged at 1.85, which is what edition
+  2024 needs and also what the async closures already in `src/fs.rs` needed.
+  Edition 2024 selects Cargo's v3 resolver for this crate; a consumer picks its
+  own resolver from its own edition and is unaffected. `rustfmt.toml` is new
+  and pins `style_edition = "2024"`, so the reformatting that comes with the
+  bump happened once, on purpose, rather than as a side effect of the next
+  unrelated change.
+- **Four `LoadingIndicator` variants are drawn rather than typed.** `Star`,
+  `Triangle`, `Braille` and `BrailleExtended` were built from `❊✳※`, `◢◣◤◥`
+  and the braille block. None of those codepoints is in either font gpui's web
+  platform bundles, and that platform loads no system fonts, so all four
+  rendered as empty boxes in a browser. They are lit-dot grids now — the
+  braille ones are the braille dot patterns, drawn — which depends on no font
+  at all. `no_variant_bets_on_a_font_having_a_glyph` holds the remaining text
+  variants to ASCII.
+
+  `BrailleExtended` is 255 frames over 25.5s, not the 30s its doc claimed; the
+  glyph version listed 192 frames while calling itself 256.
+- **`Tabs`, `ToggleGroup`, `RadioGroup` and `Slider` are on the shared control
+  size scale.** All four implement `ControlSized`, so `.small()` / `.medium()`
+  / `.large()` work on them and they resolve every dimension through
+  `Themeable::control` instead of naming their own. Each was previously
+  padding-derived or hard-coded, which meant a tab bar stood 15px taller than
+  the button beside it, a radio lined up with a checkbox on no rung, and
+  changing the scale moved neither. `Medium` is the default, so a call site
+  that names no size keeps working — but the drawn heights change: a tab strip
+  and a segmented control are now 20px rather than ~35px, a radio is the
+  rung's ink rather than a fixed `rems(1.0)`, and a slider's row is the rung
+  with a thumb of the rung's ink. The row test in
+  `src/elements/control_size_tests.rs` measures all four now, so they cannot
+  drift back.
+- `ControlMetrics::inner_radius()` is new: the corner radius for a child drawn
+  inside a bordered control's border, which is what a segmented control's end
+  options need to sit in the border rather than cut across it.
+
 ### Fixed
 
 - **A combobox's chevron opens the popup.** It was an `Adornment::icon` — the
@@ -27,39 +77,24 @@ All notable changes to this project will be documented in this file.
   `size_full` against a box with no size and drew a black rectangle the shape
   of whatever surrounded the palette. It is returned bare now, the way
   `DialogState` already returned its own.
-
-### Changed
-
-- **Four `LoadingIndicator` variants are drawn rather than typed.** `Star`,
-  `Triangle`, `Braille` and `BrailleExtended` were built from `❊✳※`, `◢◣◤◥`
-  and the braille block. None of those codepoints is in either font gpui's web
-  platform bundles, and that platform loads no system fonts, so all four
-  rendered as empty boxes in a browser. They are lit-dot grids now — the
-  braille ones are the braille dot patterns, drawn — which depends on no font
-  at all. `no_variant_bets_on_a_font_having_a_glyph` holds the remaining text
-  variants to ASCII.
-
-  `BrailleExtended` is 255 frames over 25.5s, not the 30s its doc claimed; the
-  glyph version listed 192 frames while calling itself 256.
-
-### Changed
-
-- **`Tabs`, `ToggleGroup`, `RadioGroup` and `Slider` are on the shared control
-  size scale.** All four implement `ControlSized`, so `.small()` / `.medium()`
-  / `.large()` work on them and they resolve every dimension through
-  `Themeable::control` instead of naming their own. Each was previously
-  padding-derived or hard-coded, which meant a tab bar stood 15px taller than
-  the button beside it, a radio lined up with a checkbox on no rung, and
-  changing the scale moved neither. `Medium` is the default, so a call site
-  that names no size keeps working — but the drawn heights change: a tab strip
-  and a segmented control are now 20px rather than ~35px, a radio is the
-  rung's ink rather than a fixed `rems(1.0)`, and a slider's row is the rung
-  with a thumb of the rung's ink. The row test in
-  `src/elements/control_size_tests.rs` measures all four now, so they cannot
-  drift back.
-- `ControlMetrics::inner_radius()` is new: the corner radius for a child drawn
-  inside a bordered control's border, which is what a segmented control's end
-  options need to sit in the border rather than cut across it.
+- **Every code example in the crate's documentation compiles, and all but five
+  of them run.** 55 of the 56 were fenced `` ```ignore ``, which rustdoc never
+  compiles, so the doctest job reported `1 passed; 55 ignored` and went green
+  while what docs.rs rendered drifted away from the crate. The Quick Start
+  built its app with `Application::new()`, which had not existed for some time;
+  two examples imported crates this repository does not have; one called
+  `Field::label` without importing the trait it lives on; and one passed
+  `input()` an id where it takes an `&Entity<InputState>`. Every one of them
+  looked like Rust. 37 are now doctests that render through a hidden `Render`
+  impl under `gpui::TestAppContext`, so the example is drawn rather than merely
+  constructed; the five that call `Application::run` are `no_run` with the
+  reason on record; nine that only restated the sentence above them are gone.
+  `src/doctest_fence_guard.rs` refuses `` ```ignore `` anywhere in `src/`, with
+  no allowlist, and holds `no_run` to a written justification.
+- **The README's Getting Started builds.** Its dependency block named `gpui`
+  and `gpuikit` but not `gpui_platform`, which the first line of the example
+  calls into — a reader following it met an unresolved import before reaching
+  a window.
 
 ## [0.8.0] - 2026-09-01
 

@@ -10,7 +10,7 @@ use gpuikit::a11y::FocusNavigation;
 use gpuikit::date::{Date, Weekday};
 use gpuikit::input::InputState;
 use gpuikit::markdown::{Markdown, MarkdownElement, preprocessing_available};
-use gpuikit::theme::{ActiveTheme, GlobalTheme, Theme, ThemeVariant, Themeable};
+use gpuikit::theme::{ActiveTheme, GlobalTheme, Theme, ThemeExtension, ThemeVariant, Themeable};
 use gpuikit::{
     DefaultIcons,
     elements::{
@@ -901,6 +901,61 @@ const TABLE_COLUMN_REPOSITORY: usize = 0;
 const TABLE_COLUMN_LANGUAGE: usize = 1;
 const TABLE_COLUMN_STARS: usize = 2;
 
+/// Two fills a diff view needs and gpuikit has no opinion about — declared
+/// here, in the example, which is the whole demonstration: the crate this
+/// type is defined in is not the crate that defines `Theme`.
+///
+/// `derive` is written in terms of the theme's own tokens, so every theme
+/// answers for it, including the six bundled ones that predate it.
+#[derive(Clone, PartialEq, Debug)]
+struct DiffColors {
+    added: Hsla,
+    removed: Hsla,
+}
+
+impl ThemeExtension for DiffColors {
+    fn derive(theme: &Theme) -> Self {
+        DiffColors {
+            added: theme.success().opacity(0.18),
+            removed: theme.danger().opacity(0.18),
+        }
+    }
+}
+
+/// The source listing under the page's extension section. Fixed, unlike the
+/// theme listing above it, because nothing on the page changes it.
+const EXTENSION_CODE: &str = r#"```rust
+use gpuikit::theme::{Theme, ThemeExtension, Themeable};
+
+#[derive(Clone)]
+struct DiffColors {
+    added: Hsla,
+    removed: Hsla,
+}
+
+impl ThemeExtension for DiffColors {
+    // What this looks like when a theme has not said otherwise. Written in
+    // the theme's own tokens, so it follows every theme rather than only
+    // the one it was written against.
+    fn derive(theme: &Theme) -> Self {
+        DiffColors {
+            added: theme.success().opacity(0.18),
+            removed: theme.danger().opacity(0.18),
+        }
+    }
+}
+
+// Any theme now answers for it, with no Option at the call site:
+let diff = cx.theme().extension::<DiffColors>();
+
+// And a theme author who disagrees says so:
+let theme = Theme::gruvbox_dark().with_extension(DiffColors {
+    added: hsla(0.33, 0.60, 0.20, 1.0),
+    removed: hsla(0.00, 0.60, 0.20, 1.0),
+});
+```
+"#;
+
 /// Where the Theme Extension page's controls start. Named because both the
 /// sliders and the code block under them are built from these, and a default
 /// changed in one place only would make the page's first frame disagree with
@@ -1160,6 +1215,7 @@ struct Showcase {
     theme_ext_variant: Entity<ToggleGroup<ThemeVariant>>,
     theme_ext_overrides: Entity<Switch>,
     theme_ext_code: Entity<Markdown>,
+    theme_ext_extension_code: Entity<Markdown>,
 }
 
 impl Showcase {
@@ -1755,6 +1811,8 @@ impl Showcase {
             )
         });
 
+        let theme_ext_extension_code = cx.new(|cx| Markdown::new(EXTENSION_CODE, cx));
+
         cx.observe(&theme_ext_base_hue, |this, _slider, cx| {
             this.refresh_theme_ext_code(cx);
             cx.notify();
@@ -1979,6 +2037,7 @@ impl Showcase {
             theme_ext_variant,
             theme_ext_overrides,
             theme_ext_code,
+            theme_ext_extension_code,
         }
     }
 
@@ -2690,6 +2749,55 @@ impl Showcase {
             .description("This is the page's current state, and it compiles as written.")
             .body(MarkdownElement::new(self.theme_ext_code.clone()));
 
+        // 6 — tokens this crate does not define, which is the other half of
+        // extension and the half a downstream component library needs.
+        let diff = demo.extension::<DiffColors>();
+        let gruvbox_diff = Theme::gruvbox_dark().extension::<DiffColors>();
+
+        let extension = card()
+            .title("6 · Tokens gpuikit does not define")
+            .description(
+                "A crate built on gpuikit needs colours this one has never heard of. A \
+                 ThemeExtension is a struct of them plus a rule for deriving them from any \
+                 theme, so every theme answers for it — including the bundled ones, which \
+                 predate it.",
+            )
+            .body(
+                v_stack()
+                    .gap_3()
+                    .child(swatch_columns(vec![
+                        ("DiffColors::added", diff.added),
+                        ("DiffColors::removed", diff.removed),
+                    ]))
+                    .child(div().text_xs().text_color(theme.fg_muted()).child(
+                        "Those follow the sliders above, because derive() is written in the \
+                         theme's own tokens. Under Gruvbox Dark, untouched, the same \
+                         extension resolves to:",
+                    ))
+                    .child(swatch_columns(vec![
+                        ("added", gruvbox_diff.added),
+                        ("removed", gruvbox_diff.removed),
+                    ]))
+                    .child(separator())
+                    .child(MarkdownElement::new(self.theme_ext_extension_code.clone())),
+            );
+
+        // And the answer to the other question: a theme type of your own.
+        let bring_your_own = card()
+            .title("7 · A theme type of your own")
+            .description(
+                "Implement Themeable on your own type and resolve it with \
+                 Theme::from_themeable, which reads every token once into a concrete Theme. \
+                 The snapshot is lossless — Theme carries an override field for every token \
+                 the trait defines — and it keeps the per-frame reads a field access rather \
+                 than a vtable dispatch, which is why the global stays concrete.",
+            )
+            .body(div().text_xs().text_color(theme.fg_muted()).child(
+                "Behaviour does not survive the snapshot: a Themeable whose danger() changes \
+                 with the time of day is one fixed colour afterwards, and wants \
+                 re-snapshotting when it moves.",
+            ));
+
         v_stack()
             .gap_6()
             .child(
@@ -2714,13 +2822,9 @@ impl Showcase {
             .child(overridden)
             .child(install)
             .child(code)
-            .child(card().title("What this does not do").description(
-                "Themeable is a trait, but it is not yet a plug-in point. \
-                         ActiveTheme::theme() hands back an Arc<Theme>, and GlobalTheme wraps \
-                         that same concrete struct, so implementing Themeable on a type of \
-                         your own will compile and then have nowhere to be installed. Extend \
-                         a theme by building a Theme, as above.",
-            ))
+            .child(heading("Extending the vocabulary"))
+            .child(extension)
+            .child(bring_your_own)
     }
 
     fn render_button_page(

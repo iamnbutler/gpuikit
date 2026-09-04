@@ -33,7 +33,7 @@ impl TextDirection {
 /// # Examples
 ///
 /// ```ignore
-/// use gpui::input::bidi::detect_base_direction;
+/// use gpuikit::input::detect_base_direction;
 ///
 /// // English text is LTR
 /// assert!(detect_base_direction("Hello world").is_ltr());

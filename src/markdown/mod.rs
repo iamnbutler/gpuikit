@@ -1,12 +1,12 @@
 //! Markdown rendering for gpuikit
 //!
-//! This crate provides markdown parsing and rendering using GPUI elements.
+//! This module provides markdown parsing and rendering using GPUI elements.
 //! It supports CommonMark and GitHub Flavored Markdown.
 //!
 //! # Example
 //!
 //! ```ignore
-//! use gpuikit_markdown::{markdown, MarkdownStyle};
+//! use gpuikit::markdown::{markdown, MarkdownStyle};
 //!
 //! // Simple usage - create markdown element inline
 //! div().child(markdown("# Hello\n\nThis is **bold** text.", cx))

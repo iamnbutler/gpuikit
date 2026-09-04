@@ -347,14 +347,21 @@ impl MenuState {
 
     /// Follows the pointer, so the mouse and the keyboard never disagree about
     /// which entry is about to be chosen.
-    fn focus_from_hover(&mut self, index: usize, cx: &mut Context<Self>) {
+    ///
+    /// `None` is the pointer being over something Enter could not run — a
+    /// disabled item, a header, a separator. It has to *clear* the highlight
+    /// rather than leave the last one standing: a highlighted row is the menu
+    /// saying "Enter runs this", and over a disabled item that is not true.
+    /// The keyboard then re-enters from the edge, which is where it enters
+    /// from when the menu opens.
+    fn focus_from_hover(&mut self, index: Option<usize>, cx: &mut Context<Self>) {
         let Some(open) = self.open.as_mut() else {
             return;
         };
-        if open.focused == Some(index) {
+        if open.focused == index {
             return;
         }
-        open.focused = Some(index);
+        open.focused = index;
         cx.notify();
     }
 
@@ -654,6 +661,19 @@ fn menu_popup(
         )
 }
 
+/// The mouse-move handler every row that Enter could not run carries.
+///
+/// Without it the highlight the pointer left behind stays on screen while the
+/// pointer sits on a disabled item, a header or a separator, and the menu is
+/// telling the user Enter will run a row the pointer is nowhere near.
+fn clears_the_highlight(
+    state: Entity<MenuState>,
+) -> impl Fn(&gpui::MouseMoveEvent, &mut Window, &mut App) + 'static {
+    move |_, _window, cx| {
+        state.update(cx, |menu, cx| menu.focus_from_hover(None, cx));
+    }
+}
+
 fn menu_row(row: Row, state: Entity<MenuState>, cx: &App) -> impl IntoElement {
     let theme = cx.theme();
 
@@ -662,6 +682,7 @@ fn menu_row(row: Row, state: Entity<MenuState>, cx: &App) -> impl IntoElement {
             .my_1()
             .h(px(1.))
             .bg(theme.border_subtle())
+            .on_mouse_move(clears_the_highlight(state))
             .into_any_element(),
         Row::Header(label) => div()
             .px_3()
@@ -670,6 +691,7 @@ fn menu_row(row: Row, state: Entity<MenuState>, cx: &App) -> impl IntoElement {
             .text_xs()
             .text_color(theme.fg_muted())
             .child(label)
+            .on_mouse_move(clears_the_highlight(state))
             .into_any_element(),
         Row::Item {
             index,
@@ -709,7 +731,12 @@ fn menu_row(row: Row, state: Entity<MenuState>, cx: &App) -> impl IntoElement {
                 .text_color(text_color);
 
             if disabled {
-                row = row.cursor_not_allowed();
+                row = row.cursor_not_allowed().on_mouse_move({
+                    let state = state.clone();
+                    move |_, _window, cx| {
+                        state.update(cx, |menu, cx| menu.focus_from_hover(None, cx));
+                    }
+                });
             } else {
                 row = row
                     .cursor_pointer()
@@ -717,7 +744,7 @@ fn menu_row(row: Row, state: Entity<MenuState>, cx: &App) -> impl IntoElement {
                     .on_mouse_move({
                         let state = state.clone();
                         move |_, _window, cx| {
-                            state.update(cx, |menu, cx| menu.focus_from_hover(index, cx));
+                            state.update(cx, |menu, cx| menu.focus_from_hover(Some(index), cx));
                         }
                     })
                     .on_click({
@@ -1017,6 +1044,48 @@ mod tests {
         cx.simulate_click(bounds.center(), Modifiers::default());
 
         assert_eq!(chosen.get(), vec!["Delete".to_string()]);
+    }
+
+    /// The highlight follows the pointer, so hovering a row Enter *can* run
+    /// arms Enter. Half of the pair below; without it the next test passes
+    /// against a menu whose hover does nothing at all.
+    #[gpui::test]
+    fn hovering_an_item_arms_enter_for_it(cx: &mut TestAppContext) {
+        let (chosen, cx) = open_menu(cx);
+
+        let delete = cx
+            .debug_bounds("gpuikit-context-menu-item-3")
+            .expect("the Delete row should have been laid out");
+        cx.simulate_mouse_move(delete.center(), None, Modifiers::default());
+        cx.simulate_keystrokes("enter");
+
+        assert_eq!(chosen.get(), vec!["Delete".to_string()]);
+    }
+
+    /// A disabled row used to carry no `on_mouse_move` at all, so the highlight
+    /// left behind by the last enabled row the pointer crossed stayed lit while
+    /// the pointer sat on a row Enter could not run — the menu claiming Enter
+    /// would run something it would not.
+    #[gpui::test]
+    fn hovering_a_disabled_item_clears_the_highlight(cx: &mut TestAppContext) {
+        let (chosen, cx) = open_menu(cx);
+
+        let copy = cx
+            .debug_bounds("gpuikit-context-menu-item-0")
+            .expect("the Copy row should have been laid out");
+        let paste = cx
+            .debug_bounds("gpuikit-context-menu-item-1")
+            .expect("the Paste row should have been laid out");
+
+        cx.simulate_mouse_move(copy.center(), None, Modifiers::default());
+        cx.simulate_mouse_move(paste.center(), None, Modifiers::default());
+        cx.simulate_keystrokes("enter");
+
+        assert!(
+            chosen.get().is_empty(),
+            "Enter ran {:?} while the pointer was on a disabled row",
+            chosen.get()
+        );
     }
 
     #[gpui::test]

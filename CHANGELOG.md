@@ -4,6 +4,44 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A combobox's chevron opens the popup.** It was an `Adornment::icon` — the
+  one part of the control that looks pressable, and the only part of it that
+  did nothing. It is a toggle: a second press closes what the first opened.
+- **Hovering a disabled context-menu item clears the highlight.** A disabled
+  row carried no `on_mouse_move` at all, so the highlight left by the last
+  enabled row the pointer crossed stayed lit — the menu saying Enter would run
+  something Enter would not. Headers and separators clear it too, for the same
+  reason.
+- **`Themeable::destructive_fg` picks black or white by contrast, not by HSL
+  lightness.** HSL lightness is not perceived brightness, and the old
+  `l > 0.6` rule chose white on Gruvbox Dark's `#fb4934` — 3.4:1, under WCAG
+  AA — where black on the same fill is 6.1:1. It was the only built-in theme
+  the rule got wrong, and the theme whose destructive button looked washed out.
+  Every other theme keeps the colour it had.
+- **The command palette draws its scrim over the window.** `CommandState`
+  wrapped its `deferred` scrim in a plain `div()`; `deferred` hands its child's
+  layout id straight up, so that wrapper became the containing block for an
+  absolutely positioned child and measured nothing. The scrim resolved
+  `size_full` against a box with no size and drew a black rectangle the shape
+  of whatever surrounded the palette. It is returned bare now, the way
+  `DialogState` already returned its own.
+
+### Changed
+
+- **Four `LoadingIndicator` variants are drawn rather than typed.** `Star`,
+  `Triangle`, `Braille` and `BrailleExtended` were built from `❊✳※`, `◢◣◤◥`
+  and the braille block. None of those codepoints is in either font gpui's web
+  platform bundles, and that platform loads no system fonts, so all four
+  rendered as empty boxes in a browser. They are lit-dot grids now — the
+  braille ones are the braille dot patterns, drawn — which depends on no font
+  at all. `no_variant_bets_on_a_font_having_a_glyph` holds the remaining text
+  variants to ASCII.
+
+  `BrailleExtended` is 255 frames over 25.5s, not the 30s its doc claimed; the
+  glyph version listed 192 frames while calling itself 256.
+
 ### Changed
 
 - **`Tabs`, `ToggleGroup`, `RadioGroup` and `Slider` are on the shared control

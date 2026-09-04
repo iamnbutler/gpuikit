@@ -1,59 +1,60 @@
 #![allow(missing_docs)]
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    div, px, size, App, AppContext, Application, Bounds, ClipboardItem, Context, Entity,
-    FocusHandle, FontWeight, Hsla, InteractiveElement, IntoElement, Menu, ParentElement, Render,
-    Rgba, SharedString, StatefulInteractiveElement, Styled, TitlebarOptions, Window, WindowBounds,
-    WindowOptions,
+    App, AppContext, Application, Bounds, ClipboardItem, Context, Entity, FocusHandle, FontWeight,
+    Hsla, InteractiveElement, IntoElement, Menu, ParentElement, Render, Rgba, SharedString,
+    StatefulInteractiveElement, Styled, TitlebarOptions, Window, WindowBounds, WindowOptions, div,
+    px, size,
 };
 use gpuikit::a11y::FocusNavigation;
 use gpuikit::date::{Date, Weekday};
 use gpuikit::input::InputState;
-use gpuikit::markdown::{preprocessing_available, Markdown, MarkdownElement};
+use gpuikit::markdown::{Markdown, MarkdownElement, preprocessing_available};
 use gpuikit::theme::{ActiveTheme, GlobalTheme, Theme, Themeable};
 use gpuikit::{
+    DefaultIcons,
     elements::{
-        accordion::{accordion, accordion_item, AccordionState},
+        accordion::{AccordionState, accordion, accordion_item},
         alert::alert,
         aspect_ratio::{aspect_ratio, aspect_ratio_square, aspect_ratio_video},
         avatar::avatar,
         badge::badge,
-        breadcrumb::{breadcrumb, breadcrumb_item, BreadcrumbSeparator},
+        breadcrumb::{BreadcrumbSeparator, breadcrumb, breadcrumb_item},
         button::button,
         button_group::button_group,
         calendar::{Calendar, CalendarEvent},
         card::card,
-        checkbox::{checkbox, Checkbox},
-        collapsible::{collapsible, Collapsible},
-        combobox::{combobox, Combobox, ComboboxState},
+        checkbox::{Checkbox, checkbox},
+        collapsible::{Collapsible, collapsible},
+        combobox::{Combobox, ComboboxState, combobox},
         command::{CommandItem, CommandState},
         context_menu::{context_menu, menu_item},
-        dialog::{dialog, DialogState},
+        dialog::{DialogState, dialog},
         empty::empty,
-        field::{field, LabelPosition},
+        field::{LabelPosition, field},
         form::fieldset,
         icon_button::icon_button,
         kbd::{kbd, kbd_combo},
         label::label,
         list::{List, ListEntry},
         loading_indicator::loading_indicator,
-        popover::{popover, PopoverState},
-        progress::{progress, ProgressVariant},
-        radio_group::{radio_group, radio_option, RadioGroup},
+        popover::{PopoverState, popover},
+        progress::{ProgressVariant, progress},
+        radio_group::{RadioGroup, radio_group, radio_option},
         scroll_area::scroll_area,
-        select::{select, SelectState},
+        select::{SelectState, select},
         separator::separator,
-        sidebar::{sidebar, sidebar_trigger, SidebarEdge, SidebarState},
-        slider::{slider, Slider},
+        sidebar::{SidebarEdge, SidebarState, sidebar, sidebar_trigger},
+        slider::{Slider, slider},
         splitter::splitter,
-        switch::{switch, Switch},
-        table::{table, CellAlign, Column, Row, SortDescriptor, SortDirection},
-        tabs::{tab, tabs, Tabs},
-        text_field::{text_field, Adornment},
+        switch::{Switch, switch},
+        table::{CellAlign, Column, Row, SortDescriptor, SortDirection, table},
+        tabs::{Tabs, tab, tabs},
+        text_field::{Adornment, text_field},
         textarea::textarea,
         toast::ToastExt,
-        toggle::{toggle, Toggle},
-        toggle_group::{toggle_group, toggle_option, ToggleGroup, ToggleGroupMode},
+        toggle::{Toggle, toggle},
+        toggle_group::{ToggleGroup, ToggleGroupMode, toggle_group, toggle_option},
         tooltip::tooltip,
         typography::{blockquote, h1, h2, h3, h4, lead, p, small, text},
     },
@@ -63,7 +64,6 @@ use gpuikit::{
     traits::disableable::Disableable,
     traits::labelable::Labelable,
     traits::orientable::{Orientable, Orientation},
-    DefaultIcons,
 };
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -383,7 +383,7 @@ fn navigate_to(cell: &Rc<RefCell<SharedString>>, page: SharedString, window: &mu
 /// lives as long as the page does.
 #[cfg(target_family = "wasm")]
 fn follow_location(showcase: gpui::WindowHandle<Showcase>, cx: &mut App) {
-    use wasm_bindgen::{closure::Closure, JsCast};
+    use wasm_bindgen::{JsCast, closure::Closure};
 
     let Some(browser_window) = web_sys::window() else {
         return;

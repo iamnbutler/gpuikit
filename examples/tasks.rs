@@ -1,14 +1,14 @@
 #![allow(missing_docs)]
 
 use gpui::{
-    div, hsla, prelude::FluentBuilder, px, size, App, AppContext, Application, Bounds, ClickEvent,
-    Context, ElementId, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement,
-    IntoElement, MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement,
-    Styled, TitlebarOptions, Window, WindowBounds, WindowOptions,
+    App, AppContext, Application, Bounds, ClickEvent, Context, ElementId, Entity, EventEmitter,
+    FocusHandle, Focusable, InteractiveElement, IntoElement, MouseButton, ParentElement, Render,
+    SharedString, StatefulInteractiveElement, Styled, TitlebarOptions, Window, WindowBounds,
+    WindowOptions, div, hsla, prelude::FluentBuilder, px, size,
 };
 use gpuikit::{
     elements::{
-        badge::{badge, BadgeVariant},
+        badge::{BadgeVariant, badge},
         button::button,
     },
     layout::{h_stack, v_stack},

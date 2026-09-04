@@ -2,8 +2,8 @@
 
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, prelude::FluentBuilder, rems, App, Div, ElementId, FontWeight, IntoElement, ParentElement,
-    RenderOnce, SharedString, Styled, Window,
+    App, Div, ElementId, FontWeight, IntoElement, ParentElement, RenderOnce, SharedString, Styled,
+    Window, div, prelude::FluentBuilder, rems,
 };
 
 /// Creates a label with the given text

@@ -1,7 +1,7 @@
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, prelude::FluentBuilder, px, rems, AnyElement, App, IntoElement, ParentElement, RenderOnce,
-    SharedString, Styled, Svg, Window,
+    AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Svg, Window,
+    div, prelude::FluentBuilder, px, rems,
 };
 
 pub fn empty() -> Empty {

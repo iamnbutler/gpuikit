@@ -46,8 +46,8 @@
 //! [`Textarea`]: crate::elements::textarea::Textarea
 
 use gpui::{
-    div, prelude::*, AnyElement, App, ElementId, Entity, EntityId, FocusHandle, Focusable,
-    IntoElement, ParentElement, Rems, RenderOnce, SharedString, Styled, Svg, Window,
+    AnyElement, App, ElementId, Entity, EntityId, FocusHandle, Focusable, IntoElement,
+    ParentElement, Rems, RenderOnce, SharedString, Styled, Svg, Window, div, prelude::*,
 };
 
 use crate::element_id::for_entity;

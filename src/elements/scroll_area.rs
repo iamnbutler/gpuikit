@@ -28,8 +28,8 @@
 //! ```
 
 use gpui::{
-    div, prelude::*, px, AnyElement, App, ElementId, IntoElement, Length, ParentElement,
-    RenderOnce, Styled, Window,
+    AnyElement, App, ElementId, IntoElement, Length, ParentElement, RenderOnce, Styled, Window,
+    div, prelude::*, px,
 };
 
 /// Scroll direction for the scroll area

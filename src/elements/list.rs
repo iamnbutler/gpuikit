@@ -22,9 +22,9 @@
 
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, prelude::FluentBuilder, px, uniform_list, AnyElement, App, ClickEvent, ElementId,
-    InteractiveElement, IntoElement, ParentElement, Pixels, SharedString,
-    StatefulInteractiveElement, Styled, UniformListScrollHandle, Window,
+    AnyElement, App, ClickEvent, ElementId, InteractiveElement, IntoElement, ParentElement, Pixels,
+    SharedString, StatefulInteractiveElement, Styled, UniformListScrollHandle, Window, div,
+    prelude::FluentBuilder, px, uniform_list,
 };
 use std::rc::Rc;
 

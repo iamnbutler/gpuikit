@@ -128,14 +128,14 @@
 use crate::a11y::{A11y, Announce};
 #[cfg(test)]
 use crate::elements::listbox::option_a11y;
-use crate::elements::listbox::{Listbox, ListboxFocus, LISTBOX_GAP};
-use crate::theme::{focus_ring, ActiveTheme, ControlSize, Themeable};
+use crate::elements::listbox::{LISTBOX_GAP, Listbox, ListboxFocus};
+use crate::theme::{ActiveTheme, ControlSize, Themeable, focus_ring};
 use crate::traits::accessible::Accessible;
 use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use gpui::{
-    anchored, deferred, div, point, prelude::*, px, App, Context, DismissEvent, ElementId, Entity,
-    EventEmitter, IntoElement, ParentElement, Rems, Render, Role, SharedString, Styled, Window,
+    App, Context, DismissEvent, ElementId, Entity, EventEmitter, IntoElement, ParentElement, Rems,
+    Render, Role, SharedString, Styled, Window, anchored, deferred, div, point, prelude::*, px,
 };
 
 use crate::icons::Icons;
@@ -614,8 +614,8 @@ impl<T: Clone + PartialEq + 'static> Render for SelectState<T> {
 mod tests {
     use super::*;
     use gpui::{
-        px, size, Bounds, KeyUpEvent, Keystroke, Pixels, PlatformInput, Render, TestAppContext,
-        VisualTestContext,
+        Bounds, KeyUpEvent, Keystroke, Pixels, PlatformInput, Render, TestAppContext,
+        VisualTestContext, px, size,
     };
     use std::ops::Deref;
 

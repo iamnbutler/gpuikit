@@ -257,8 +257,8 @@
 //! derived cell ids first.
 
 use gpui::{
-    actions, App, FocusHandle, InteractiveElement, KeyBinding, Orientation, Role, SharedString,
-    StatefulInteractiveElement, Toggled,
+    App, FocusHandle, InteractiveElement, KeyBinding, Orientation, Role, SharedString,
+    StatefulInteractiveElement, Toggled, actions,
 };
 
 /// What an element announces: a role, a name, and whatever state goes with the
@@ -1064,7 +1064,7 @@ impl<E: StatefulInteractiveElement> Announce for E {}
 /// point, and hand back the node it would have built.
 #[cfg(test)]
 pub(crate) mod test_support {
-    use gpui::{accesskit, App, Element, ElementId, IntoElement, RenderOnce, Role, Window};
+    use gpui::{App, Element, ElementId, IntoElement, RenderOnce, Role, Window, accesskit};
 
     /// One element, as gpui's accessibility walk would have seen it.
     pub(crate) struct Announced {
@@ -1137,7 +1137,7 @@ pub(crate) mod test_support {
 mod tests {
     use super::test_support::announced_element;
     use super::*;
-    use gpui::{accesskit, div, Orientation, Role, Toggled};
+    use gpui::{Orientation, Role, Toggled, accesskit, div};
     use std::fs;
     use std::path::{Path, PathBuf};
 
@@ -1440,12 +1440,16 @@ mod tests {
     #[test]
     fn a_required_name_is_absent_blank_or_given() {
         assert!(A11y::new(Role::Button).is_missing_a_required_name());
-        assert!(A11y::new(Role::Button)
-            .name("  ")
-            .is_missing_a_required_name());
-        assert!(!A11y::new(Role::Button)
-            .name("Save")
-            .is_missing_a_required_name());
+        assert!(
+            A11y::new(Role::Button)
+                .name("  ")
+                .is_missing_a_required_name()
+        );
+        assert!(
+            !A11y::new(Role::Button)
+                .name("Save")
+                .is_missing_a_required_name()
+        );
         assert!(!A11y::new(Role::Document).is_missing_a_required_name());
 
         assert_eq!(

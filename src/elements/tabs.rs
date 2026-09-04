@@ -7,8 +7,8 @@ use crate::theme::{ActiveTheme, ControlSize, Themeable};
 use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use gpui::{
-    div, prelude::*, px, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
+    Context, ElementId, EventEmitter, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    Render, SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::*, px,
 };
 
 /// Event emitted when the selected tab changes

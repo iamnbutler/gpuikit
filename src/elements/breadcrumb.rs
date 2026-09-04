@@ -3,9 +3,8 @@
 use crate::layout::h_stack;
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, prelude::*, rems, App, ClickEvent, ElementId, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement, Styled,
-    Window,
+    App, ClickEvent, ElementId, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    RenderOnce, SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::*, rems,
 };
 
 /// A single breadcrumb item

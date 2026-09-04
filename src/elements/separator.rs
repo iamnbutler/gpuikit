@@ -4,7 +4,7 @@
 
 use crate::theme::{ActiveTheme, Themeable};
 use crate::traits::orientable::{Orientable, Orientation};
-use gpui::{div, px, IntoElement, Pixels, Styled};
+use gpui::{IntoElement, Pixels, Styled, div, px};
 
 /// A separator component for visually dividing content.
 #[derive(IntoElement)]

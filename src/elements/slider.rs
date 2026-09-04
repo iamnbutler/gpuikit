@@ -30,9 +30,9 @@ use crate::traits::disableable::Disableable;
 use crate::traits::labelable::Labelable;
 use crate::utils::element_manager::ElementManagerExt;
 use gpui::{
-    canvas, div, prelude::*, px, App, Bounds, Context, DispatchPhase, ElementId, EventEmitter,
-    IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels,
-    Point, Rems, Render, SharedString, Styled, Window,
+    App, Bounds, Context, DispatchPhase, ElementId, EventEmitter, IntoElement, MouseButton,
+    MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels, Point, Rems, Render,
+    SharedString, Styled, Window, canvas, div, prelude::*, px,
 };
 use std::ops::RangeInclusive;
 
@@ -419,7 +419,7 @@ impl ControlSized for Slider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{size, Entity, Modifiers, TestAppContext, VisualTestContext};
+    use gpui::{Entity, Modifiers, TestAppContext, VisualTestContext, size};
 
     // A `Slider` cannot be drawn with `VisualTestContext::draw`: registering a
     // mouse listener reads `Window::current_view`, which is only set while a

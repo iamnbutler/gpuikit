@@ -75,9 +75,9 @@
 use std::rc::Rc;
 
 use gpui::{
-    canvas, div, prelude::*, px, AnyElement, App, Bounds, Context, CursorStyle, DispatchPhase, Div,
-    ElementId, Entity, FocusHandle, KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent,
-    MouseUpEvent, Pixels, Rems, Role, SharedString, Window,
+    AnyElement, App, Bounds, Context, CursorStyle, DispatchPhase, Div, ElementId, Entity,
+    FocusHandle, KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels,
+    Rems, Role, SharedString, Window, canvas, div, prelude::*, px,
 };
 
 use crate::a11y::{A11y, Announce};
@@ -741,9 +741,9 @@ impl RenderOnce for Splitter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::a11y::{role_requires_a_name, role_requires_keyboard_focus, FocusNavigation};
+    use crate::a11y::{FocusNavigation, role_requires_a_name, role_requires_keyboard_focus};
     use crate::theme::ControlScale;
-    use gpui::{size, Modifiers, Point, Render, Size, TestAppContext, VisualTestContext};
+    use gpui::{Modifiers, Point, Render, Size, TestAppContext, VisualTestContext, size};
     use std::cell::RefCell;
 
     // --- the split maths, with no window ---
@@ -1050,9 +1050,11 @@ mod tests {
     fn a_splitter_is_one_of_the_roles_that_must_be_named() {
         assert!(role_requires_a_name(Role::Splitter));
         assert!(A11y::new(Role::Splitter).is_missing_a_required_name());
-        assert!(!splitter("panes", "Panes", 0.5)
-            .a11y()
-            .is_missing_a_required_name());
+        assert!(
+            !splitter("panes", "Panes", 0.5)
+                .a11y()
+                .is_missing_a_required_name()
+        );
     }
 
     /// The declaration half: the splitter answers the focus question its role

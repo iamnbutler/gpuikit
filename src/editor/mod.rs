@@ -28,7 +28,7 @@ pub use buffer::{GapBuffer, TextBuffer};
 pub use editor::{CursorPosition, Editor, EditorConfig};
 pub use element::EditorElement;
 // Re-export keymap types from keymap module
-pub use crate::keymap::extensions::{bind, create_bindings, BindingBuilder};
+pub use crate::keymap::extensions::{BindingBuilder, bind, create_bindings};
 pub use crate::keymap::{BindingSpec, Keymap, KeymapCollection};
 pub use meta_line::{Language, MetaLine, Selection};
 pub use syntax_highlighter::SyntaxHighlighter;

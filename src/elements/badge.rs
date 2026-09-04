@@ -1,7 +1,7 @@
 use crate::theme::{ActiveTheme, ControlSize, Themeable};
 use crate::traits::control_sized::ControlSized;
 use gpui::{
-    div, App, FontWeight, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window,
+    App, FontWeight, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
 };
 
 pub fn badge(label: impl Into<SharedString>) -> Badge {

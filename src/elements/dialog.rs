@@ -40,9 +40,9 @@ use crate::theme::{ActiveTheme, ControlSize, Themeable};
 use crate::traits::accessible::Accessible;
 use crate::traits::control_sized::ControlSized;
 use gpui::{
-    actions, deferred, div, prelude::*, px, AnyElement, App, Context, DismissEvent, ElementId,
-    EventEmitter, FocusHandle, Focusable, IntoElement, KeyBinding, ParentElement, Render, Role,
-    SharedString, Styled, Window,
+    AnyElement, App, Context, DismissEvent, ElementId, EventEmitter, FocusHandle, Focusable,
+    IntoElement, KeyBinding, ParentElement, Render, Role, SharedString, Styled, Window, actions,
+    deferred, div, prelude::*, px,
 };
 use std::rc::Rc;
 
@@ -806,9 +806,11 @@ mod tests {
     /// would trip `announce`'s own `debug_assert!`.
     #[test]
     fn an_untitled_dialog_has_no_name_to_announce() {
-        assert!(DialogState::new(dialog("plain"))
-            .a11y()
-            .is_missing_a_required_name());
+        assert!(
+            DialogState::new(dialog("plain"))
+                .a11y()
+                .is_missing_a_required_name()
+        );
     }
 
     /// The refining builders adjust a confirmation and refuse to create one,
@@ -831,7 +833,7 @@ mod tests {
 
     #[test]
     fn a_destructive_button_reports_its_variant() {
-        use crate::elements::button::{button, ButtonVariant};
+        use crate::elements::button::{ButtonVariant, button};
 
         // `b.variant()` with no argument resolves to the inherent *builder*
         // and fails to compile; the getter is reached through the trait.

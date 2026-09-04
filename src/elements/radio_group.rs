@@ -5,8 +5,8 @@ use crate::traits::control_sized::ControlSized;
 use crate::traits::disableable::Disableable;
 use crate::traits::orientable::{Orientable, Orientation};
 use gpui::{
-    div, prelude::*, Context, ElementId, EventEmitter, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window,
+    Context, ElementId, EventEmitter, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    Render, SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::*,
 };
 
 /// Event emitted when the radio group selection changes

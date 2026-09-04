@@ -8,7 +8,7 @@
 //! browser. On wasm, build a [`Keymap`] from a JSON string or in code
 //! instead. `src/wasm_compat_guard.rs` tracks this exemption.
 
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::{Context as _, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;

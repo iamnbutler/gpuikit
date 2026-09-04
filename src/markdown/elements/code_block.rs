@@ -1,12 +1,12 @@
 //! Code block element for markdown.
 
 use crate::theme::{ActiveTheme, Themeable};
-use gpui::{div, prelude::*, rems, App, ElementId, ParentElement, SharedString, Styled};
+use gpui::{App, ElementId, ParentElement, SharedString, Styled, div, prelude::*, rems};
 
 use super::super::code_highlight::code_highlights;
 use super::super::selectable_text::{RunRole, SelectableText};
 use super::super::style::TextStyle;
-use super::paragraph::{selection_styled_text, RunContext};
+use super::paragraph::{RunContext, selection_styled_text};
 
 /// Render a code block element. The text inside is a selectable run — code
 /// is the thing people copy most.

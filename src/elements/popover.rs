@@ -24,9 +24,9 @@
 use crate::element_id::for_entity;
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    anchored, deferred, div, point, prelude::*, px, AnyElement, App, Context, DismissEvent,
-    ElementId, Entity, EventEmitter, FocusHandle, Focusable, IntoElement, ParentElement, Pixels,
-    Point, Render, Styled, Window,
+    AnyElement, App, Context, DismissEvent, ElementId, Entity, EventEmitter, FocusHandle,
+    Focusable, IntoElement, ParentElement, Pixels, Point, Render, Styled, Window, anchored,
+    deferred, div, point, prelude::*, px,
 };
 use std::rc::Rc;
 

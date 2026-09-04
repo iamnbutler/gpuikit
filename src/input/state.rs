@@ -6,16 +6,16 @@ use std::time::Duration;
 use web_time::Instant;
 
 use gpui::{
-    point, px, App, AppContext, Bounds, ClipboardItem, Context, Entity, EventEmitter, FocusHandle,
-    Focusable, Pixels, Point, SharedString, Subscription, TextRun, TextStyle, UTF16Selection,
-    Window, WrappedLine,
+    App, AppContext, Bounds, ClipboardItem, Context, Entity, EventEmitter, FocusHandle, Focusable,
+    Pixels, Point, SharedString, Subscription, TextRun, TextStyle, UTF16Selection, Window,
+    WrappedLine, point, px,
 };
 
 use super::blink::CursorBlink;
 use super::handler::EntityInputHandler;
 use unicode_segmentation::UnicodeSegmentation;
 
-use super::bidi::{detect_base_direction, TextDirection};
+use super::bidi::{TextDirection, detect_base_direction};
 use super::bindings::{
     Backspace, Copy, Cut, Delete, DeleteToBeginningOfLine, DeleteToEndOfLine, DeleteWordLeft,
     DeleteWordRight, Down, End, Enter, Home, InsertNewline, Left, MoveToBeginning, MoveToEnd,
@@ -1982,8 +1982,8 @@ impl Focusable for InputState {
 mod tests {
     use super::*;
     use gpui::{
-        div, AppContext, Entity, InteractiveElement, IntoElement, ParentElement, Render,
-        TestAppContext, TextStyle, WindowHandle,
+        AppContext, Entity, InteractiveElement, IntoElement, ParentElement, Render, TestAppContext,
+        TextStyle, WindowHandle, div,
     };
     use std::cell::Cell;
     use std::cell::RefCell;

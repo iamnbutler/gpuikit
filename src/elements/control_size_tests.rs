@@ -10,21 +10,21 @@
 //! [`CONTROLS`] and [`every_sized_control_on_a_row_is_the_same_height`] for
 //! which elements are left out and why.
 
-use gpui::{div, prelude::*, px, Context, Entity, Pixels, Render, TestAppContext, Window};
+use gpui::{Context, Entity, Pixels, Render, TestAppContext, Window, div, prelude::*, px};
 
 use crate::elements::badge::badge;
 use crate::elements::button::button;
-use crate::elements::checkbox::{checkbox, Checkbox};
+use crate::elements::checkbox::{Checkbox, checkbox};
 use crate::elements::icon_button::icon_button;
 use crate::elements::kbd::kbd;
-use crate::elements::radio_group::{radio_group, radio_option, RadioGroup};
-use crate::elements::select::{select, SelectState};
-use crate::elements::slider::{slider, Slider};
-use crate::elements::switch::{switch, Switch};
-use crate::elements::tabs::{tab, tabs, Tabs};
+use crate::elements::radio_group::{RadioGroup, radio_group, radio_option};
+use crate::elements::select::{SelectState, select};
+use crate::elements::slider::{Slider, slider};
+use crate::elements::switch::{Switch, switch};
+use crate::elements::tabs::{Tabs, tab, tabs};
 use crate::elements::text_field::text_field;
-use crate::elements::toggle::{toggle, Toggle};
-use crate::elements::toggle_group::{toggle_group, toggle_option, ToggleGroup};
+use crate::elements::toggle::{Toggle, toggle};
+use crate::elements::toggle_group::{ToggleGroup, toggle_group, toggle_option};
 use crate::icons::Icons;
 use crate::input::InputState;
 use crate::layout::h_stack;

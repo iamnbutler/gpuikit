@@ -10,20 +10,20 @@
 use std::sync::Arc;
 
 use gpui::{
-    fill, point, px, relative, size, Action, App, Bounds, ContentMask, Context, CursorStyle,
-    DispatchPhase, Element, ElementId, Entity, FocusHandle, Focusable, GlobalElementId, Hitbox,
-    HitboxBehavior, Hsla, InspectorElementId, InteractiveElement, Interactivity, IntoElement,
-    LayoutId, Length, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point,
-    ScrollWheelEvent, SharedString, StyleRefinement, Styled, TextAlign, TextRun, TextStyle,
-    TextStyleRefinement, Window, WrappedLine,
+    Action, App, Bounds, ContentMask, Context, CursorStyle, DispatchPhase, Element, ElementId,
+    Entity, FocusHandle, Focusable, GlobalElementId, Hitbox, HitboxBehavior, Hsla,
+    InspectorElementId, InteractiveElement, Interactivity, IntoElement, LayoutId, Length,
+    MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, ScrollWheelEvent,
+    SharedString, StyleRefinement, Styled, TextAlign, TextRun, TextStyle, TextStyleRefinement,
+    Window, WrappedLine, fill, point, px, relative, size,
 };
 
 use crate::theme::{ActiveTheme, ControlSize, Themeable};
 use crate::traits::control_sized::ControlSized;
 
 use crate::input::{
-    bindings::Escape, ElementInputHandler, InputLineLayout, InputState, TextDirection,
-    INPUT_CONTEXT,
+    ElementInputHandler, INPUT_CONTEXT, InputLineLayout, InputState, TextDirection,
+    bindings::Escape,
 };
 
 const CURSOR_WIDTH: f32 = 2.0;

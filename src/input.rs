@@ -31,8 +31,8 @@ mod blink;
 mod handler;
 mod state;
 
-pub use bidi::{detect_base_direction, TextDirection};
-pub use bindings::{bind_input_keys, InputBindings, INPUT_CONTEXT};
+pub use bidi::{TextDirection, detect_base_direction};
+pub use bindings::{INPUT_CONTEXT, InputBindings, bind_input_keys};
 pub use blink::CursorBlink;
 pub use handler::*;
 pub use state::{InputLineLayout, InputState, InputStateEvent, SubmitOn};

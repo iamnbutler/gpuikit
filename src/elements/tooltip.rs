@@ -2,8 +2,8 @@
 
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, px, AnyView, App, AppContext, Context, IntoElement, ParentElement, Render, SharedString,
-    Styled, Window,
+    AnyView, App, AppContext, Context, IntoElement, ParentElement, Render, SharedString, Styled,
+    Window, div, px,
 };
 
 /// A simple text tooltip.

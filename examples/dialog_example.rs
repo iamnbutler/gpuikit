@@ -5,11 +5,11 @@
 #![allow(missing_docs)]
 
 use gpui::{
-    div, prelude::*, px, size, App, Application, Bounds, Context, Entity, FocusHandle, Focusable,
-    ParentElement, Render, Styled, Window, WindowBounds, WindowOptions,
+    App, Application, Bounds, Context, Entity, FocusHandle, Focusable, ParentElement, Render,
+    Styled, Window, WindowBounds, WindowOptions, div, prelude::*, px, size,
 };
 use gpuikit::elements::button::button;
-use gpuikit::elements::dialog::{dialog, DialogClosed, DialogOpened, DialogState};
+use gpuikit::elements::dialog::{DialogClosed, DialogOpened, DialogState, dialog};
 use gpuikit::layout::h_stack;
 use gpuikit::theme::{ActiveTheme, Themeable};
 

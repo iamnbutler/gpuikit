@@ -3,11 +3,11 @@
 //! Run with: cargo run --example popover_demo
 
 use gpui::{
-    div, prelude::*, px, size, App, Application, Bounds, Context, Entity, FocusHandle, Focusable,
-    IntoElement, ParentElement, Render, Styled, Window, WindowBounds, WindowOptions,
+    App, Application, Bounds, Context, Entity, FocusHandle, Focusable, IntoElement, ParentElement,
+    Render, Styled, Window, WindowBounds, WindowOptions, div, prelude::*, px, size,
 };
 use gpuikit::elements::button::button;
-use gpuikit::elements::popover::{popover, PopoverState};
+use gpuikit::elements::popover::{PopoverState, popover};
 use gpuikit::layout::v_stack;
 use gpuikit::theme::{ActiveTheme, Themeable};
 

@@ -78,11 +78,26 @@ const FORBIDDEN: &[ForbiddenApi] = &[
               errors at runtime. Bundle files with the asset system, or document the API as \
               native-only and add it to this allowlist.",
         allowed: &[
-            ("fs.rs", "the file-editing module exists to read/write the local disk; native-only by design and documented as such"),
-            ("keymap/mod.rs", "loads keymap JSON from user-supplied paths; native-only by design and documented as such"),
-            ("editor/syntax_highlighter.rs", "`load_theme_from_file` reads a .tmTheme from disk; native-only by design and documented as such"),
-            ("a11y.rs", "test-only: golden-file assertions inside `#[cfg(test)] mod tests`"),
-            ("element_id.rs", "test-only: source scan inside `#[cfg(test)] mod tests`"),
+            (
+                "fs.rs",
+                "the file-editing module exists to read/write the local disk; native-only by design and documented as such",
+            ),
+            (
+                "keymap/mod.rs",
+                "loads keymap JSON from user-supplied paths; native-only by design and documented as such",
+            ),
+            (
+                "editor/syntax_highlighter.rs",
+                "`load_theme_from_file` reads a .tmTheme from disk; native-only by design and documented as such",
+            ),
+            (
+                "a11y.rs",
+                "test-only: golden-file assertions inside `#[cfg(test)] mod tests`",
+            ),
+            (
+                "element_id.rs",
+                "test-only: source scan inside `#[cfg(test)] mod tests`",
+            ),
             ("build_profile_guard.rs", "test-only guard module"),
             ("release_input_validation.rs", "test-only guard module"),
             ("release_version_guard.rs", "test-only guard module"),

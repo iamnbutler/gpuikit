@@ -30,8 +30,8 @@ mod style;
 pub use code_highlight::normalize_language;
 #[cfg(feature = "editor")]
 pub use code_highlight::{
-    code_highlight_themes, init_code_highlighting, set_code_highlight_theme, CodeHighlightTheme,
-    DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME,
+    CodeHighlightTheme, DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, code_highlight_themes,
+    init_code_highlighting, set_code_highlight_theme,
 };
 pub use elements::*;
 pub use inline_style::*;
@@ -44,8 +44,8 @@ pub use style::*;
 use crate::a11y::{A11y, Announce};
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, prelude::*, rems, App, Context, ElementId, Entity, EntityId, IntoElement, ParentElement,
-    Role, SharedString, Styled, Task, Window,
+    App, Context, ElementId, Entity, EntityId, IntoElement, ParentElement, Role, SharedString,
+    Styled, Task, Window, div, prelude::*, rems,
 };
 use pulldown_cmark::{Alignment, Event, Tag, TagEnd};
 
@@ -1132,7 +1132,7 @@ impl MarkdownRenderer {
 mod tests {
     use super::selectable_text::recorder::{self, RecordedRun};
     use super::*;
-    use gpui::{point, px, size, AnyElement, Pixels, Render, TestAppContext, VisualTestContext};
+    use gpui::{AnyElement, Pixels, Render, TestAppContext, VisualTestContext, point, px, size};
     use std::cell::Cell;
     use std::collections::HashSet;
     use std::rc::Rc;
@@ -2061,10 +2061,12 @@ mod tests {
 
         markdown.read_with(cx, |markdown, _| {
             assert_eq!(rendered_text(markdown), "A partially written");
-            assert!(markdown
-                .events()
-                .iter()
-                .any(|event| matches!(event.event, Event::Start(Tag::Strong))));
+            assert!(
+                markdown
+                    .events()
+                    .iter()
+                    .any(|event| matches!(event.event, Event::Start(Tag::Strong)))
+            );
         });
     }
 

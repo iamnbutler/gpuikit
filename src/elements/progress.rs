@@ -1,7 +1,7 @@
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, prelude::FluentBuilder, px, relative, App, IntoElement, ParentElement, Pixels, RenderOnce,
-    Styled, Window,
+    App, IntoElement, ParentElement, Pixels, RenderOnce, Styled, Window, div,
+    prelude::FluentBuilder, px, relative,
 };
 
 pub fn progress(value: f32) -> Progress {

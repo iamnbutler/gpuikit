@@ -26,12 +26,12 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    accesskit, App, Bounds, CursorStyle, DispatchPhase, Element, ElementId, GlobalElementId,
-    Hitbox, HitboxBehavior, IntoElement, LayoutId, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    Pixels, Role, SharedString, StyledText, TextLayout, Window,
+    App, Bounds, CursorStyle, DispatchPhase, Element, ElementId, GlobalElementId, Hitbox,
+    HitboxBehavior, IntoElement, LayoutId, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels,
+    Role, SharedString, StyledText, TextLayout, Window, accesskit,
 };
 
-use super::selection::{word_range_at, MarkdownSelection, SelectionPosition};
+use super::selection::{MarkdownSelection, SelectionPosition, word_range_at};
 
 /// One run's layout and text, registered into the document's selection state
 /// for the current frame.

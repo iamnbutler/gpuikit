@@ -27,8 +27,8 @@
 
 use crate::theme::{ActiveTheme, Themeable};
 use gpui::{
-    div, rems, App, FontWeight, IntoElement, ParentElement, RenderOnce, SharedString, Styled,
-    Window,
+    App, FontWeight, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
+    rems,
 };
 
 /// The typescale ratio (minor third).

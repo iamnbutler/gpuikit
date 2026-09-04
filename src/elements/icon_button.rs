@@ -4,9 +4,9 @@ use crate::traits::{
     selectable::Selectable,
 };
 use gpui::{
-    prelude::FluentBuilder, AnyView, App, ClickEvent, Context, ElementId, Entity,
-    InteractiveElement, IntoElement, MouseButton, ParentElement, Rems, RenderOnce,
-    StatefulInteractiveElement, Styled, Svg, Window,
+    AnyView, App, ClickEvent, Context, ElementId, Entity, InteractiveElement, IntoElement,
+    MouseButton, ParentElement, Rems, RenderOnce, StatefulInteractiveElement, Styled, Svg, Window,
+    prelude::FluentBuilder,
 };
 
 pub fn icon_button(id: impl Into<ElementId>, icon: Svg) -> IconButton {

@@ -108,9 +108,13 @@ pulldown-cmark = { version = "0.13.4", default-features = false, features = ["si
 # half-written `**bold` does not flash as literal asterisks (optional)
 mdstitch = { version = "0.1", optional = true }
 
-# Editor dependencies (optional)
-syntect = { version = "5.3.0", optional = true }
-gpui_util = { package = "gpui-util-gpui-unofficial", version = "1.14.2", optional = true }
+# Editor dependencies (optional). syntect's default regex engine is Oniguruma,
+# a C library that does not build for wasm32-unknown-unknown; `default-fancy`
+# is the same batteries-included preset over the pure-Rust `fancy-regex`, so
+# the editor page highlights in the browser as well as natively.
+syntect = { version = "5.3.0", optional = true, default-features = false, features = [
+    "default-fancy",
+] }
 
 # Schema generation (optional)
 schemars = { version = "0.8", optional = true }
@@ -143,7 +147,7 @@ wasm-bindgen = "0.2"
 
 [features]
 default = []
-editor = ["dep:syntect", "dep:gpui_util"]
+editor = ["dep:syntect"]
 schema = ["dep:schemars"]
 # Compile Metal shaders at runtime instead of at build time (no Xcode Metal
 # toolchain required).

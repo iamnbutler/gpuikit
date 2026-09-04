@@ -61,6 +61,15 @@ All notable changes to this project will be documented in this file.
   column's minimum width and a long description made the box wider than its
   container — an alert ran under the button beside it, a toast ran past its
   own 360px column — instead of wrapping.
+- **The Editor page renders on the web.** The hosted showcase compiled the
+  example with `--features examples` but not `editor`, so the browser saw the
+  page's "built without the editor feature" fallback instead of a live buffer.
+  It could not simply be switched on: syntect's default regex engine is
+  Oniguruma, a C library that does not build for `wasm32-unknown-unknown`.
+  The dependency now uses `default-fancy`, the same batteries-included preset
+  over the pure-Rust `fancy-regex`, and the web build asks for the feature —
+  so the editor highlights in the browser as it does natively. (The unused
+  `gpui_util` dependency the `editor` feature also pulled in is dropped.)
 
 ## [0.9.0] - 2026-09-04
 

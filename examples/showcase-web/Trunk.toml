@@ -9,7 +9,9 @@
 [build]
 target = "index.html"
 example = "showcase"
-features = ["examples"]
+# `editor` too: the Editor page renders a live, syntax-highlighted buffer, and
+# syntect's `default-fancy` backend (see Cargo.toml) builds for wasm.
+features = ["examples", "editor"]
 dist = "dist"
 
 # Trunk watches the config's own directory by default, which is not where

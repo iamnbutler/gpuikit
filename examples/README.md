@@ -5,7 +5,10 @@ Two kinds of example live here, and the difference decides where new work goes.
 **`showcase.rs` covers components.** One binary, one nav, one page per element:
 what it looks like, what its variants are, what it does when you click it. If
 you want to know whether `gpuikit` has a slider and what it looks like, this is
-the only place you should have to look. It is also the hosted showcase at
+the only place you should have to look. It opens on a Home page that composes
+the parts into one board, the way an application would; the component pages
+after it show each part's variants on their own. Images the showcase draws
+live in `showcase-media/` and are compiled in — see the README there for why. It is also the hosted showcase at
 <https://nate.rip/gpuikit/>: the same file, built for the browser by
 `showcase-web/` on every push to `main`.
 

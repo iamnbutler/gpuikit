@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **The showcase opens on a Home page.** A mission-control board for a small
+  lunar freight line — crew manifest, burn planner, life support, comms,
+  docking, checklist, cargo, launch windows — built from nothing but the kit,
+  so the parts can be seen composed the way an application composes them
+  rather than one variant at a time. Every control on it has its own state,
+  and the readouts (propellant by the rocket equation, subsystems online,
+  items go) are derived from that state on each frame. It is the first entry
+  in the nav and the page a native run opens on; the URL hash still wins on
+  the web.
+- **The showcase's portraits are compiled in.** gpui's default `HttpClient`
+  is a null client, so an `img` pointed at a URL never loads — natively or on
+  the web — unless the application installs one. The Avatar page had been a
+  blank circle for that reason. Nine 96px Unsplash crops now live in
+  `examples/showcase-media/`, with their attribution, and are decoded once
+  into `Arc<Image>`s the pages share. They are not in `assets/`, which
+  rust-embed compiles into every consumer.
+
+### Fixed
+
+- **`Alert` and `Toast` wrap long descriptions.** Both laid their text out in
+  a `flex_1` column with no `min_w_0`, so the text's first line set the
+  column's minimum width and a long description made the box wider than its
+  container — an alert ran under the button beside it, a toast ran past its
+  own 360px column — instead of wrapping.
+
 ## [0.9.0] - 2026-09-04
 
 A documentation release. Almost every code example this crate published was one

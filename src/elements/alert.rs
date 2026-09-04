@@ -265,10 +265,14 @@ impl RenderOnce for Alert {
                         .child(icon.size(px(16.0)).text_color(variant_color)),
                 )
             })
-            // Content
+            // Content. A flex item's minimum width is its content's — for
+            // text, the whole first line — so without `min_w_0` a long
+            // description makes the alert wider than its container instead
+            // of wrapping.
             .child(
                 div()
                     .flex_1()
+                    .min_w_0()
                     .flex()
                     .flex_col()
                     .gap(rems(0.25))

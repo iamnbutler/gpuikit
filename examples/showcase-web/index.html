@@ -30,6 +30,12 @@
                 margin: 0;
                 height: 100%;
             }
+            /* A dark ground so nobody gets a white flash before the canvas
+               paints — or, for a browser that can't run the demo, behind the
+               fallback below. */
+            body {
+                background: #0a0a0c;
+            }
             canvas {
                 display: block;
                 width: 100%;
@@ -39,7 +45,211 @@
                 -webkit-user-select: none;
                 user-select: none;
             }
+
+            /* The fallback. gpui-web appends its <canvas> to <body> only once
+               WebGPU has booted, so its presence is the signal the live demo is
+               running — hide the fallback the moment it appears. `:has()` covers
+               modern browsers; the MutationObserver in the script covers the
+               rest. A browser too old for either is also too old for WebGPU, so
+               it never gets a canvas and correctly keeps the fallback. */
+            body:has(canvas) #gk-fallback {
+                display: none;
+            }
+            #gk-fallback {
+                position: fixed;
+                inset: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 24px;
+                font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                color: #e6e6ea;
+                line-height: 1.5;
+            }
+            #gk-fallback .card {
+                width: 100%;
+                max-width: 30rem;
+                text-align: center;
+                display: grid;
+                gap: 14px;
+                justify-items: center;
+            }
+            #gk-fallback .title {
+                font-size: 1.5rem;
+                font-weight: 650;
+                letter-spacing: -0.01em;
+            }
+            #gk-fallback .status {
+                font-size: 1rem;
+                color: #cfcfd6;
+                margin: 0;
+            }
+            #gk-fallback .hint {
+                font-size: 0.85rem;
+                color: #8a8a95;
+                margin: 0;
+            }
+            #gk-fallback .links {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px 18px;
+                justify-content: center;
+                margin-top: 4px;
+            }
+            #gk-fallback a {
+                color: #7aa2f7;
+                text-decoration: none;
+                font-size: 0.9rem;
+            }
+            #gk-fallback a:hover {
+                text-decoration: underline;
+            }
+            /* Shown only while the demo is loading (JS adds `is-loading`). */
+            #gk-fallback .spinner {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                border: 2px solid #2a2a33;
+                border-top-color: #7aa2f7;
+                animation: gk-spin 0.8s linear infinite;
+                display: none;
+            }
+            #gk-fallback.is-loading .spinner {
+                display: block;
+            }
+            @keyframes gk-spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                #gk-fallback .spinner {
+                    animation: none;
+                }
+            }
         </style>
     </head>
-    <body></body>
+    <body>
+        <!-- Visible until gpui-web's canvas takes over (see CSS above). Content
+             is set by the script below once it knows whether this browser can
+             actually run the WebGPU demo. -->
+        <div id="gk-fallback">
+            <div class="card">
+                <div class="title">gpuikit</div>
+                <div class="spinner" aria-hidden="true"></div>
+                <p class="status" role="status" aria-live="polite">Preparing the showcase…</p>
+                <p class="hint"></p>
+                <div class="links">
+                    <a href="https://github.com/iamnbutler/gpuikit">GitHub</a>
+                    <a href="https://crates.io/crates/gpuikit">crates.io</a>
+                    <a href="https://docs.rs/gpuikit">docs.rs</a>
+                </div>
+            </div>
+        </div>
+        <script>
+            (function () {
+                var root = document.getElementById("gk-fallback");
+                if (!root) return;
+                var statusEl = root.querySelector(".status");
+                var hintEl = root.querySelector(".hint");
+
+                // WebGPU has broad but not universal support; keep the guidance
+                // evergreen rather than naming version numbers that will age.
+                var WEBGPU_HINT =
+                    "The showcase renders live on the GPU with WebGPU. It works in " +
+                    "recent Chrome, Edge, Safari, and Firefox — updating your browser, " +
+                    "or opening this in a Chromium-based one, should run it.";
+
+                function show(status, hint, loading) {
+                    statusEl.textContent = status;
+                    hintEl.textContent = hint || "";
+                    root.classList.toggle("is-loading", !!loading);
+                }
+
+                // gpui-web appends its <canvas> to <body> once WebGPU is up; when
+                // it does, the demo is live and the fallback's job is done. CSS
+                // hides it too, but doing it here also lets us stop the timer.
+                var booted = false;
+                function onBooted() {
+                    if (booted) return;
+                    booted = true;
+                    root.classList.remove("is-loading");
+                    if (slowTimer) clearTimeout(slowTimer);
+                }
+                if (document.querySelector("canvas")) {
+                    onBooted();
+                } else if (window.MutationObserver) {
+                    var obs = new MutationObserver(function () {
+                        if (document.querySelector("canvas")) {
+                            onBooted();
+                            obs.disconnect();
+                        }
+                    });
+                    obs.observe(document.body, { childList: true });
+                }
+
+                // Last-resort net: if we said "loading" but no canvas ever
+                // arrives (e.g. cross-origin isolation blocked, so the wasm
+                // threads abort), soften the message instead of spinning forever.
+                var slowTimer = null;
+                function armSlowTimer() {
+                    slowTimer = setTimeout(function () {
+                        if (booted) return;
+                        show(
+                            "The live demo is taking longer than expected — it may not run in this browser.",
+                            WEBGPU_HINT,
+                            false,
+                        );
+                    }, 20000);
+                }
+
+                if (typeof WebAssembly === "undefined") {
+                    show(
+                        "This showcase runs on WebAssembly, which this browser can’t run.",
+                        "Try a current version of Chrome, Edge, Safari, or Firefox.",
+                        false,
+                    );
+                    return;
+                }
+
+                if (!navigator.gpu) {
+                    show(
+                        "This is a live WebGPU demo — and this browser doesn’t support WebGPU yet.",
+                        WEBGPU_HINT,
+                        false,
+                    );
+                    return;
+                }
+
+                // navigator.gpu can exist yet hand back no adapter (no usable
+                // GPU / driver). Confirm before promising the demo will load.
+                show("Loading the live demo…", "First load pulls a large WebAssembly bundle.", true);
+                armSlowTimer();
+                Promise.resolve()
+                    .then(function () {
+                        return navigator.gpu.requestAdapter();
+                    })
+                    .then(function (adapter) {
+                        if (!adapter && !booted) {
+                            if (slowTimer) clearTimeout(slowTimer);
+                            show(
+                                "This browser has WebGPU, but no compatible GPU adapter is available here.",
+                                WEBGPU_HINT,
+                                false,
+                            );
+                        }
+                    })
+                    .catch(function () {
+                        if (!booted) {
+                            if (slowTimer) clearTimeout(slowTimer);
+                            show(
+                                "This is a live WebGPU demo, and it couldn’t start on this browser.",
+                                WEBGPU_HINT,
+                                false,
+                            );
+                        }
+                    });
+            })();
+        </script>
+    </body>
 </html>
